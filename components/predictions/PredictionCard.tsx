@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { PredictionMarket } from "@/types/predictions";
 import { Bookmark, ShoppingCart } from "lucide-react";
 
@@ -11,7 +12,7 @@ export default function PredictionCard({ market }: PredictionCardProps) {
   const isUpDown = market.options[0]?.label === "Up" || market.options[0]?.label === "Down";
 
   return (
-    <div className="group bg-[#0b0b0e] border border-[#1c1c28] rounded-lg p-4 hover:border-[#00c076]/30 transition-all duration-300 hover:shadow-[0_0_20px_rgba(0,192,118,0.08)] flex flex-col">
+    <Link href={`/predictions/${market.id}`} className="group bg-[#0b0b0e] border border-[#1c1c28] rounded-lg p-4 hover:border-[#00c076]/30 transition-all duration-300 hover:shadow-[0_0_20px_rgba(0,192,118,0.08)] flex flex-col cursor-pointer">
       {/* Header */}
       <div className="flex items-start gap-3 mb-3">
         <div
@@ -123,6 +124,6 @@ export default function PredictionCard({ market }: PredictionCardProps) {
           </button>
         </div>
       </div>
-    </div>
+    </Link>
   );
 }
