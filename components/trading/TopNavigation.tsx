@@ -1,45 +1,53 @@
 "use client";
 
 import { Search, Bell, Settings, Globe } from "lucide-react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 const navItems = [
-  { label: "Spot", active: false },
-  { label: "Futures", active: true },
-  { label: "Lend", active: false },
-  { label: "Vault", active: false },
-  { label: "BP", active: false },
-  { label: "More", active: false, hasDropdown: true },
+  { label: "Perpetuals", href: "/trading" },
+  { label: "Predictions", href: "/predictions" },
+  { label: "Lend", href: "#" },
+  { label: "Vault", href: "#" },
+  { label: "BP", href: "#" },
+  { label: "More", href: "#", hasDropdown: true },
 ];
 
 export default function TopNavigation() {
+  const pathname = usePathname();
+
   return (
     <header className="flex items-center justify-between h-12 px-4 bg-[#0b0b0e] border-b border-[#1c1c28]">
       {/* Left: Logo + Nav */}
       <div className="flex items-center gap-1">
         {/* Backpack Logo */}
-        <div className="flex items-center gap-2 mr-4">
+        <Link href="/" className="flex items-center gap-2 mr-4">
           <div className="w-6 h-6 rounded bg-white/90 flex items-center justify-center">
             <span className="text-black text-xs font-bold">B</span>
           </div>
           <span className="text-white text-sm font-semibold tracking-wide">Backpack</span>
-        </div>
+        </Link>
 
         {/* Nav Items */}
-        {navItems.map((item) => (
-          <button
-            key={item.label}
-            className={`px-3 py-1.5 text-[13px] rounded transition-colors ${
-              item.active
-                ? "text-white bg-[#1c1c28]"
-                : "text-[#8a8a9a] hover:text-white hover:bg-[#1c1c28]/50"
-            }`}
-          >
-            {item.label}
-            {item.hasDropdown && (
-              <span className="ml-1 text-[10px]">▾</span>
-            )}
-          </button>
-        ))}
+        {navItems.map((item) => {
+          const isActive = pathname === item.href;
+          return (
+            <Link
+              key={item.label}
+              href={item.href}
+              className={`px-3 py-1.5 text-[13px] rounded transition-colors ${
+                isActive
+                  ? "text-white bg-[#1c1c28]"
+                  : "text-[#8a8a9a] hover:text-white hover:bg-[#1c1c28]/50"
+              }`}
+            >
+              {item.label}
+              {item.hasDropdown && (
+                <span className="ml-1 text-[10px]">▾</span>
+              )}
+            </Link>
+          );
+        })}
       </div>
 
       {/* Right: Actions */}

@@ -4,22 +4,31 @@ import { priceHeaderData } from "@/lib/mockData";
 import { formatPrice, formatVolume } from "@/lib/formatters";
 import { ChevronDown } from "lucide-react";
 
-export default function PriceHeader() {
+interface PriceHeaderProps {
+  onTokenPickerOpen?: () => void;
+  selectedSymbol?: string;
+}
+
+export default function PriceHeader({ onTokenPickerOpen, selectedSymbol }: PriceHeaderProps) {
   const d = priceHeaderData;
+  const displaySymbol = selectedSymbol || d.symbol;
 
   return (
     <div className="flex items-center gap-0 h-[52px] px-4 bg-[#0b0b0e] border-b border-[#1c1c28] overflow-x-auto">
       {/* Symbol + Leverage */}
-      <div className="flex items-center gap-2 mr-4 shrink-0">
+      <button
+        onClick={onTokenPickerOpen}
+        className="flex items-center gap-2 mr-4 shrink-0 hover:bg-[#1c1c28]/50 rounded px-2 py-1 -ml-2 transition-colors"
+      >
         <div className="flex items-center gap-1.5">
-          <div className="w-5 h-5 rounded-full bg-gradient-to-br from-purple-500 to-blue-500" />
-          <span className="text-white text-sm font-semibold">{d.symbol}</span>
+          <div className="w-5 h-5 rounded-full bg-linear-to-br from-purple-500 to-blue-500" />
+          <span className="text-white text-sm font-semibold">{displaySymbol}</span>
           <span className="px-1.5 py-0.5 text-[10px] font-medium text-yellow-400 bg-yellow-400/10 rounded">
             {d.leverage}
           </span>
           <ChevronDown size={14} className="text-[#8a8a9a]" />
         </div>
-      </div>
+      </button>
 
       {/* Price */}
       <div className="flex flex-col mr-5 shrink-0">

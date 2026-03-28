@@ -48,7 +48,7 @@ export default function OrderBook() {
             >
               {/* Depth bar */}
               <div
-                className="absolute right-0 top-0 bottom-0 bg-[#ff4d4f]/8"
+                className="absolute right-0 top-0 bottom-0 bg-[rgba(255,77,79,0.12)]"
                 style={{
                   width: `${(order.total / maxAskTotal) * 100}%`,
                 }}
@@ -81,7 +81,7 @@ export default function OrderBook() {
             >
               {/* Depth bar */}
               <div
-                className="absolute right-0 top-0 bottom-0 bg-[#00c076]/8"
+                className="absolute right-0 top-0 bottom-0 bg-[rgba(0,192,118,0.12)]"
                 style={{
                   width: `${(order.total / maxBidTotal) * 100}%`,
                 }}
@@ -100,14 +100,14 @@ export default function OrderBook() {
         </div>
 
         {/* Bid/Ask percentage bar */}
-        <div className="flex items-center h-5 px-2 border-t border-[#1c1c28]">
-          <div className="flex w-full h-1.5 rounded-full overflow-hidden">
-            <div className="bg-[#00c076] h-full" style={{ width: "44%" }} />
-            <div className="bg-[#ff4d4f] h-full" style={{ width: "56%" }} />
-          </div>
-          <div className="flex justify-between w-full absolute left-0 right-0 px-2">
+        <div className="relative px-2 py-1.5 border-t border-[#1c1c28]">
+          <div className="flex justify-between mb-1">
             <span className="text-[10px] text-[#00c076]">44%</span>
             <span className="text-[10px] text-[#ff4d4f]">56%</span>
+          </div>
+          <div className="flex w-full h-1 rounded-full overflow-hidden">
+            <div className="bg-[#00c076]" style={{ width: "44%" }} />
+            <div className="bg-[#ff4d4f]" style={{ width: "56%" }} />
           </div>
         </div>
       </div>

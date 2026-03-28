@@ -1,0 +1,128 @@
+"use client";
+
+import { PredictionMarket } from "@/types/predictions";
+import { Bookmark, ShoppingCart } from "lucide-react";
+
+interface PredictionCardProps {
+  market: PredictionMarket;
+}
+
+export default function PredictionCard({ market }: PredictionCardProps) {
+  const isUpDown = market.options[0]?.label === "Up" || market.options[0]?.label === "Down";
+
+  return (
+    <div className="group bg-[#0b0b0e] border border-[#1c1c28] rounded-lg p-4 hover:border-[#00c076]/30 transition-all duration-300 hover:shadow-[0_0_20px_rgba(0,192,118,0.08)] flex flex-col">
+      {/* Header */}
+      <div className="flex items-start gap-3 mb-3">
+        <div
+          className="w-8 h-8 rounded-full shrink-0 flex items-center justify-center text-white text-sm font-bold"
+          style={{ backgroundColor: market.iconColor }}
+        >
+          {market.tokenIcon}
+        </div>
+        <h3 className="text-white text-[13px] font-medium leading-snug font-mono flex-1">
+          {market.question}
+        </h3>
+      </div>
+
+      {/* Up/Down Special Layout */}
+      {isUpDown ? (
+        <div className="flex-1">
+          {/* Percentage Circle */}
+          <div className="flex items-center justify-center mb-3">
+            <div className="relative w-16 h-16">
+              <svg viewBox="0 0 36 36" className="w-16 h-16 -rotate-90">
+                <path
+                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                  fill="none"
+                  stroke="#1c1c28"
+                  strokeWidth="3"
+                />
+                <path
+                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                  fill="none"
+                  stroke="#00c076"
+                  strokeWidth="3"
+                  strokeDasharray={`${market.options[0].percentage}, 100`}
+                />
+              </svg>
+              <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <span className="text-white text-sm font-bold font-mono">
+                  {market.options[0].percentage}%
+                </span>
+                <span className="text-[#5a5a6a] text-[9px] font-mono">Up</span>
+              </div>
+            </div>
+          </div>
+          {/* Up / Down Buttons */}
+          <div className="flex gap-2">
+            <button className="flex-1 py-2 rounded text-[12px] font-medium font-mono bg-[#00c076]/15 text-[#00c076] border border-[#00c076]/20 hover:bg-[#00c076]/25 transition-colors">
+              Up
+            </button>
+            <button className="flex-1 py-2 rounded text-[12px] font-medium font-mono bg-[#ff4d4f]/15 text-[#ff4d4f] border border-[#ff4d4f]/20 hover:bg-[#ff4d4f]/25 transition-colors">
+              Down
+            </button>
+          </div>
+        </div>
+      ) : (
+        /* Options List */
+        <div className="flex-1 space-y-1.5 mb-3">
+          {market.options.map((option, i) => (
+            <div
+              key={i}
+              className="flex items-center justify-between py-1.5"
+            >
+              <div className="flex items-center gap-2">
+                <span
+                  className={`text-[12px] font-mono ${
+                    option.direction === "up" ? "text-[#00c076]" : "text-[#ff4d4f]"
+                  }`}
+                >
+                  {option.label}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-white text-[12px] font-mono">
+                  {option.percentage}%
+                </span>
+                <button className="px-2 py-0.5 text-[10px] font-mono bg-[#00c076]/15 text-[#00c076] rounded hover:bg-[#00c076]/25 transition-colors">
+                  Yes
+                </button>
+                <button className="px-2 py-0.5 text-[10px] font-mono bg-[#ff4d4f]/15 text-[#ff4d4f] rounded hover:bg-[#ff4d4f]/25 transition-colors">
+                  No
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Footer */}
+      <div className="flex items-center justify-between pt-2 border-t border-[#1c1c28] mt-auto">
+        <div className="flex items-center gap-2">
+          {market.isLive && (
+            <div className="flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#ff4d4f] animate-pulse" />
+              <span className="text-[#ff4d4f] text-[10px] font-mono font-medium">LIVE</span>
+            </div>
+          )}
+          <span className="text-[#5a5a6a] text-[10px] font-mono">{market.volume}</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <button
+            className="p-1 text-[#2a2a3a] hover:text-[#8a8a9a] transition-colors"
+            title="Buy"
+          >
+            <ShoppingCart size={12} />
+          </button>
+          <button
+            className="p-1 text-[#2a2a3a] hover:text-[#8a8a9a] transition-colors"
+            title="Bookmark"
+          >
+            <Bookmark size={12} />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
