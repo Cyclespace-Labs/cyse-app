@@ -2,13 +2,22 @@
 
 import { useEffect, useRef } from "react";
 import { createChart, ColorType, CandlestickSeries, HistogramSeries } from "lightweight-charts";
-import { candlestickData } from "@/lib/mockData";
+import { generateCandlestickDataForToken } from "@/lib/tradingData";
+import { Order, Position } from "@/types/trading";
 
-export default function CandlestickChart() {
+interface CandlestickChartProps {
+  symbol?: string;
+  orders?: Order[];
+  positions?: Position[];
+}
+
+export default function CandlestickChart({ symbol = "SOL", orders = [], positions = [] }: CandlestickChartProps) {
   const chartContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!chartContainerRef.current) return;
+
+    const tokenData = generateCandlestickDataForToken(symbol);
 
     const chart = createChart(chartContainerRef.current, {
       layout: {
@@ -57,7 +66,7 @@ export default function CandlestickChart() {
       scaleMargins: { top: 0.8, bottom: 0 },
     });
 
-    const formattedCandles = candlestickData.map((d) => ({
+    const formattedCandles = tokenData.map((d) => ({
       time: (new Date(d.time).getTime() / 1000) as unknown as string,
       open: d.open,
       high: d.high,
@@ -65,7 +74,7 @@ export default function CandlestickChart() {
       close: d.close,
     }));
 
-    const formattedVolume = candlestickData.map((d) => ({
+    const formattedVolume = tokenData.map((d) => ({
       time: (new Date(d.time).getTime() / 1000) as unknown as string,
       value: d.volume,
       color: d.close >= d.open ? "rgba(0, 192, 118, 0.3)" : "rgba(255, 77, 79, 0.3)",
@@ -73,6 +82,62 @@ export default function CandlestickChart() {
 
     candleSeries.setData(formattedCandles);
     volumeSeries.setData(formattedVolume);
+
+    // Render limit order lines
+    const openOrders = orders.filter((o) => o.status === "open");
+    for (const order of openOrders) {
+      candleSeries.createPriceLine({
+        price: order.price,
+        color: order.side === "buy" ? "#00c076" : "#ff4d4f",
+        lineWidth: 1,
+        lineStyle: 2,
+        axisLabelVisible: true,
+        title: `${order.side === "buy" ? "BUY" : "SELL"} ${order.quantity} @ ${order.price}`,
+      });
+
+      if (order.tp) {
+        candleSeries.createPriceLine({
+          price: order.tp,
+          color: "#00c076",
+          lineWidth: 1,
+          lineStyle: 3,
+          axisLabelVisible: true,
+          title: `TP ${order.tp}`,
+        });
+      }
+      if (order.sl) {
+        candleSeries.createPriceLine({
+          price: order.sl,
+          color: "#ff4d4f",
+          lineWidth: 1,
+          lineStyle: 3,
+          axisLabelVisible: true,
+          title: `SL ${order.sl}`,
+        });
+      }
+    }
+
+    // Render position entry lines
+    for (const pos of positions) {
+      candleSeries.createPriceLine({
+        price: pos.entryPrice,
+        color: pos.side === "long" ? "#00c076" : "#ff4d4f",
+        lineWidth: 2,
+        lineStyle: 0,
+        axisLabelVisible: true,
+        title: `${pos.side === "long" ? "LONG" : "SHORT"} Entry ${pos.entryPrice}`,
+      });
+
+      candleSeries.createPriceLine({
+        price: pos.liquidationPrice,
+        color: "#ff6b35",
+        lineWidth: 1,
+        lineStyle: 3,
+        axisLabelVisible: true,
+        title: `LIQ ${pos.liquidationPrice}`,
+      });
+    }
+
     chart.timeScale().fitContent();
 
     const handleResize = () => {
@@ -90,7 +155,7 @@ export default function CandlestickChart() {
       window.removeEventListener("resize", handleResize);
       chart.remove();
     };
-  }, []);
+  }, [symbol, orders, positions]);
 
   return <div ref={chartContainerRef} className="w-full h-full" />;
 }

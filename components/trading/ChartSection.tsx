@@ -10,11 +10,20 @@ import {
   RotateCcw,
   Camera,
 } from "lucide-react";
+import { Order, Position, TokenPriceData } from "@/types/trading";
+import { formatPrice } from "@/lib/formatters";
 
 const chartTabs = ["Chart", "Depth", "Margin", "Funding", "Market Info"];
 const timeframes = ["1m", "3m", "5m", "15m", "1h", "4h", "1d"];
 
-export default function ChartSection() {
+interface ChartSectionProps {
+  symbol?: string;
+  orders?: Order[];
+  positions?: Position[];
+  tokenPriceData?: TokenPriceData | null;
+}
+
+export default function ChartSection({ symbol = "SOL", orders = [], positions = [], tokenPriceData }: ChartSectionProps) {
   const [activeTab, setActiveTab] = useState("Chart");
   const [activeTimeframe, setActiveTimeframe] = useState("1m");
 
@@ -105,20 +114,28 @@ export default function ChartSection() {
 
       {/* Pair info bar */}
       <div className="flex items-center gap-2 px-3 py-1 text-[11px] text-[#5a5a6a] border-b border-[#1c1c28]">
-        <span className="text-white">SOL-PERP · 1 · Backpack</span>
+        <span className="text-white">{symbol}-PERP · 1 · Backpack</span>
         <span className="text-[#8a8a9a]">·</span>
-        <span>
-          O <span className="text-white">86.12</span> H{" "}
-          <span className="text-white">86.14</span> L{" "}
-          <span className="text-white">86.12</span> C{" "}
-          <span className="text-[#00c076]">86.13</span>
-        </span>
-        <span className="text-[#8a8a9a]">0.01 (+0.01%)</span>
+        {tokenPriceData && (
+          <>
+            <span>
+              O <span className="text-white">{formatPrice(tokenPriceData.price)}</span> H{" "}
+              <span className="text-white">{formatPrice(tokenPriceData.high24h)}</span> L{" "}
+              <span className="text-white">{formatPrice(tokenPriceData.low24h)}</span> C{" "}
+              <span className={tokenPriceData.change24h >= 0 ? "text-[#00c076]" : "text-[#ff4d4f]"}>
+                {formatPrice(tokenPriceData.price)}
+              </span>
+            </span>
+            <span className={tokenPriceData.change24h >= 0 ? "text-[#00c076]" : "text-[#ff4d4f]"}>
+              {tokenPriceData.change24h >= 0 ? "+" : ""}{formatPrice(tokenPriceData.change24h)} ({tokenPriceData.changePct24h.toFixed(2)}%)
+            </span>
+          </>
+        )}
       </div>
 
       {/* Chart */}
       <div className="flex-1 relative min-h-0">
-        <CandlestickChart />
+        <CandlestickChart symbol={symbol} orders={orders} positions={positions} />
         {/* TradingView Watermark */}
         <div className="absolute bottom-3 left-3 flex items-center gap-1.5 opacity-40">
           <div className="w-5 h-5 rounded bg-[#2962FF] flex items-center justify-center">

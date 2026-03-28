@@ -3,14 +3,16 @@
 import { priceHeaderData } from "@/lib/mockData";
 import { formatPrice, formatVolume } from "@/lib/formatters";
 import { ChevronDown } from "lucide-react";
+import { TokenPriceData } from "@/types/trading";
 
 interface PriceHeaderProps {
   onTokenPickerOpen?: () => void;
   selectedSymbol?: string;
+  tokenPriceData?: TokenPriceData | null;
 }
 
-export default function PriceHeader({ onTokenPickerOpen, selectedSymbol }: PriceHeaderProps) {
-  const d = priceHeaderData;
+export default function PriceHeader({ onTokenPickerOpen, selectedSymbol, tokenPriceData }: PriceHeaderProps) {
+  const d = tokenPriceData ?? priceHeaderData;
   const displaySymbol = selectedSymbol || d.symbol;
 
   return (

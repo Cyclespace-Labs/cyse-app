@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import TopNavigation from "@/components/trading/TopNavigation";
 import PriceHeader from "@/components/trading/PriceHeader";
 import ChartSection from "@/components/trading/ChartSection";
@@ -10,10 +10,33 @@ import BottomTabs from "@/components/trading/BottomTabs";
 import BottomTicker from "@/components/trading/BottomTicker";
 import TokenPickerDialog from "@/components/trading/TokenPickerDialog";
 import { TokenMarket } from "@/lib/tokenData";
+import { getTokenPriceData } from "@/lib/tradingData";
+import { TokenPriceData } from "@/types/trading";
+import { useTradingState } from "@/hooks/useTradingState";
 
 export default function TradingPage() {
   const [isTokenPickerOpen, setIsTokenPickerOpen] = useState(false);
   const [selectedToken, setSelectedToken] = useState<TokenMarket | null>(null);
+  const [tokenPriceData, setTokenPriceData] = useState<TokenPriceData | null>(null);
+
+  const symbol = selectedToken?.symbol || "SOL";
+
+  useEffect(() => {
+    setTokenPriceData(getTokenPriceData(symbol));
+  }, [symbol]);
+
+  const {
+    user,
+    openOrders,
+    activePositions,
+    orderPending,
+    lastNotification,
+    login,
+    logout,
+    placeOrder,
+    cancelOrder,
+    closePosition,
+  } = useTradingState(symbol);
 
   const handleTokenSelect = (token: TokenMarket) => {
     setSelectedToken(token);
@@ -27,7 +50,8 @@ export default function TradingPage() {
       {/* Price Header */}
       <PriceHeader
         onTokenPickerOpen={() => setIsTokenPickerOpen(true)}
-        selectedSymbol={selectedToken ? `${selectedToken.symbol}-PERP` : undefined}
+        selectedSymbol={`${symbol}-PERP`}
+        tokenPriceData={tokenPriceData}
       />
 
       {/* Token Picker Dialog */}
@@ -42,9 +66,20 @@ export default function TradingPage() {
         {/* Left: Chart + Bottom Tabs */}
         <div className="flex flex-col flex-1 min-w-0">
           <div className="flex-1 min-h-0">
-            <ChartSection />
+            <ChartSection
+              symbol={symbol}
+              orders={openOrders}
+              positions={activePositions}
+              tokenPriceData={tokenPriceData}
+            />
           </div>
-          <BottomTabs />
+          <BottomTabs
+            isAuthenticated={user.isAuthenticated}
+            positions={activePositions}
+            orders={openOrders}
+            onCancelOrder={cancelOrder}
+            onClosePosition={closePosition}
+          />
         </div>
 
         {/* Center: Order Book */}
@@ -54,7 +89,20 @@ export default function TradingPage() {
 
         {/* Right: Trading Panel */}
         <div className="w-[280px] shrink-0">
-          <TradingPanel />
+          <TradingPanel
+            user={user}
+            symbol={symbol}
+            tokenPriceData={tokenPriceData}
+            activePositions={activePositions}
+            openOrders={openOrders}
+            orderPending={orderPending}
+            lastNotification={lastNotification}
+            onLogin={login}
+            onLogout={logout}
+            onPlaceOrder={placeOrder}
+            onCancelOrder={cancelOrder}
+            onClosePosition={closePosition}
+          />
         </div>
       </div>
 

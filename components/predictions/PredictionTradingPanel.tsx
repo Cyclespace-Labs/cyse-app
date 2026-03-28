@@ -130,15 +130,15 @@ export default function PredictionTradingPanel({ market }: PredictionTradingPane
       {/* Amount */}
       <div className="px-4 pb-3">
         <label className="text-[#5a5a6a] text-[11px] font-mono block mb-1.5">Amount</label>
-        <div className="flex items-center bg-[#12121a] border border-[#1c1c28] rounded px-3 py-2.5">
+        <div className="flex items-center bg-[#12121a] border border-[#1c1c28] rounded px-3 py-3">
+          <span className="text-[#5a5a6a] text-lg font-mono mr-2">$</span>
           <input
             type="text"
             value={amount}
             onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ""))}
-            placeholder="0"
-            className="flex-1 bg-transparent text-white text-2xl font-mono font-bold outline-none text-right"
+            placeholder="0.00"
+            className="flex-1 bg-transparent text-white text-xl font-mono font-semibold outline-none"
           />
-          <span className="text-[#5a5a6a] text-lg font-mono ml-1">$</span>
         </div>
       </div>
 
