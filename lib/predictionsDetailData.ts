@@ -2,6 +2,9 @@ import {
   PredictionMarketDetail,
   PricePoint,
   PredictionOrderBookEntry,
+  OrderBookData,
+  OrderBookLevel,
+  OrderBookOrder,
   Comment,
   Holder,
   MarketActivity,
@@ -57,6 +60,70 @@ function generateOrderBook(
   }
 
   return entries;
+}
+
+const makerNames = ["CryptoWhale42", "DeFiDegen", "AlgoTrader", "MarketMaker_X", "SmartMoney", "RetailTrader1", "YieldFarmer", "Contrarian"];
+const timeAgo = ["1 min ago", "3 min ago", "5 min ago", "12 min ago", "25 min ago", "1 hr ago", "2 hrs ago", "4 hrs ago"];
+
+function generateOrderBookData(currentYesPrice: number): OrderBookData {
+  const centerPrice = Math.round(currentYesPrice * 10) / 10;
+  const asks: OrderBookLevel[] = [];
+  const bids: OrderBookLevel[] = [];
+
+  // Generate asks (sell side) — prices above the center, sorted descending
+  for (let i = 4; i >= 1; i--) {
+    const price = parseFloat((centerPrice + i * 0.3 + Math.random() * 0.4).toFixed(1));
+    const numOrders = 1 + Math.floor(Math.random() * 3);
+    const orders: OrderBookOrder[] = [];
+    let totalShares = 0;
+    for (let j = 0; j < numOrders; j++) {
+      const shares = parseFloat((Math.random() * 400 + 0.2).toFixed(2));
+      totalShares += shares;
+      orders.push({
+        id: `ask-${i}-${j}`,
+        price,
+        shares,
+        maker: makerNames[Math.floor(Math.random() * makerNames.length)],
+        timestamp: timeAgo[Math.floor(Math.random() * timeAgo.length)],
+      });
+    }
+    asks.push({
+      price,
+      shares: parseFloat(totalShares.toFixed(2)),
+      total: parseFloat((totalShares * price / 100).toFixed(2)),
+      orders,
+    });
+  }
+
+  // Generate bids (buy side) — prices below center, sorted descending
+  for (let i = 1; i <= 4; i++) {
+    const price = parseFloat((centerPrice - i * 0.3 - Math.random() * 0.4).toFixed(1));
+    const numOrders = 1 + Math.floor(Math.random() * 3);
+    const orders: OrderBookOrder[] = [];
+    let totalShares = 0;
+    for (let j = 0; j < numOrders; j++) {
+      const shares = parseFloat((Math.random() * 400 + 0.2).toFixed(2));
+      totalShares += shares;
+      orders.push({
+        id: `bid-${i}-${j}`,
+        price,
+        shares,
+        maker: makerNames[Math.floor(Math.random() * makerNames.length)],
+        timestamp: timeAgo[Math.floor(Math.random() * timeAgo.length)],
+      });
+    }
+    bids.push({
+      price,
+      shares: parseFloat(totalShares.toFixed(2)),
+      total: parseFloat((totalShares * price / 100).toFixed(2)),
+      orders,
+    });
+  }
+
+  const lastPrice = centerPrice;
+  const spread = parseFloat(Math.abs((asks[asks.length - 1]?.price ?? 0) - (bids[0]?.price ?? 0)).toFixed(1));
+
+  return { asks, bids, lastPrice, spread };
 }
 
 const commentPool: Comment[] = [
@@ -115,6 +182,7 @@ function buildDetail(
     relatedMarketIds: [],
     priceHistory: generatePriceHistory(baseYes, 120, 3),
     orderBook: generateOrderBook(baseYes),
+    orderBookData: generateOrderBookData(baseYes),
     comments: commentPool.slice(0, 6 + Math.floor(Math.random() * 4)),
     topHolders: holderPool.slice(0, 5 + Math.floor(Math.random() * 3)),
     recentActivity: activityPool.slice(0, 6 + Math.floor(Math.random() * 3)),

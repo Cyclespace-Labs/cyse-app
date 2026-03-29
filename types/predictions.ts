@@ -78,9 +78,32 @@ export interface MarketActivity {
   timestamp: string;
 }
 
+export interface OrderBookOrder {
+  id: string;
+  price: number;
+  shares: number;
+  maker: string;
+  timestamp: string;
+}
+
+export interface OrderBookLevel {
+  price: number;
+  shares: number;
+  total: number;
+  orders: OrderBookOrder[];
+}
+
+export interface OrderBookData {
+  asks: OrderBookLevel[];
+  bids: OrderBookLevel[];
+  lastPrice: number;
+  spread: number;
+}
+
 export interface PredictionMarketDetail extends PredictionMarket {
   priceHistory: PricePoint[];
   orderBook: PredictionOrderBookEntry[];
+  orderBookData?: OrderBookData;
   comments: Comment[];
   topHolders: Holder[];
   recentActivity: MarketActivity[];
