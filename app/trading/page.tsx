@@ -65,13 +65,19 @@ export default function TradingPage() {
       <div className="flex flex-1 min-h-0 overflow-hidden">
         {/* Left: Chart + Bottom Tabs */}
         <div className="flex flex-col flex-1 min-w-0">
-          <div className="flex-1 min-h-0">
-            <ChartSection
-              symbol={symbol}
-              orders={openOrders}
-              positions={activePositions}
-              tokenPriceData={tokenPriceData}
-            />
+          <div className="flex flex-1 min-h-0">
+            <div className="flex-1 min-h-0">
+              <ChartSection
+                symbol={symbol}
+                orders={openOrders}
+                positions={activePositions}
+                tokenPriceData={tokenPriceData}
+              />
+            </div>
+            {/* Center: Order Book */}
+            <div className="w-[260px] shrink-0">
+              <OrderBook />
+            </div>
           </div>
           <BottomTabs
             isAuthenticated={user.isAuthenticated}
@@ -82,10 +88,6 @@ export default function TradingPage() {
           />
         </div>
 
-        {/* Center: Order Book */}
-        <div className="w-[260px] shrink-0">
-          <OrderBook />
-        </div>
 
         {/* Right: Trading Panel */}
         <div className="w-[280px] shrink-0">

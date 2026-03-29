@@ -69,19 +69,26 @@ export default function TokenPickerDialog({
   return (
     <div
       ref={backdropRef}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm"
+      style={{ background: "rgba(12,15,20,0.85)" }}
       onClick={(e) => {
         if (e.target === backdropRef.current) onClose();
       }}
     >
-      <div className="w-[580px] max-h-[80vh] bg-[#0b0b0e] border border-[#1c1c28] rounded-lg flex flex-col shadow-2xl shadow-black/50 animate-dialog-in">
+      <div
+        className="w-[580px] max-h-[80vh] rounded-lg flex flex-col animate-dialog-in surface-float"
+        style={{ background: "var(--surface-container-low)", border: "1px solid rgba(66,70,84,0.4)" }}
+      >
         {/* Header */}
         <div className="flex items-center justify-between px-4 pt-4 pb-2">
-          <h2 className="text-white text-sm font-semibold">Select Market</h2>
+          <h2 className="text-sm font-semibold" style={{ color: "var(--on-surface)" }}>Select Market</h2>
           <button
             onClick={onClose}
-            className="p-1 text-[#5a5a6a] hover:text-white transition-colors rounded hover:bg-[#1c1c28]"
+            className="p-1 rounded transition-colors"
+            style={{ color: "var(--on-surface-disabled)" }}
             title="Close"
+            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = "var(--on-surface)"; (e.currentTarget as HTMLElement).style.background = "var(--surface-container-high)"; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = "var(--on-surface-disabled)"; (e.currentTarget as HTMLElement).style.background = "transparent"; }}
           >
             <X size={16} />
           </button>
@@ -89,15 +96,19 @@ export default function TokenPickerDialog({
 
         {/* Search */}
         <div className="px-4 pb-2">
-          <div className="flex items-center gap-2 bg-[#12121a] border border-[#1c1c28] rounded-lg px-3 py-2">
-            <Search size={14} className="text-[#5a5a6a] shrink-0" />
+          <div
+            className="flex items-center gap-2 rounded-lg px-3 py-2"
+            style={{ background: "var(--surface-container)", borderBottom: "2px solid var(--outline-variant)" }}
+          >
+            <Search size={14} className="shrink-0" style={{ color: "var(--on-surface-disabled)" }} />
             <input
               ref={searchRef}
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search markets"
-              className="flex-1 bg-transparent text-white text-[13px] outline-none placeholder:text-[#5a5a6a]"
+              className="flex-1 bg-transparent text-[13px] outline-none"
+              style={{ color: "var(--on-surface)" }}
             />
           </div>
         </div>
@@ -108,11 +119,11 @@ export default function TokenPickerDialog({
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`px-3 py-1.5 text-[11px] rounded transition-colors ${
-                activeTab === tab
-                  ? "text-white bg-[#1c1c28]"
-                  : "text-[#5a5a6a] hover:text-[#8a8a9a]"
-              }`}
+              className="px-3 py-1.5 text-[11px] rounded transition-colors"
+              style={{
+                color: activeTab === tab ? "var(--on-surface)" : "var(--on-surface-disabled)",
+                background: activeTab === tab ? "var(--surface-container-high)" : "transparent",
+              }}
             >
               {tab}
             </button>
@@ -120,22 +131,28 @@ export default function TokenPickerDialog({
         </div>
 
         {/* Column Headers */}
-        <div className="grid grid-cols-[1fr_100px_80px_50px] gap-2 px-4 py-1.5 border-b border-[#1c1c28] text-[10px] text-[#5a5a6a]">
+        <div
+          className="grid grid-cols-[1fr_100px_80px_50px] gap-2 px-4 py-1.5 text-[10px]"
+          style={{ borderBottom: "1px solid rgba(66,70,84,0.4)", color: "var(--on-surface-disabled)" }}
+        >
           <button
             onClick={() => setSortBy("volume")}
-            className={`text-left hover:text-[#8a8a9a] ${sortBy === "volume" ? "text-[#8a8a9a]" : ""}`}
+            className="text-left transition-colors"
+            style={{ color: sortBy === "volume" ? "var(--on-surface-variant)" : "var(--on-surface-disabled)" }}
           >
             Market / Volume ↓
           </button>
           <button
             onClick={() => setSortBy("price")}
-            className={`text-right hover:text-[#8a8a9a] ${sortBy === "price" ? "text-[#8a8a9a]" : ""}`}
+            className="text-right transition-colors"
+            style={{ color: sortBy === "price" ? "var(--on-surface-variant)" : "var(--on-surface-disabled)" }}
           >
             Price / Change
           </button>
           <button
             onClick={() => setSortBy("marketCap")}
-            className={`text-right hover:text-[#8a8a9a] ${sortBy === "marketCap" ? "text-[#8a8a9a]" : ""}`}
+            className="text-right transition-colors"
+            style={{ color: sortBy === "marketCap" ? "var(--on-surface-variant)" : "var(--on-surface-disabled)" }}
           >
             Market Cap
           </button>
@@ -151,7 +168,9 @@ export default function TokenPickerDialog({
                 onSelect(token);
                 onClose();
               }}
-              className="w-full grid grid-cols-[1fr_100px_80px_50px] gap-2 items-center px-4 py-2.5 hover:bg-[#1c1c28]/60 transition-colors text-left group"
+              className="w-full grid grid-cols-[1fr_100px_80px_50px] gap-2 items-center px-4 py-2.5 transition-colors text-left group"
+              onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = "var(--surface-container)")}
+              onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = "transparent")}
             >
               {/* Token info */}
               <div className="flex items-center gap-2.5 min-w-0">
@@ -164,24 +183,28 @@ export default function TokenPickerDialog({
                 </div>
                 <div className="flex flex-col min-w-0">
                   <div className="flex items-center gap-1.5">
-                    <span className="text-white text-[13px] font-medium truncate">
+                    <span className="text-[13px] font-medium truncate" style={{ color: "var(--on-surface)" }}>
                       {token.pair}
                     </span>
                     {token.leverage && (
-                      <span className="px-1 py-0.5 text-[9px] font-medium text-yellow-400 bg-yellow-400/10 rounded shrink-0">
+                      <span
+                        className="px-1 py-0.5 text-[9px] font-semibold rounded shrink-0"
+                        style={{ color: "var(--tertiary)", background: "rgba(255,182,143,0.1)" }}
+                      >
                         {token.leverage}
                       </span>
                     )}
                     {token.tags?.map((tag) => (
                       <span
                         key={tag}
-                        className="px-1 py-0.5 text-[9px] font-medium text-[#00c076] bg-[#00c076]/10 rounded shrink-0"
+                        className="px-1 py-0.5 text-[9px] font-semibold rounded shrink-0"
+                        style={{ color: "var(--buy)", background: "rgba(0,192,118,0.1)" }}
                       >
                         {tag}
                       </span>
                     ))}
                   </div>
-                  <span className="text-[#5a5a6a] text-[10px]">
+                  <span className="text-[10px]" style={{ color: "var(--on-surface-disabled)" }}>
                     ${formatVolume(token.volume24h)}
                   </span>
                 </div>
@@ -189,13 +212,12 @@ export default function TokenPickerDialog({
 
               {/* Price / Change */}
               <div className="flex flex-col items-end">
-                <span className="text-white text-[12px] font-mono">
+                <span className="text-[12px] font-mono" style={{ color: "var(--on-surface)" }}>
                   {formatPrice(token.price)}
                 </span>
                 <span
-                  className={`text-[11px] font-mono ${
-                    token.change24h >= 0 ? "text-[#00c076]" : "text-[#ff4d4f]"
-                  }`}
+                  className="text-[11px] font-mono"
+                  style={{ color: token.change24h >= 0 ? "var(--buy)" : "var(--sell)" }}
                 >
                   {token.change24h >= 0 ? "+" : ""}
                   {token.change24h.toFixed(2)}%
@@ -204,7 +226,7 @@ export default function TokenPickerDialog({
 
               {/* Market Cap */}
               <div className="text-right">
-                <span className="text-[#8a8a9a] text-[11px] font-mono">
+                <span className="text-[11px] font-mono" style={{ color: "var(--on-surface-muted)" }}>
                   ${formatVolume(token.marketCap)}
                 </span>
               </div>
@@ -213,18 +235,18 @@ export default function TokenPickerDialog({
               <div className="flex justify-end">
                 <Star
                   size={14}
-                  className={`transition-colors ${
-                    token.isFavorite
-                      ? "text-yellow-400 fill-yellow-400"
-                      : "text-[#2a2a3a] group-hover:text-[#5a5a6a]"
-                  }`}
+                  className="transition-colors"
+                  style={{
+                    color: token.isFavorite ? "var(--tertiary)" : "var(--outline-variant)",
+                    fill: token.isFavorite ? "var(--tertiary)" : "none",
+                  }}
                 />
               </div>
             </button>
           ))}
 
           {sorted.length === 0 && (
-            <div className="flex items-center justify-center py-12 text-[#5a5a6a] text-[13px]">
+            <div className="flex items-center justify-center py-12 text-[13px]" style={{ color: "var(--on-surface-disabled)" }}>
               No markets found
             </div>
           )}

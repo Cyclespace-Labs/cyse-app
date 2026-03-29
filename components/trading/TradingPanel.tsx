@@ -126,67 +126,67 @@ export default function TradingPanel({
   };
 
   return (
-    <div className="flex flex-col h-full bg-[#0b0b0e] text-white">
+    <div className="flex flex-col h-full" style={{ background: "var(--surface-container-lowest)", color: "var(--on-surface)" }}>
       {/* Notification */}
       {lastNotification && (
         <div
-          className={`px-3 py-2 text-[11px] font-mono ${
-            lastNotification.type === "success"
-              ? "bg-[#00c076]/10 text-[#00c076]"
-              : "bg-[#ff4d4f]/10 text-[#ff4d4f]"
-          }`}
+          className="px-3 py-2 text-[11px] font-mono"
+          style={{
+            background: lastNotification.type === "success" ? "rgba(0,192,118,0.1)" : "rgba(255,77,79,0.1)",
+            color: lastNotification.type === "success" ? "var(--buy)" : "var(--sell)",
+          }}
         >
           {lastNotification.message}
         </div>
       )}
 
       {/* Buy/Sell Toggle */}
-      <div className="flex border-b border-[#1c1c28]">
+      <div className="flex" style={{ borderBottom: "1px solid rgba(66,70,84,0.4)" }}>
         <button
           onClick={() => setSide("buy")}
-          className={`flex-1 py-2.5 text-[13px] font-medium transition-colors ${
-            side === "buy"
-              ? "text-[#00c076] border-b-2 border-[#00c076]"
-              : "text-[#5a5a6a] hover:text-[#8a8a9a]"
-          }`}
+          className="flex-1 py-2.5 text-[13px] font-semibold transition-colors"
+          style={{
+            color: side === "buy" ? "var(--buy)" : "var(--on-surface-disabled)",
+            borderBottom: side === "buy" ? "2px solid var(--buy)" : "2px solid transparent",
+          }}
         >
           Buy / Long
         </button>
         <button
           onClick={() => setSide("sell")}
-          className={`flex-1 py-2.5 text-[13px] font-medium transition-colors ${
-            side === "sell"
-              ? "text-[#ff4d4f] border-b-2 border-[#ff4d4f]"
-              : "text-[#5a5a6a] hover:text-[#8a8a9a]"
-          }`}
+          className="flex-1 py-2.5 text-[13px] font-semibold transition-colors"
+          style={{
+            color: side === "sell" ? "var(--sell)" : "var(--on-surface-disabled)",
+            borderBottom: side === "sell" ? "2px solid var(--sell)" : "2px solid transparent",
+          }}
         >
           Sell / Short
         </button>
       </div>
 
       {/* Order Type Tabs */}
-      <div className="flex items-center gap-1 px-3 py-2 border-b border-[#1c1c28]">
+      <div className="flex items-center gap-1 px-3 py-2" style={{ borderBottom: "1px solid rgba(66,70,84,0.4)" }}>
         {orderTypes.map((type) => (
           <button
             key={type}
             onClick={() => setActiveType(type)}
-            className={`px-2.5 py-1 text-[11px] rounded transition-colors ${
-              activeType === type
-                ? "text-white bg-[#1c1c28]"
-                : "text-[#5a5a6a] hover:text-[#8a8a9a]"
-            }`}
+            className="px-2.5 py-1 text-[11px] rounded transition-colors"
+            style={{
+              color: activeType === type ? "var(--on-surface)" : "var(--on-surface-disabled)",
+              background: activeType === type ? "var(--surface-container-high)" : "transparent",
+            }}
           >
             {type}
           </button>
         ))}
-        <ChevronDown size={12} className="text-[#5a5a6a] ml-auto" />
+        <ChevronDown size={12} className="ml-auto" style={{ color: "var(--on-surface-disabled)" }} />
       </div>
 
       <div className="flex-1 overflow-y-auto px-3 py-3 space-y-3 scrollbar-hide">
         {/* Available Equity */}
         <div className="flex items-center justify-between text-[11px]">
-          <span className="text-[#5a5a6a]">Available Equity</span>
-          <span className="text-white">
+          <span style={{ color: "var(--on-surface-disabled)" }}>Available Equity</span>
+          <span style={{ color: "var(--on-surface)" }}>
             {user.isAuthenticated ? `$${user.balance.toLocaleString("en-US", { minimumFractionDigits: 2 })}` : "$0.00"}
           </span>
         </div>
@@ -195,41 +195,54 @@ export default function TradingPanel({
         {activeType !== "Market" && (
           <div>
             <div className="flex items-center justify-between mb-1">
-              <label htmlFor="price-input" className="text-[11px] text-[#5a5a6a]">Price</label>
+              <label htmlFor="price-input" className="text-[11px]" style={{ color: "var(--on-surface-disabled)" }}>Price</label>
               <div className="flex items-center gap-1">
                 <button
                   onClick={handleMid}
-                  className="px-1.5 py-0.5 text-[10px] rounded text-[#5a5a6a] hover:text-white hover:bg-[#1c1c28] transition-colors"
+                  className="px-1.5 py-0.5 text-[10px] rounded transition-colors"
+                  style={{ color: "var(--on-surface-muted)", background: "transparent" }}
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = "var(--on-surface)"; (e.currentTarget as HTMLElement).style.background = "var(--surface-container-high)"; }}
+                  onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = "var(--on-surface-muted)"; (e.currentTarget as HTMLElement).style.background = "transparent"; }}
                 >
                   Mid
                 </button>
                 <button
                   onClick={handleBBO}
-                  className="px-1.5 py-0.5 text-[10px] rounded text-yellow-400 bg-yellow-400/10 hover:bg-yellow-400/20 transition-colors"
+                  className="px-1.5 py-0.5 text-[10px] rounded transition-colors"
+                  style={{ color: "var(--tertiary)", background: "rgba(255,182,143,0.1)" }}
+                  onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = "rgba(255,182,143,0.2)")}
+                  onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = "rgba(255,182,143,0.1)")}
                 >
                   BBO
                 </button>
               </div>
             </div>
-            <div className="flex items-center bg-[#12121a] border border-[#1c1c28] rounded px-3 py-2">
+            <div className="flex items-center rounded px-3 py-2" style={{ background: "var(--surface-container-low)", borderBottom: "2px solid var(--outline-variant)" }}>
               <input
                 id="price-input"
                 type="text"
                 value={price}
                 onChange={(e) => setPrice(e.target.value)}
                 placeholder={String(currentPrice)}
-                className="flex-1 bg-transparent text-white text-sm outline-none font-mono"
+                className="flex-1 bg-transparent text-sm outline-none font-mono"
+                style={{ color: "var(--on-surface)" }}
               />
               <div className="flex items-center gap-1">
                 <button
                   onClick={handleTickDown}
-                  className="w-5 h-5 flex items-center justify-center text-[#5a5a6a] hover:text-white bg-[#1c1c28] rounded text-xs"
+                  className="w-5 h-5 flex items-center justify-center rounded text-xs transition-colors"
+                  style={{ color: "var(--on-surface-muted)", background: "var(--surface-container-high)" }}
+                  onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.color = "var(--on-surface)")}
+                  onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.color = "var(--on-surface-muted)")}
                 >
                   −
                 </button>
                 <button
                   onClick={handleTickUp}
-                  className="w-5 h-5 flex items-center justify-center text-[#5a5a6a] hover:text-white bg-[#1c1c28] rounded text-xs"
+                  className="w-5 h-5 flex items-center justify-center rounded text-xs transition-colors"
+                  style={{ color: "var(--on-surface-muted)", background: "var(--surface-container-high)" }}
+                  onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.color = "var(--on-surface)")}
+                  onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.color = "var(--on-surface-muted)")}
                 >
                   +
                 </button>
@@ -240,17 +253,18 @@ export default function TradingPanel({
 
         {/* Quantity Input */}
         <div>
-          <label htmlFor="qty-input" className="text-[11px] text-[#5a5a6a] mb-1 block">Quantity</label>
-          <div className="flex items-center bg-[#12121a] border border-[#1c1c28] rounded px-3 py-2">
+          <label htmlFor="qty-input" className="text-[11px] mb-1 block" style={{ color: "var(--on-surface-disabled)" }}>Quantity</label>
+          <div className="flex items-center rounded px-3 py-2" style={{ background: "var(--surface-container-low)", borderBottom: "2px solid var(--outline-variant)" }}>
             <input
               id="qty-input"
               type="text"
               value={quantity}
               onChange={(e) => setQuantity(e.target.value)}
               placeholder="0"
-              className="flex-1 bg-transparent text-white text-sm outline-none font-mono"
+              className="flex-1 bg-transparent text-sm outline-none font-mono"
+              style={{ color: "var(--on-surface)" }}
             />
-            <span className="text-[#5a5a6a] text-[11px] ml-2">{symbol}</span>
+            <span className="text-[11px] ml-2" style={{ color: "var(--on-surface-disabled)" }}>{symbol}</span>
           </div>
           {/* Percentage buttons */}
           {user.isAuthenticated && (
@@ -259,7 +273,10 @@ export default function TradingPanel({
                 <button
                   key={pct}
                   onClick={() => handlePctQuantity(pct)}
-                  className="flex-1 py-1 text-[10px] font-mono bg-[#1c1c28] text-[#5a5a6a] rounded hover:bg-[#2a2a3a] hover:text-white transition-colors"
+                  className="flex-1 py-1 text-[10px] font-mono rounded transition-colors"
+                  style={{ background: "var(--surface-container-high)", color: "var(--on-surface-muted)" }}
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "var(--surface-bright)"; (e.currentTarget as HTMLElement).style.color = "var(--on-surface)"; }}
+                  onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "var(--surface-container-high)"; (e.currentTarget as HTMLElement).style.color = "var(--on-surface-muted)"; }}
                 >
                   {pct}%
                 </button>
@@ -271,8 +288,8 @@ export default function TradingPanel({
         {/* Leverage Slider */}
         <div>
           <div className="flex items-center justify-between mb-1">
-            <label htmlFor="leverage-slider" className="text-[11px] text-[#5a5a6a]">Leverage</label>
-            <span className="text-[11px] text-white font-mono">{leverage}x</span>
+            <label htmlFor="leverage-slider" className="text-[11px]" style={{ color: "var(--on-surface-disabled)" }}>Leverage</label>
+            <span className="text-[11px] font-mono" style={{ color: "var(--on-surface)" }}>{leverage}x</span>
           </div>
           <input
             id="leverage-slider"
@@ -281,16 +298,15 @@ export default function TradingPanel({
             max={50}
             value={leverage}
             onChange={(e) => setLeverage(Number(e.target.value))}
-            className="w-full h-1 bg-[#1c1c28] rounded-full appearance-none cursor-pointer accent-[#00c076]"
+            className="w-full h-1 rounded-full appearance-none cursor-pointer"
           />
           <div className="flex justify-between mt-1">
             {[1, 5, 10, 20, 50].map((l) => (
               <button
                 key={l}
                 onClick={() => setLeverage(l)}
-                className={`text-[10px] font-mono transition-colors ${
-                  leverage === l ? "text-white" : "text-[#5a5a6a] hover:text-[#8a8a9a]"
-                }`}
+                className="text-[10px] font-mono transition-colors"
+                style={{ color: leverage === l ? "var(--on-surface)" : "var(--on-surface-disabled)" }}
               >
                 {l}x
               </button>
@@ -300,9 +316,9 @@ export default function TradingPanel({
 
         {/* Order Value */}
         <div>
-          <span className="text-[11px] text-[#5a5a6a] mb-1 block">Order Value</span>
-          <div className="flex items-center bg-[#12121a] border border-[#1c1c28] rounded px-3 py-2">
-            <span className="text-white text-sm font-mono">
+          <span className="text-[11px] mb-1 block" style={{ color: "var(--on-surface-disabled)" }}>Order Value</span>
+          <div className="flex items-center rounded px-3 py-2" style={{ background: "var(--surface-container-low)" }}>
+            <span className="text-sm font-mono" style={{ color: "var(--on-surface)" }}>
               {orderValue > 0 ? `$${orderValue.toLocaleString("en-US", { minimumFractionDigits: 2 })}` : "—"}
             </span>
           </div>
@@ -311,14 +327,14 @@ export default function TradingPanel({
         {/* Margin Required & Est. Liquidation */}
         <div className="space-y-1.5">
           <div className="flex items-center justify-between text-[11px]">
-            <span className="text-[#5a5a6a]">Margin Required</span>
-            <span className={insufficientBalance ? "text-[#ff4d4f]" : "text-white"}>
+            <span style={{ color: "var(--on-surface-disabled)" }}>Margin Required</span>
+            <span style={{ color: insufficientBalance ? "var(--sell)" : "var(--on-surface)" }}>
               {marginRequired > 0 ? `$${marginRequired.toLocaleString("en-US", { minimumFractionDigits: 2 })}` : "—"}
             </span>
           </div>
           <div className="flex items-center justify-between text-[11px]">
-            <span className="text-[#5a5a6a]">Est. Liquidation Price</span>
-            <span className="text-white">{estLiquidation !== null ? estLiquidation : "—"}</span>
+            <span style={{ color: "var(--on-surface-disabled)" }}>Est. Liquidation Price</span>
+            <span style={{ color: "var(--on-surface)" }}>{estLiquidation !== null ? estLiquidation : "—"}</span>
           </div>
         </div>
 
@@ -330,34 +346,36 @@ export default function TradingPanel({
             onChange={(e) => setTpsl(e.target.checked)}
             className="w-3 h-3 rounded border-[#2a2a3a] bg-[#12121a] accent-[#00c076]"
           />
-          <span className="text-[11px] text-[#8a8a9a]">TP/SL</span>
+          <span className="text-[11px]" style={{ color: "var(--on-surface-variant)" }}>TP/SL</span>
         </label>
 
         {tpsl && (
           <div className="space-y-2">
             <div>
-              <label htmlFor="tp-input" className="text-[10px] text-[#00c076] mb-1 block">Take Profit</label>
-              <div className="flex items-center bg-[#12121a] border border-[#1c1c28] rounded px-3 py-1.5">
+              <label htmlFor="tp-input" className="text-[10px] mb-1 block" style={{ color: "var(--buy)" }}>Take Profit</label>
+              <div className="flex items-center rounded px-3 py-1.5" style={{ background: "var(--surface-container-low)", borderBottom: "2px solid var(--outline-variant)" }}>
                 <input
                   id="tp-input"
                   type="text"
                   value={tpPrice}
                   onChange={(e) => setTpPrice(e.target.value)}
                   placeholder="TP Price"
-                  className="flex-1 bg-transparent text-white text-sm outline-none font-mono"
+                  className="flex-1 bg-transparent text-sm outline-none font-mono"
+                  style={{ color: "var(--on-surface)" }}
                 />
               </div>
             </div>
             <div>
-              <label htmlFor="sl-input" className="text-[10px] text-[#ff4d4f] mb-1 block">Stop Loss</label>
-              <div className="flex items-center bg-[#12121a] border border-[#1c1c28] rounded px-3 py-1.5">
+              <label htmlFor="sl-input" className="text-[10px] mb-1 block" style={{ color: "var(--sell)" }}>Stop Loss</label>
+              <div className="flex items-center rounded px-3 py-1.5" style={{ background: "var(--surface-container-low)", borderBottom: "2px solid var(--outline-variant)" }}>
                 <input
                   id="sl-input"
                   type="text"
                   value={slPrice}
                   onChange={(e) => setSlPrice(e.target.value)}
                   placeholder="SL Price"
-                  className="flex-1 bg-transparent text-white text-sm outline-none font-mono"
+                  className="flex-1 bg-transparent text-sm outline-none font-mono"
+                  style={{ color: "var(--on-surface)" }}
                 />
               </div>
             </div>
@@ -369,13 +387,16 @@ export default function TradingPanel({
           <div className="space-y-2 pt-1">
             <button
               onClick={onLogin}
-              className="w-full py-2.5 bg-white text-black text-[13px] font-medium rounded hover:bg-gray-200 transition-colors"
+              className="w-full py-2.5 text-[13px] font-semibold rounded btn-primary-gradient"
             >
               Sign up to trade
             </button>
             <button
               onClick={onLogin}
-              className="w-full py-2.5 border border-[#2a2a3a] text-white text-[13px] rounded hover:bg-[#1c1c28] transition-colors"
+              className="w-full py-2.5 text-[13px] rounded transition-colors"
+              style={{ background: "var(--surface-container-high)", color: "var(--on-surface-variant)" }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "var(--surface-bright)"; (e.currentTarget as HTMLElement).style.color = "var(--on-surface)"; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "var(--surface-container-high)"; (e.currentTarget as HTMLElement).style.color = "var(--on-surface-variant)"; }}
             >
               Log in to trade
             </button>
@@ -385,13 +406,23 @@ export default function TradingPanel({
             <button
               onClick={handlePlaceOrder}
               disabled={orderPending || insufficientBalance || qtyNum <= 0}
-              className={`w-full py-2.5 text-[13px] font-medium rounded transition-colors flex items-center justify-center gap-2 ${
-                orderPending || insufficientBalance || qtyNum <= 0
-                  ? "bg-[#1c1c28] text-[#5a5a6a] cursor-not-allowed"
-                  : side === "buy"
-                  ? "bg-[#00c076] text-black hover:bg-[#00d884]"
-                  : "bg-[#ff4d4f] text-white hover:bg-[#ff6b6d]"
-              }`}
+              className="w-full py-2.5 text-[13px] font-semibold rounded transition-colors flex items-center justify-center gap-2"
+            style={{
+              background: orderPending || insufficientBalance || qtyNum <= 0
+                ? "var(--surface-container-high)"
+                : side === "buy"
+                ? "linear-gradient(135deg, var(--buy) 0%, var(--buy-bright) 100%)"
+                : "linear-gradient(135deg, var(--sell) 0%, var(--sell-bright) 100%)",
+              color: orderPending || insufficientBalance || qtyNum <= 0
+                ? "var(--on-surface-disabled)"
+                : side === "buy" ? "#000" : "var(--on-primary)",
+              cursor: orderPending || insufficientBalance || qtyNum <= 0 ? "not-allowed" : "pointer",
+              boxShadow: orderPending || insufficientBalance || qtyNum <= 0
+                ? "none"
+                : side === "buy"
+                ? "0 0 16px 2px rgba(0,192,118,0.25)"
+                : "0 0 16px 2px rgba(255,77,79,0.25)",
+            }}
             >
               {orderPending ? (
                 <>
@@ -409,66 +440,54 @@ export default function TradingPanel({
 
         {/* Order Options */}
         {user.isAuthenticated && (
-          <div className="flex items-center gap-3 pt-1 border-t border-[#1c1c28]">
+          <div className="flex items-center gap-3 pt-1" style={{ borderTop: "1px solid rgba(66,70,84,0.4)" }}>
             <label className="flex items-center gap-1.5 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={postOnly}
-                onChange={(e) => setPostOnly(e.target.checked)}
-                className="w-3 h-3 rounded border-[#2a2a3a] bg-[#12121a] accent-[#00c076]"
-              />
-              <span className="text-[11px] text-[#8a8a9a]">Post Only</span>
+              <input type="checkbox" checked={postOnly} onChange={(e) => setPostOnly(e.target.checked)} />
+              <span className="text-[11px]" style={{ color: "var(--on-surface-variant)" }}>Post Only</span>
             </label>
             <label className="flex items-center gap-1.5 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={ioc}
-                onChange={(e) => setIoc(e.target.checked)}
-                className="w-3 h-3 rounded border-[#2a2a3a] bg-[#12121a] accent-[#00c076]"
-              />
-              <span className="text-[11px] text-[#8a8a9a]">IOC</span>
+              <input type="checkbox" checked={ioc} onChange={(e) => setIoc(e.target.checked)} />
+              <span className="text-[11px]" style={{ color: "var(--on-surface-variant)" }}>IOC</span>
             </label>
             <label className="flex items-center gap-1.5 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={reduceOnly}
-                onChange={(e) => setReduceOnly(e.target.checked)}
-                className="w-3 h-3 rounded border-[#2a2a3a] bg-[#12121a] accent-[#00c076]"
-              />
-              <span className="text-[11px] text-[#8a8a9a]">Reduce Only</span>
+              <input type="checkbox" checked={reduceOnly} onChange={(e) => setReduceOnly(e.target.checked)} />
+              <span className="text-[11px]" style={{ color: "var(--on-surface-variant)" }}>Reduce Only</span>
             </label>
           </div>
         )}
 
         {/* Active Positions */}
         {user.isAuthenticated && activePositions.length > 0 && (
-          <div className="pt-2 border-t border-[#1c1c28]">
-            <span className="text-[11px] text-[#5a5a6a] mb-2 block">Active Positions</span>
+          <div className="pt-2" style={{ borderTop: "1px solid rgba(66,70,84,0.4)" }}>
+            <span className="text-[11px] mb-2 block" style={{ color: "var(--on-surface-disabled)" }}>Active Positions</span>
             {activePositions.map((pos) => (
-              <div key={pos.id} className="bg-[#12121a] rounded p-2.5 mb-2 border border-[#1c1c28]">
+              <div key={pos.id} className="rounded p-2.5 mb-2" style={{ background: "var(--surface-container-low)" }}>
                 <div className="flex items-center justify-between mb-1.5">
-                  <span className={`text-[11px] font-mono font-medium ${pos.side === "long" ? "text-[#00c076]" : "text-[#ff4d4f]"}`}>
+                  <span className="text-[11px] font-mono font-medium" style={{ color: pos.side === "long" ? "var(--buy)" : "var(--sell)" }}>
                     {pos.side.toUpperCase()} {pos.quantity} {pos.symbol}
                   </span>
-                  <span className="text-[10px] text-[#5a5a6a]">{pos.leverage}x</span>
+                  <span className="text-[10px]" style={{ color: "var(--on-surface-disabled)" }}>{pos.leverage}x</span>
                 </div>
                 <div className="flex items-center justify-between text-[10px] mb-1">
-                  <span className="text-[#5a5a6a]">Entry</span>
-                  <span className="text-white font-mono">{pos.entryPrice}</span>
+                  <span style={{ color: "var(--on-surface-disabled)" }}>Entry</span>
+                  <span className="font-mono" style={{ color: "var(--on-surface)" }}>{pos.entryPrice}</span>
                 </div>
                 <div className="flex items-center justify-between text-[10px] mb-1">
-                  <span className="text-[#5a5a6a]">Liq. Price</span>
-                  <span className="text-[#ff6b35] font-mono">{pos.liquidationPrice}</span>
+                  <span style={{ color: "var(--on-surface-disabled)" }}>Liq. Price</span>
+                  <span className="font-mono" style={{ color: "var(--liquidation)" }}>{pos.liquidationPrice}</span>
                 </div>
                 <div className="flex items-center justify-between text-[10px] mb-2">
-                  <span className="text-[#5a5a6a]">Unrealized PnL</span>
-                  <span className={`font-mono ${pos.unrealizedPnl >= 0 ? "text-[#00c076]" : "text-[#ff4d4f]"}`}>
+                  <span style={{ color: "var(--on-surface-disabled)" }}>Unrealized PnL</span>
+                  <span className="font-mono" style={{ color: pos.unrealizedPnl >= 0 ? "var(--buy)" : "var(--sell)" }}>
                     {pos.unrealizedPnl >= 0 ? "+" : ""}${pos.unrealizedPnl.toFixed(2)} ({pos.unrealizedPnlPct.toFixed(2)}%)
                   </span>
                 </div>
                 <button
                   onClick={() => onClosePosition(pos.id)}
-                  className="w-full py-1.5 text-[11px] font-mono border border-[#ff4d4f]/30 text-[#ff4d4f] rounded hover:bg-[#ff4d4f]/10 transition-colors"
+                  className="w-full py-1.5 text-[11px] font-mono rounded transition-colors"
+                  style={{ border: "1px solid rgba(255,77,79,0.3)", color: "var(--sell)", background: "transparent" }}
+                  onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = "rgba(255,77,79,0.08)")}
+                  onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = "transparent")}
                 >
                   Close Position
                 </button>
@@ -479,20 +498,23 @@ export default function TradingPanel({
 
         {/* Open Orders */}
         {user.isAuthenticated && openOrders.length > 0 && (
-          <div className="pt-2 border-t border-[#1c1c28]">
-            <span className="text-[11px] text-[#5a5a6a] mb-2 block">Open Orders</span>
+          <div className="pt-2" style={{ borderTop: "1px solid rgba(66,70,84,0.4)" }}>
+            <span className="text-[11px] mb-2 block" style={{ color: "var(--on-surface-disabled)" }}>Open Orders</span>
             {openOrders.map((order) => (
-              <div key={order.id} className="flex items-center justify-between bg-[#12121a] rounded p-2 mb-1.5 border border-[#1c1c28]">
+              <div key={order.id} className="flex items-center justify-between rounded p-2 mb-1.5" style={{ background: "var(--surface-container-low)" }}>
                 <div>
-                  <span className={`text-[10px] font-mono font-medium ${order.side === "buy" ? "text-[#00c076]" : "text-[#ff4d4f]"}`}>
+                  <span className="text-[10px] font-mono font-medium" style={{ color: order.side === "buy" ? "var(--buy)" : "var(--sell)" }}>
                     {order.side.toUpperCase()} {order.quantity} @ {order.price}
                   </span>
-                  <span className="text-[9px] text-[#5a5a6a] ml-2">{order.type}</span>
+                  <span className="text-[9px] ml-2" style={{ color: "var(--on-surface-disabled)" }}>{order.type}</span>
                 </div>
                 <button
                   onClick={() => onCancelOrder(order.id)}
-                  className="p-1 text-[#5a5a6a] hover:text-[#ff4d4f] transition-colors"
+                  className="p-1 rounded transition-colors"
+                  style={{ color: "var(--on-surface-disabled)" }}
                   title="Cancel order"
+                  onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.color = "var(--sell)")}
+                  onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.color = "var(--on-surface-disabled)")}
                 >
                   <X size={12} />
                 </button>
@@ -503,10 +525,13 @@ export default function TradingPanel({
 
         {/* Logout button */}
         {user.isAuthenticated && (
-          <div className="pt-2 border-t border-[#1c1c28]">
+          <div className="pt-2" style={{ borderTop: "1px solid rgba(66,70,84,0.4)" }}>
             <button
               onClick={onLogout}
-              className="w-full py-2 text-[11px] text-[#5a5a6a] hover:text-white border border-[#1c1c28] rounded hover:bg-[#1c1c28] transition-colors"
+              className="w-full py-2 text-[11px] rounded transition-colors"
+              style={{ color: "var(--on-surface-disabled)", background: "transparent", border: "1px solid rgba(66,70,84,0.4)" }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = "var(--on-surface)"; (e.currentTarget as HTMLElement).style.background = "var(--surface-container-high)"; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = "var(--on-surface-disabled)"; (e.currentTarget as HTMLElement).style.background = "transparent"; }}
             >
               Disconnect
             </button>

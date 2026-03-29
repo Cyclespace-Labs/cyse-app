@@ -28,18 +28,18 @@ export default function ChartSection({ symbol = "SOL", orders = [], positions = 
   const [activeTimeframe, setActiveTimeframe] = useState("1m");
 
   return (
-    <div className="flex flex-col h-full bg-[#0b0b0e] border-r border-[#1c1c28]">
+    <div className="flex flex-col h-full" style={{ background: "var(--surface-container-lowest)", borderRight: "1px solid rgba(66,70,84,0.4)" }}>
       {/* Chart Tabs */}
-      <div className="flex items-center border-b border-[#1c1c28] px-2">
+      <div className="flex items-center px-2" style={{ borderBottom: "1px solid rgba(66,70,84,0.4)" }}>
         {chartTabs.map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`px-3 py-2.5 text-[12px] transition-colors ${
-              activeTab === tab
-                ? "text-white border-b-2 border-white"
-                : "text-[#5a5a6a] hover:text-[#8a8a9a]"
-            }`}
+            className="px-3 py-2.5 text-[12px] transition-colors"
+            style={{
+              color: activeTab === tab ? "var(--on-surface)" : "var(--on-surface-disabled)",
+              borderBottom: activeTab === tab ? "2px solid var(--primary)" : "2px solid transparent",
+            }}
           >
             {tab}
           </button>
@@ -50,11 +50,11 @@ export default function ChartSection({ symbol = "SOL", orders = [], positions = 
           {["Last", "Mark", "Index"].map((label) => (
             <button
               key={label}
-              className={`px-2 py-1 text-[11px] rounded ${
-                label === "Last"
-                  ? "text-white bg-[#1c1c28]"
-                  : "text-[#5a5a6a] hover:text-[#8a8a9a]"
-              }`}
+              className="px-2 py-1 text-[11px] rounded transition-colors"
+              style={{
+                color: label === "Last" ? "var(--on-surface)" : "var(--on-surface-disabled)",
+                background: label === "Last" ? "var(--surface-container-high)" : "transparent",
+              }}
             >
               {label}
             </button>
@@ -63,70 +63,70 @@ export default function ChartSection({ symbol = "SOL", orders = [], positions = 
       </div>
 
       {/* Timeframe + Tools */}
-      <div className="flex items-center gap-1 px-2 py-1.5 border-b border-[#1c1c28]">
+      <div className="flex items-center gap-1 px-2 py-1.5" style={{ borderBottom: "1px solid rgba(66,70,84,0.4)" }}>
         {timeframes.map((tf) => (
           <button
             key={tf}
             onClick={() => setActiveTimeframe(tf)}
-            className={`px-2 py-1 text-[11px] rounded transition-colors ${
-              activeTimeframe === tf
-                ? "text-white bg-[#1c1c28]"
-                : "text-[#5a5a6a] hover:text-[#8a8a9a]"
-            }`}
+            className="px-2 py-1 text-[11px] rounded transition-colors"
+            style={{
+              color: activeTimeframe === tf ? "var(--on-surface)" : "var(--on-surface-disabled)",
+              background: activeTimeframe === tf ? "var(--surface-container-high)" : "transparent",
+            }}
           >
             {tf}
           </button>
         ))}
 
-        <div className="w-px h-4 bg-[#1c1c28] mx-1" />
+        <div className="w-px h-4 mx-1" style={{ background: "rgba(66,70,84,0.4)" }} />
 
-        <button className="px-2 py-1 text-[11px] text-[#5a5a6a] hover:text-[#8a8a9a] rounded">
+        <button className="px-2 py-1 text-[11px] rounded transition-colors" style={{ color: "var(--on-surface-disabled)" }}>
           Indicators
         </button>
-        <button className="px-1.5 py-1 text-[11px] bg-yellow-500/20 text-yellow-400 rounded font-medium">
+        <button
+          className="px-1.5 py-1 text-[11px] rounded font-semibold"
+          style={{ color: "var(--tertiary)", background: "rgba(255,182,143,0.1)" }}
+        >
           OL
         </button>
-        <button className="px-1.5 py-1 text-[11px] text-[#5a5a6a] hover:text-[#8a8a9a] rounded">
+        <button className="px-1.5 py-1 text-[11px] rounded transition-colors" style={{ color: "var(--on-surface-disabled)" }}>
           TE
         </button>
 
         <div className="ml-auto flex items-center gap-0.5">
-          <button className="p-1 text-[#5a5a6a] hover:text-white" title="Crosshair">
-            <Crosshair size={14} />
-          </button>
-          <button className="p-1 text-[#5a5a6a] hover:text-white" title="Ruler">
-            <Ruler size={14} />
-          </button>
-          <button className="p-1 text-[#5a5a6a] hover:text-white" title="Text">
-            <Type size={14} />
-          </button>
-          <button className="p-1 text-[#5a5a6a] hover:text-white" title="Screenshot">
-            <Camera size={14} />
-          </button>
-          <button className="p-1 text-[#5a5a6a] hover:text-white" title="Fullscreen">
-            <Maximize2 size={14} />
-          </button>
-          <button className="px-2 py-1 text-[11px] text-[#5a5a6a] hover:text-white" title="Reset">
+          {[{ icon: <Crosshair size={14} />, title: "Crosshair" }, { icon: <Ruler size={14} />, title: "Ruler" }, { icon: <Type size={14} />, title: "Text" }, { icon: <Camera size={14} />, title: "Screenshot" }, { icon: <Maximize2 size={14} />, title: "Fullscreen" }].map(({ icon, title }) => (
+            <button
+              key={title}
+              className="p-1 rounded transition-colors"
+              style={{ color: "var(--on-surface-disabled)" }}
+              title={title}
+              onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.color = "var(--on-surface)")}
+              onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.color = "var(--on-surface-disabled)" )}
+            >
+              {icon}
+            </button>
+          ))}
+          <button className="px-2 py-1 text-[11px] rounded transition-colors" style={{ color: "var(--on-surface-disabled)" }} title="Reset">
             <RotateCcw size={14} />
           </button>
         </div>
       </div>
 
       {/* Pair info bar */}
-      <div className="flex items-center gap-2 px-3 py-1 text-[11px] text-[#5a5a6a] border-b border-[#1c1c28]">
-        <span className="text-white">{symbol}-PERP · 1 · Backpack</span>
-        <span className="text-[#8a8a9a]">·</span>
+      <div className="flex items-center gap-2 px-3 py-1 text-[11px]" style={{ color: "var(--on-surface-disabled)", borderBottom: "1px solid rgba(66,70,84,0.4)" }}>
+        <span style={{ color: "var(--on-surface)" }}>{symbol}-PERP · 1 · Backpack</span>
+        <span style={{ color: "var(--on-surface-muted)" }}>·</span>
         {tokenPriceData && (
           <>
             <span>
-              O <span className="text-white">{formatPrice(tokenPriceData.price)}</span> H{" "}
-              <span className="text-white">{formatPrice(tokenPriceData.high24h)}</span> L{" "}
-              <span className="text-white">{formatPrice(tokenPriceData.low24h)}</span> C{" "}
-              <span className={tokenPriceData.change24h >= 0 ? "text-[#00c076]" : "text-[#ff4d4f]"}>
+              O <span style={{ color: "var(--on-surface)" }}>{formatPrice(tokenPriceData.price)}</span> H{" "}
+              <span style={{ color: "var(--on-surface)" }}>{formatPrice(tokenPriceData.high24h)}</span> L{" "}
+              <span style={{ color: "var(--on-surface)" }}>{formatPrice(tokenPriceData.low24h)}</span> C{" "}
+              <span style={{ color: tokenPriceData.change24h >= 0 ? "var(--buy)" : "var(--sell)" }}>
                 {formatPrice(tokenPriceData.price)}
               </span>
             </span>
-            <span className={tokenPriceData.change24h >= 0 ? "text-[#00c076]" : "text-[#ff4d4f]"}>
+            <span style={{ color: tokenPriceData.change24h >= 0 ? "var(--buy)" : "var(--sell)" }}>
               {tokenPriceData.change24h >= 0 ? "+" : ""}{formatPrice(tokenPriceData.change24h)} ({tokenPriceData.changePct24h.toFixed(2)}%)
             </span>
           </>
@@ -138,31 +138,34 @@ export default function ChartSection({ symbol = "SOL", orders = [], positions = 
         <CandlestickChart symbol={symbol} orders={orders} positions={positions} />
         {/* TradingView Watermark */}
         <div className="absolute bottom-3 left-3 flex items-center gap-1.5 opacity-40">
-          <div className="w-5 h-5 rounded bg-[#2962FF] flex items-center justify-center">
-            <span className="text-white text-[9px] font-bold">TV</span>
+          <div className="w-5 h-5 rounded flex items-center justify-center" style={{ background: "var(--primary)" }}>
+            <span className="text-[9px] font-bold" style={{ color: "var(--on-primary)" }}>TV</span>
           </div>
         </div>
         {/* Volume SMA label */}
-        <div className="absolute bottom-16 left-3 text-[10px] text-[#5a5a6a]">
-          Volume SMA <span className="text-[#8a8a9a]">11.5K</span>
+        <div className="absolute bottom-16 left-3 text-[10px]" style={{ color: "var(--on-surface-disabled)" }}>
+          Volume SMA <span style={{ color: "var(--on-surface-muted)" }}>11.5K</span>
         </div>
       </div>
 
       {/* Timerange bar */}
-      <div className="flex items-center gap-2 px-3 py-1.5 border-t border-[#1c1c28] text-[11px]">
+      <div className="flex items-center gap-2 px-3 py-1.5 text-[11px]" style={{ borderTop: "1px solid rgba(66,70,84,0.4)" }}>
         {["All", "1y", "6m", "3m", "1m", "5d", "1d"].map((range) => (
           <button
             key={range}
-            className="text-[#5a5a6a] hover:text-white transition-colors"
+            className="transition-colors"
+            style={{ color: "var(--on-surface-disabled)" }}
+            onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.color = "var(--on-surface)")}
+            onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.color = "var(--on-surface-disabled)")}
           >
             {range}
           </button>
         ))}
-        <div className="ml-auto flex items-center gap-2 text-[#5a5a6a]">
+        <div className="ml-auto flex items-center gap-2" style={{ color: "var(--on-surface-disabled)" }}>
           <span>06:56:25 [UTC+2]</span>
-          <span className="text-[#5a5a6a]">%</span>
-          <span className="text-[#5a5a6a]">log</span>
-          <span className="text-[#5a5a6a]">auto</span>
+          <span>%</span>
+          <span>log</span>
+          <span>auto</span>
         </div>
       </div>
     </div>

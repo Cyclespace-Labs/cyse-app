@@ -39,7 +39,7 @@ export default function BottomTabs({
   const renderContent = () => {
     if (!isAuthenticated) {
       return (
-        <div className="flex items-center justify-center h-16 text-[#5a5a6a] text-[12px]">
+        <div className="flex items-center justify-center h-16 text-[12px]" style={{ color: "var(--on-surface-disabled)" }}>
           <span>Connect wallet or log in to view your {activeTab.toLowerCase()}</span>
         </div>
       );
@@ -50,7 +50,7 @@ export default function BottomTabs({
         <div className="overflow-x-auto">
           <table className="w-full text-[11px] font-mono">
             <thead>
-              <tr className="text-[#5a5a6a] border-b border-[#1c1c28]">
+              <tr style={{ color: "var(--on-surface-disabled)", borderBottom: "1px solid rgba(66,70,84,0.3)" }}>
                 <th className="text-left px-3 py-1.5 font-normal">Symbol</th>
                 <th className="text-left px-3 py-1.5 font-normal">Side</th>
                 <th className="text-right px-3 py-1.5 font-normal">Size</th>
@@ -62,21 +62,29 @@ export default function BottomTabs({
             </thead>
             <tbody>
               {positions.map((pos) => (
-                <tr key={pos.id} className="border-b border-[#1c1c28]/50 hover:bg-[#1c1c28]/30">
-                  <td className="px-3 py-1.5 text-white">{pos.symbol}</td>
-                  <td className={`px-3 py-1.5 ${pos.side === "long" ? "text-[#00c076]" : "text-[#ff4d4f]"}`}>
+                <tr
+                  key={pos.id}
+                  style={{ borderBottom: "1px solid rgba(66,70,84,0.2)" }}
+                  onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = "var(--surface-container-low)")}
+                  onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = "transparent")}
+                >
+                  <td className="px-3 py-1.5" style={{ color: "var(--on-surface)" }}>{pos.symbol}</td>
+                  <td className="px-3 py-1.5" style={{ color: pos.side === "long" ? "var(--buy)" : "var(--sell)" }}>
                     {pos.side.toUpperCase()} {pos.leverage}x
                   </td>
-                  <td className="px-3 py-1.5 text-white text-right">{pos.quantity}</td>
-                  <td className="px-3 py-1.5 text-white text-right">{pos.entryPrice}</td>
-                  <td className="px-3 py-1.5 text-[#ff6b35] text-right">{pos.liquidationPrice}</td>
-                  <td className={`px-3 py-1.5 text-right ${pos.unrealizedPnl >= 0 ? "text-[#00c076]" : "text-[#ff4d4f]"}`}>
+                  <td className="px-3 py-1.5 text-right" style={{ color: "var(--on-surface)" }}>{pos.quantity}</td>
+                  <td className="px-3 py-1.5 text-right" style={{ color: "var(--on-surface)" }}>{pos.entryPrice}</td>
+                  <td className="px-3 py-1.5 text-right" style={{ color: "var(--liquidation)" }}>{pos.liquidationPrice}</td>
+                  <td className="px-3 py-1.5 text-right" style={{ color: pos.unrealizedPnl >= 0 ? "var(--buy)" : "var(--sell)" }}>
                     {pos.unrealizedPnl >= 0 ? "+" : ""}${pos.unrealizedPnl.toFixed(2)}
                   </td>
                   <td className="px-3 py-1.5 text-right">
                     <button
                       onClick={() => onClosePosition?.(pos.id)}
-                      className="text-[10px] px-2 py-0.5 border border-[#ff4d4f]/30 text-[#ff4d4f] rounded hover:bg-[#ff4d4f]/10"
+                      className="text-[10px] px-2 py-0.5 rounded transition-colors"
+                      style={{ border: "1px solid rgba(255,77,79,0.3)", color: "var(--sell)", background: "transparent" }}
+                      onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = "rgba(255,77,79,0.08)")}
+                      onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = "transparent")}
                     >
                       Close
                     </button>
@@ -94,7 +102,7 @@ export default function BottomTabs({
         <div className="overflow-x-auto">
           <table className="w-full text-[11px] font-mono">
             <thead>
-              <tr className="text-[#5a5a6a] border-b border-[#1c1c28]">
+              <tr style={{ color: "var(--on-surface-disabled)", borderBottom: "1px solid rgba(66,70,84,0.3)" }}>
                 <th className="text-left px-3 py-1.5 font-normal">Symbol</th>
                 <th className="text-left px-3 py-1.5 font-normal">Side</th>
                 <th className="text-left px-3 py-1.5 font-normal">Type</th>
@@ -105,19 +113,27 @@ export default function BottomTabs({
             </thead>
             <tbody>
               {openOrders.map((order) => (
-                <tr key={order.id} className="border-b border-[#1c1c28]/50 hover:bg-[#1c1c28]/30">
-                  <td className="px-3 py-1.5 text-white">{order.symbol}</td>
-                  <td className={`px-3 py-1.5 ${order.side === "buy" ? "text-[#00c076]" : "text-[#ff4d4f]"}`}>
+                <tr
+                  key={order.id}
+                  style={{ borderBottom: "1px solid rgba(66,70,84,0.2)" }}
+                  onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = "var(--surface-container-low)")}
+                  onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = "transparent")}
+                >
+                  <td className="px-3 py-1.5" style={{ color: "var(--on-surface)" }}>{order.symbol}</td>
+                  <td className="px-3 py-1.5" style={{ color: order.side === "buy" ? "var(--buy)" : "var(--sell)" }}>
                     {order.side.toUpperCase()}
                   </td>
-                  <td className="px-3 py-1.5 text-[#8a8a9a]">{order.type}</td>
-                  <td className="px-3 py-1.5 text-white text-right">{order.price}</td>
-                  <td className="px-3 py-1.5 text-white text-right">{order.quantity}</td>
+                  <td className="px-3 py-1.5" style={{ color: "var(--on-surface-muted)" }}>{order.type}</td>
+                  <td className="px-3 py-1.5 text-right" style={{ color: "var(--on-surface)" }}>{order.price}</td>
+                  <td className="px-3 py-1.5 text-right" style={{ color: "var(--on-surface)" }}>{order.quantity}</td>
                   <td className="px-3 py-1.5 text-right">
                     <button
                       onClick={() => onCancelOrder?.(order.id)}
-                      className="p-0.5 text-[#5a5a6a] hover:text-[#ff4d4f]"
+                      className="p-0.5 rounded transition-colors"
+                      style={{ color: "var(--on-surface-disabled)" }}
                       title="Cancel"
+                      onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.color = "var(--sell)")}
+                      onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.color = "var(--on-surface-disabled)")}
                     >
                       <X size={12} />
                     </button>
@@ -135,7 +151,7 @@ export default function BottomTabs({
         <div className="overflow-x-auto">
           <table className="w-full text-[11px] font-mono">
             <thead>
-              <tr className="text-[#5a5a6a] border-b border-[#1c1c28]">
+              <tr style={{ color: "var(--on-surface-disabled)", borderBottom: "1px solid rgba(66,70,84,0.3)" }}>
                 <th className="text-left px-3 py-1.5 font-normal">Symbol</th>
                 <th className="text-left px-3 py-1.5 font-normal">Side</th>
                 <th className="text-right px-3 py-1.5 font-normal">Price</th>
@@ -145,14 +161,14 @@ export default function BottomTabs({
             </thead>
             <tbody>
               {filledOrders.map((order) => (
-                <tr key={order.id} className="border-b border-[#1c1c28]/50">
-                  <td className="px-3 py-1.5 text-white">{order.symbol}</td>
-                  <td className={`px-3 py-1.5 ${order.side === "buy" ? "text-[#00c076]" : "text-[#ff4d4f]"}`}>
+                <tr key={order.id} style={{ borderBottom: "1px solid rgba(66,70,84,0.2)" }}>
+                  <td className="px-3 py-1.5" style={{ color: "var(--on-surface)" }}>{order.symbol}</td>
+                  <td className="px-3 py-1.5" style={{ color: order.side === "buy" ? "var(--buy)" : "var(--sell)" }}>
                     {order.side.toUpperCase()}
                   </td>
-                  <td className="px-3 py-1.5 text-white text-right">{order.price}</td>
-                  <td className="px-3 py-1.5 text-white text-right">{order.filled}</td>
-                  <td className="px-3 py-1.5 text-[#00c076] text-right">Filled</td>
+                  <td className="px-3 py-1.5 text-right" style={{ color: "var(--on-surface)" }}>{order.price}</td>
+                  <td className="px-3 py-1.5 text-right" style={{ color: "var(--on-surface)" }}>{order.filled}</td>
+                  <td className="px-3 py-1.5 text-right" style={{ color: "var(--buy)" }}>Filled</td>
                 </tr>
               ))}
             </tbody>
@@ -162,32 +178,32 @@ export default function BottomTabs({
     }
 
     return (
-      <div className="flex items-center justify-center h-16 text-[#5a5a6a] text-[12px]">
+      <div className="flex items-center justify-center h-16 text-[12px]" style={{ color: "var(--on-surface-disabled)" }}>
         <span>No {activeTab.toLowerCase()} to display</span>
       </div>
     );
   };
 
   return (
-    <div className="flex flex-col bg-[#0b0b0e] border-t border-[#1c1c28]">
+    <div className="flex flex-col" style={{ background: "var(--surface-container-lowest)", borderTop: "1px solid rgba(66,70,84,0.4)" }}>
       {/* Tab Header */}
-      <div className="flex items-center overflow-x-auto border-b border-[#1c1c28] px-2 scrollbar-hide">
+      <div className="flex items-center justify-between overflow-x-auto px-2 scrollbar-hide" style={{ borderBottom: "1px solid rgba(66,70,84,0.4)" }}>
         {tabs.map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`px-3 py-2 text-[12px] whitespace-nowrap transition-colors relative ${
-              activeTab === tab
-                ? "text-white border-b-2 border-white"
-                : "text-[#5a5a6a] hover:text-[#8a8a9a]"
-            }`}
+            className="px-3 py-2 text-[12px] whitespace-nowrap transition-colors relative"
+            style={{
+              color: activeTab === tab ? "var(--on-surface)" : "var(--on-surface-disabled)",
+              borderBottom: activeTab === tab ? "2px solid var(--primary)" : "2px solid transparent",
+            }}
           >
             {tab}
             {tab === "Positions" && positions.length > 0 && (
-              <span className="ml-1 text-[9px] text-[#00c076]">({positions.length})</span>
+              <span className="ml-1 text-[9px]" style={{ color: "var(--buy)" }}>({positions.length})</span>
             )}
             {tab === "Open Orders" && openOrders.length > 0 && (
-              <span className="ml-1 text-[9px] text-yellow-400">({openOrders.length})</span>
+              <span className="ml-1 text-[9px]" style={{ color: "var(--tertiary)" }}>({openOrders.length})</span>
             )}
           </button>
         ))}
