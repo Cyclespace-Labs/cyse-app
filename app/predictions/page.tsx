@@ -22,7 +22,7 @@ export default function PredictionsPage() {
   });
 
   return (
-    <div className="flex flex-col h-screen bg-black text-white overflow-hidden">
+    <div className="flex flex-col h-screen overflow-hidden" style={{ background: "var(--surface)", color: "var(--on-surface)" }}>
       {/* Top Navigation */}
       <TopNavigation />
 
@@ -37,10 +37,10 @@ export default function PredictionsPage() {
         {/* Main Area */}
         <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
           {/* Header Bar */}
-          <div className="flex items-center justify-between px-5 py-3 border-b border-[#1c1c28] bg-[#0b0b0e]">
+          <div className="flex items-center justify-between px-5 py-3" style={{ borderBottom: "1px solid rgba(66,70,84,0.4)", background: "var(--surface-container-lowest)" }}>
             <div className="flex items-center gap-3">
-              <h1 className="text-white text-lg font-semibold font-mono">
-                <span className="text-[#00c076]">&gt;</span> Crypto
+              <h1 className="text-lg font-semibold font-mono" style={{ color: "var(--on-surface)" }}>
+                <span style={{ color: "var(--primary)" }}>&gt;</span> Crypto
               </h1>
 
               {/* Filter Tabs */}
@@ -49,11 +49,12 @@ export default function PredictionsPage() {
                   <button
                     key={tab}
                     onClick={() => setActiveFilter(tab)}
-                    className={`px-2.5 py-1 text-[11px] rounded font-mono transition-colors ${
-                      activeFilter === tab
-                        ? "text-black bg-[#00c076] font-medium"
-                        : "text-[#5a5a6a] hover:text-[#8a8a9a] hover:bg-[#1c1c28]"
-                    }`}
+                    className="px-2.5 py-1 text-[11px] rounded font-mono transition-colors"
+                    style={{
+                      background: activeFilter === tab ? "var(--primary)" : "transparent",
+                      color: activeFilter === tab ? "#000" : "var(--on-surface-disabled)",
+                      fontWeight: activeFilter === tab ? 500 : undefined,
+                    }}
                   >
                     {tab}
                   </button>
@@ -62,37 +63,38 @@ export default function PredictionsPage() {
             </div>
 
             {/* Search */}
-            <div className="flex items-center gap-2 bg-[#12121a] border border-[#1c1c28] rounded px-3 py-1.5 w-[280px]">
-              <Search size={13} className="text-[#5a5a6a] shrink-0" />
+            <div className="flex items-center gap-2 rounded px-3 py-1.5 w-[280px]" style={{ background: "var(--surface-container)", border: "1px solid rgba(66,70,84,0.4)" }}>
+              <Search size={13} className="shrink-0" style={{ color: "var(--on-surface-disabled)" }} />
               <input
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search predictions..."
-                className="flex-1 bg-transparent text-white text-[12px] font-mono outline-none placeholder:text-[#5a5a6a]"
+                className="flex-1 bg-transparent text-[12px] font-mono outline-none"
+                style={{ color: "var(--on-surface)" }}
               />
             </div>
           </div>
 
           {/* Terminal Status Bar */}
-          <div className="flex items-center gap-4 px-5 py-1.5 border-b border-[#1c1c28] bg-[#080810] text-[10px] font-mono">
-            <span className="text-[#00c076]">● SYSTEM ONLINE</span>
-            <span className="text-[#5a5a6a]">|</span>
-            <span className="text-[#5a5a6a]">
-              MARKETS: <span className="text-white">{filtered.length}</span>
+          <div className="flex items-center gap-4 px-5 py-1.5 text-[10px] font-mono" style={{ borderBottom: "1px solid rgba(66,70,84,0.4)", background: "var(--surface-container-lowest)" }}>
+            <span style={{ color: "var(--primary)" }}>● SYSTEM ONLINE</span>
+            <span style={{ color: "var(--on-surface-disabled)" }}>|</span>
+            <span style={{ color: "var(--on-surface-disabled)" }}>
+              MARKETS: <span style={{ color: "var(--on-surface)" }}>{filtered.length}</span>
             </span>
-            <span className="text-[#5a5a6a]">|</span>
-            <span className="text-[#5a5a6a]">
-              FILTER: <span className="text-[#00c076]">{activeCategory.toUpperCase()}</span>
+            <span style={{ color: "var(--on-surface-disabled)" }}>|</span>
+            <span style={{ color: "var(--on-surface-disabled)" }}>
+              FILTER: <span style={{ color: "var(--primary)" }}>{activeCategory.toUpperCase()}</span>
             </span>
-            <span className="text-[#5a5a6a]">|</span>
-            <span className="text-[#5a5a6a]">
-              TOTAL VOL: <span className="text-white">$142.8M</span>
+            <span style={{ color: "var(--on-surface-disabled)" }}>|</span>
+            <span style={{ color: "var(--on-surface-disabled)" }}>
+              TOTAL VOL: <span style={{ color: "var(--on-surface)" }}>$142.8M</span>
             </span>
             <div className="ml-auto flex items-center gap-1">
-              <span className="text-[#5a5a6a]">BLOCK:</span>
-              <span className="text-[#00c076]">19,847,231</span>
-              <span className="text-[#5a5a6a] animate-pulse">█</span>
+              <span style={{ color: "var(--on-surface-disabled)" }}>BLOCK:</span>
+              <span style={{ color: "var(--primary)" }}>19,847,231</span>
+              <span className="animate-pulse" style={{ color: "var(--on-surface-disabled)" }}>█</span>
             </div>
           </div>
 
@@ -105,9 +107,9 @@ export default function PredictionsPage() {
                 ))}
               </div>
             ) : (
-              <div className="flex flex-col items-center justify-center h-full text-[#5a5a6a]">
+              <div className="flex flex-col items-center justify-center h-full" style={{ color: "var(--on-surface-disabled)" }}>
                 <div className="font-mono text-sm mb-2">
-                  <span className="text-[#00c076]">&gt;</span> NO_MARKETS_FOUND
+                  <span style={{ color: "var(--primary)" }}>&gt;</span> NO_MARKETS_FOUND
                 </div>
                 <span className="text-[11px] font-mono">
                   Try adjusting your filters or search query

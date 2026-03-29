@@ -15,21 +15,18 @@ export default function MarketHeader({ market }: MarketHeaderProps) {
     : market.volume;
 
   return (
-    <div className="px-6 py-5 border-b border-[#1c1c28] bg-[#0b0b0e]">
+    <div className="px-6 py-5" style={{ background: "var(--surface-container-lowest)", borderBottom: "1px solid rgba(66,70,84,0.4)" }}>
       {/* Breadcrumb */}
       <div className="flex items-center gap-1.5 text-[11px] font-mono mb-3">
-        <Link href="/predictions" className="text-[#5a5a6a] hover:text-[#00c076] transition-colors">
+        <Link href="/predictions" className="transition-colors" style={{ color: "var(--on-surface-disabled)" }} onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.color = "var(--primary)")} onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.color = "var(--on-surface-disabled)")}>
           Predictions
         </Link>
-        <ChevronRight size={10} className="text-[#2a2a3a]" />
-        <Link
-          href="/predictions"
-          className="text-[#5a5a6a] hover:text-[#00c076] transition-colors"
-        >
+        <ChevronRight size={10} style={{ color: "var(--outline-variant)" }} />
+        <Link href="/predictions" className="transition-colors" style={{ color: "var(--on-surface-disabled)" }} onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.color = "var(--primary)")} onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.color = "var(--on-surface-disabled)")}>
           {market.category}
         </Link>
-        <ChevronRight size={10} className="text-[#2a2a3a]" />
-        <span className="text-[#8a8a9a]">{market.tokenSymbol}</span>
+        <ChevronRight size={10} style={{ color: "var(--outline-variant)" }} />
+        <span style={{ color: "var(--on-surface-muted)" }}>{market.tokenSymbol}</span>
       </div>
 
       {/* Main Header */}
@@ -43,19 +40,19 @@ export default function MarketHeader({ market }: MarketHeaderProps) {
             {market.tokenIcon}
           </div>
           <div className="flex-1 min-w-0">
-            <h1 className="text-white text-xl font-semibold leading-snug mb-1">
+            <h1 className="text-xl font-semibold leading-snug mb-1" style={{ color: "var(--on-surface)" }}>
               {market.question}
             </h1>
             <div className="flex items-center gap-3 text-[12px] font-mono">
               {market.status === "live" && (
                 <div className="flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#ff4d4f] animate-pulse" />
-                  <span className="text-[#ff4d4f] font-medium">LIVE</span>
+                  <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: "var(--sell)" }} />
+                  <span className="font-medium" style={{ color: "var(--sell)" }}>LIVE</span>
                 </div>
               )}
-              <span className="text-[#5a5a6a]">{formattedVolume}</span>
+              <span style={{ color: "var(--on-surface-disabled)" }}>{formattedVolume}</span>
               {market.expiryDate && (
-                <span className="text-[#5a5a6a]">
+                <span style={{ color: "var(--on-surface-disabled)" }}>
                   Expires: {new Date(market.expiryDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
                 </span>
               )}
@@ -68,14 +65,20 @@ export default function MarketHeader({ market }: MarketHeaderProps) {
           {market.expiryDate && <CountdownTimer expiryDate={market.expiryDate} />}
           <div className="flex items-center gap-1.5">
             <button
-              className="p-2 text-[#5a5a6a] hover:text-white hover:bg-[#1c1c28] rounded transition-colors"
+              className="p-2 rounded transition-colors"
+              style={{ color: "var(--on-surface-disabled)" }}
               title="Share"
+              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = "var(--on-surface)"; (e.currentTarget as HTMLElement).style.background = "var(--surface-container)"; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = "var(--on-surface-disabled)"; (e.currentTarget as HTMLElement).style.background = "transparent"; }}
             >
               <Share2 size={16} />
             </button>
             <button
-              className="p-2 text-[#5a5a6a] hover:text-white hover:bg-[#1c1c28] rounded transition-colors"
+              className="p-2 rounded transition-colors"
+              style={{ color: "var(--on-surface-disabled)" }}
               title="Bookmark"
+              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = "var(--on-surface)"; (e.currentTarget as HTMLElement).style.background = "var(--surface-container)"; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = "var(--on-surface-disabled)"; (e.currentTarget as HTMLElement).style.background = "transparent"; }}
             >
               <Bookmark size={16} />
             </button>
@@ -87,14 +90,14 @@ export default function MarketHeader({ market }: MarketHeaderProps) {
       {market.priceToHit && (
         <div className="flex items-center gap-6 mt-4 text-[13px] font-mono">
           <div className="flex flex-col">
-            <span className="text-[#5a5a6a] text-[10px]">Price to beat</span>
-            <span className="text-white font-semibold">
+            <span className="text-[10px]" style={{ color: "var(--on-surface-disabled)" }}>Price to beat</span>
+            <span className="font-semibold" style={{ color: "var(--on-surface)" }}>
               ${market.priceToHit.toLocaleString(undefined, { minimumFractionDigits: 2 })}
             </span>
           </div>
           <div className="flex flex-col">
-            <span className="text-[#5a5a6a] text-[10px]">Current price</span>
-            <span className="text-[#00c076] font-semibold">
+            <span className="text-[10px]" style={{ color: "var(--on-surface-disabled)" }}>Current price</span>
+            <span className="font-semibold" style={{ color: "var(--buy)" }}>
               ${(market.priceToHit * 1.0005).toLocaleString(undefined, { minimumFractionDigits: 2 })}
             </span>
           </div>

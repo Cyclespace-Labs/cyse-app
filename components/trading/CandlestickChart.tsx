@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import { createChart, ColorType, CandlestickSeries, HistogramSeries } from "lightweight-charts";
+import { useEffect, useRef, useCallback } from "react";
+import { createChart, ColorType, CandlestickSeries, HistogramSeries, IChartApi } from "lightweight-charts";
 import { generateCandlestickDataForToken } from "@/lib/tradingData";
 import { Order, Position } from "@/types/trading";
+import { useTheme } from "@/contexts/ThemeContext";
 
 interface CandlestickChartProps {
   symbol?: string;
@@ -13,33 +14,49 @@ interface CandlestickChartProps {
 
 export default function CandlestickChart({ symbol = "SOL", orders = [], positions = [] }: CandlestickChartProps) {
   const chartContainerRef = useRef<HTMLDivElement>(null);
+  const chartRef = useRef<IChartApi | null>(null);
+  const { theme } = useTheme();
+
+  const getThemeColors = useCallback(() => {
+    const root = document.documentElement;
+    const style = getComputedStyle(root);
+    return {
+      background: style.getPropertyValue("--surface-container-lowest").trim() || "#0c0f14",
+      textColor: style.getPropertyValue("--on-surface-disabled").trim() || "#5a5d70",
+      gridColor: style.getPropertyValue("--outline-variant").trim() || "#424654",
+      crosshairColor: style.getPropertyValue("--on-surface-muted").trim() || "#8a8da0",
+      buy: style.getPropertyValue("--buy").trim() || "#00c076",
+      sell: style.getPropertyValue("--sell").trim() || "#ff4d4f",
+    };
+  }, []);
 
   useEffect(() => {
     if (!chartContainerRef.current) return;
 
+    const colors = getThemeColors();
     const tokenData = generateCandlestickDataForToken(symbol);
 
     const chart = createChart(chartContainerRef.current, {
       layout: {
-        background: { type: ColorType.Solid, color: "#0b0b0e" },
-        textColor: "#5a5a6a",
+        background: { type: ColorType.Solid, color: colors.background },
+        textColor: colors.textColor,
         fontSize: 11,
       },
       grid: {
-        vertLines: { color: "#1c1c28" },
-        horzLines: { color: "#1c1c28" },
+        vertLines: { color: colors.gridColor },
+        horzLines: { color: colors.gridColor },
       },
       crosshair: {
         mode: 0,
-        vertLine: { color: "#3a3a4a", width: 1, style: 2 },
-        horzLine: { color: "#3a3a4a", width: 1, style: 2 },
+        vertLine: { color: colors.crosshairColor, width: 1, style: 2 },
+        horzLine: { color: colors.crosshairColor, width: 1, style: 2 },
       },
       rightPriceScale: {
-        borderColor: "#1c1c28",
+        borderColor: colors.gridColor,
         scaleMargins: { top: 0.1, bottom: 0.25 },
       },
       timeScale: {
-        borderColor: "#1c1c28",
+        borderColor: colors.gridColor,
         timeVisible: true,
         secondsVisible: false,
       },
@@ -47,13 +64,15 @@ export default function CandlestickChart({ symbol = "SOL", orders = [], position
       height: chartContainerRef.current.clientHeight,
     });
 
+    chartRef.current = chart;
+
     const candleSeries = chart.addSeries(CandlestickSeries, {
-      upColor: "#00c076",
-      downColor: "#ff4d4f",
-      borderDownColor: "#ff4d4f",
-      borderUpColor: "#00c076",
-      wickDownColor: "#ff4d4f",
-      wickUpColor: "#00c076",
+      upColor: colors.buy,
+      downColor: colors.sell,
+      borderDownColor: colors.sell,
+      borderUpColor: colors.buy,
+      wickDownColor: colors.sell,
+      wickUpColor: colors.buy,
     });
 
     const volumeSeries = chart.addSeries(HistogramSeries, {
@@ -77,7 +96,7 @@ export default function CandlestickChart({ symbol = "SOL", orders = [], position
     const formattedVolume = tokenData.map((d) => ({
       time: (new Date(d.time).getTime() / 1000) as unknown as string,
       value: d.volume,
-      color: d.close >= d.open ? "rgba(0, 192, 118, 0.3)" : "rgba(255, 77, 79, 0.3)",
+      color: d.close >= d.open ? `${colors.buy}4D` : `${colors.sell}4D`,
     }));
 
     candleSeries.setData(formattedCandles);
@@ -88,7 +107,7 @@ export default function CandlestickChart({ symbol = "SOL", orders = [], position
     for (const order of openOrders) {
       candleSeries.createPriceLine({
         price: order.price,
-        color: order.side === "buy" ? "#00c076" : "#ff4d4f",
+        color: order.side === "buy" ? colors.buy : colors.sell,
         lineWidth: 1,
         lineStyle: 2,
         axisLabelVisible: true,
@@ -98,7 +117,7 @@ export default function CandlestickChart({ symbol = "SOL", orders = [], position
       if (order.tp) {
         candleSeries.createPriceLine({
           price: order.tp,
-          color: "#00c076",
+          color: colors.buy,
           lineWidth: 1,
           lineStyle: 3,
           axisLabelVisible: true,
@@ -108,7 +127,7 @@ export default function CandlestickChart({ symbol = "SOL", orders = [], position
       if (order.sl) {
         candleSeries.createPriceLine({
           price: order.sl,
-          color: "#ff4d4f",
+          color: colors.sell,
           lineWidth: 1,
           lineStyle: 3,
           axisLabelVisible: true,
@@ -118,10 +137,11 @@ export default function CandlestickChart({ symbol = "SOL", orders = [], position
     }
 
     // Render position entry lines
+    const liquidationColor = getComputedStyle(document.documentElement).getPropertyValue("--liquidation").trim() || "#ff6b35";
     for (const pos of positions) {
       candleSeries.createPriceLine({
         price: pos.entryPrice,
-        color: pos.side === "long" ? "#00c076" : "#ff4d4f",
+        color: pos.side === "long" ? colors.buy : colors.sell,
         lineWidth: 2,
         lineStyle: 0,
         axisLabelVisible: true,
@@ -130,7 +150,7 @@ export default function CandlestickChart({ symbol = "SOL", orders = [], position
 
       candleSeries.createPriceLine({
         price: pos.liquidationPrice,
-        color: "#ff6b35",
+        color: liquidationColor,
         lineWidth: 1,
         lineStyle: 3,
         axisLabelVisible: true,
@@ -154,8 +174,9 @@ export default function CandlestickChart({ symbol = "SOL", orders = [], position
     return () => {
       window.removeEventListener("resize", handleResize);
       chart.remove();
+      chartRef.current = null;
     };
-  }, [symbol, orders, positions]);
+  }, [symbol, orders, positions, theme, getThemeColors]);
 
   return <div ref={chartContainerRef} className="w-full h-full" />;
 }

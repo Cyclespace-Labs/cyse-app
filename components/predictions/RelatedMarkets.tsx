@@ -16,7 +16,10 @@ export default function RelatedMarkets({ markets }: RelatedMarketsProps) {
         <Link
           key={m.id}
           href={`/predictions/${m.id}`}
-          className="flex items-center gap-3 p-3 bg-[#0b0b0e] border border-[#1c1c28] rounded-lg hover:border-[#00c076]/30 transition-all group"
+          className="flex items-center gap-3 p-3 rounded-lg transition-all group"
+          style={{ background: "var(--surface-container-lowest)", border: "1px solid rgba(66,70,84,0.4)" }}
+          onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.borderColor = "rgba(14,118,253,0.3)")}
+          onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.borderColor = "rgba(66,70,84,0.4)")}
         >
           <div
             className="w-8 h-8 rounded-full shrink-0 flex items-center justify-center text-white text-sm font-bold"
@@ -25,15 +28,15 @@ export default function RelatedMarkets({ markets }: RelatedMarketsProps) {
             {m.tokenIcon}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-white text-[12px] font-mono leading-snug truncate group-hover:text-[#00c076] transition-colors">
+            <p className="text-[12px] font-mono leading-snug truncate transition-colors" style={{ color: "var(--on-surface)" }}>
               {m.question}
             </p>
           </div>
           <div className="text-right shrink-0">
-            <span className="text-white text-[13px] font-mono font-semibold">
+            <span className="text-[13px] font-mono font-semibold" style={{ color: "var(--on-surface)" }}>
               {m.options[0]?.percentage}%
             </span>
-            <div className="text-[#5a5a6a] text-[9px] font-mono">
+            <div className="text-[9px] font-mono" style={{ color: "var(--on-surface-disabled)" }}>
               {m.options[0]?.direction === "up" ? "Up" : "Down"}
             </div>
           </div>

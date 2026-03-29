@@ -27,7 +27,7 @@ export default function PredictionDetailPage({
   const relatedMarkets = getRelatedPredictions(id);
 
   return (
-    <div className="flex flex-col h-screen bg-black text-white overflow-hidden">
+    <div className="flex flex-col h-screen overflow-hidden" style={{ background: "var(--surface)", color: "var(--on-surface)" }}>
       <TopNavigation />
 
       <div className="flex-1 overflow-y-auto scrollbar-hide">
@@ -57,12 +57,12 @@ export default function PredictionDetailPage({
           </div>
 
           {/* Right Sidebar: Trading Panel + Related Markets */}
-          <div className="w-[320px] shrink-0 border-l border-[#1c1c28] p-4 space-y-4 overflow-y-auto scrollbar-hide">
+          <div className="w-[320px] shrink-0 p-4 space-y-4 overflow-y-auto scrollbar-hide" style={{ borderLeft: "1px solid rgba(66,70,84,0.4)" }}>
             <PredictionTradingPanel market={market} />
 
             {relatedMarkets.length > 0 && (
               <div>
-                <h3 className="text-[#5a5a6a] text-[11px] font-mono uppercase mb-3">
+                <h3 className="text-[11px] font-mono uppercase mb-3" style={{ color: "var(--on-surface-disabled)" }}>
                   Related Markets
                 </h3>
                 <RelatedMarkets markets={relatedMarkets} />

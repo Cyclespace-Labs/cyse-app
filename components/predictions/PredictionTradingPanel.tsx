@@ -83,17 +83,17 @@ export default function PredictionTradingPanel({ market }: PredictionTradingPane
   };
 
   return (
-    <div className="bg-[#0b0b0e] border border-[#1c1c28] rounded-lg overflow-hidden h-fit">
+    <div className="rounded-lg overflow-hidden h-fit" style={{ background: "var(--surface-container-lowest)", border: "1px solid rgba(66,70,84,0.4)" }}>
       {/* Selected Option Header */}
       {!isUpDown && market.options.length > 2 && (
-        <div className="flex items-center gap-2 px-4 py-3 border-b border-[#1c1c28]">
+        <div className="flex items-center gap-2 px-4 py-3" style={{ borderBottom: "1px solid rgba(66,70,84,0.4)" }}>
           <div
-            className="w-6 h-6 rounded-full shrink-0 flex items-center justify-center text-white text-[10px] font-bold"
-            style={{ backgroundColor: market.iconColor }}
+            className="w-6 h-6 rounded-full shrink-0 flex items-center justify-center text-[10px] font-bold"
+            style={{ backgroundColor: market.iconColor, color: "#fff" }}
           >
             {market.tokenIcon}
           </div>
-          <span className="text-white text-[13px] font-mono font-medium">
+          <span className="text-[13px] font-mono font-medium" style={{ color: "var(--on-surface)" }}>
             {option?.label || market.options[0]?.label}
           </span>
         </div>
@@ -103,47 +103,45 @@ export default function PredictionTradingPanel({ market }: PredictionTradingPane
       <div className="flex items-center px-4 pt-3 pb-2 gap-4">
         <button
           onClick={() => setSide("buy")}
-          className={`text-[13px] font-mono font-medium transition-colors pb-1 ${
-            side === "buy"
-              ? "text-white border-b-2 border-white"
-              : "text-[#5a5a6a] hover:text-[#8a8a9a]"
-          }`}
+          className="text-[13px] font-mono font-medium transition-colors pb-1"
+          style={{
+            color: side === "buy" ? "var(--on-surface)" : "var(--on-surface-disabled)",
+            borderBottom: side === "buy" ? "2px solid var(--primary)" : "2px solid transparent",
+          }}
         >
           Buy
         </button>
         <button
           onClick={() => setSide("sell")}
-          className={`text-[13px] font-mono font-medium transition-colors pb-1 ${
-            side === "sell"
-              ? "text-white border-b-2 border-white"
-              : "text-[#5a5a6a] hover:text-[#8a8a9a]"
-          }`}
+          className="text-[13px] font-mono font-medium transition-colors pb-1"
+          style={{
+            color: side === "sell" ? "var(--on-surface)" : "var(--on-surface-disabled)",
+            borderBottom: side === "sell" ? "2px solid var(--primary)" : "2px solid transparent",
+          }}
         >
           Sell
         </button>
         <div className="ml-auto flex items-center gap-1">
           <button
             onClick={() => setOrderType("market")}
-            className={`text-[11px] font-mono px-2 py-0.5 rounded transition-colors ${
-              orderType === "market"
-                ? "bg-[#1c1c28] text-white"
-                : "text-[#5a5a6a] hover:text-[#8a8a9a]"
-            }`}
+            className="text-[11px] font-mono px-2 py-0.5 rounded transition-colors"
+            style={{
+              background: orderType === "market" ? "var(--surface-container-high)" : "transparent",
+              color: orderType === "market" ? "var(--on-surface)" : "var(--on-surface-disabled)",
+            }}
           >
             Market
           </button>
           <button
             onClick={() => {
               setOrderType("limit");
-              if (!limitPrice) {
-                setLimitPrice((activePrice * 100).toFixed(1));
-              }
+              if (!limitPrice) setLimitPrice((activePrice * 100).toFixed(1));
             }}
-            className={`text-[11px] font-mono px-2 py-0.5 rounded transition-colors ${
-              orderType === "limit"
-                ? "bg-[#1c1c28] text-white"
-                : "text-[#5a5a6a] hover:text-[#8a8a9a]"
-            }`}
+            className="text-[11px] font-mono px-2 py-0.5 rounded transition-colors"
+            style={{
+              background: orderType === "limit" ? "var(--surface-container-high)" : "transparent",
+              color: orderType === "limit" ? "var(--on-surface)" : "var(--on-surface-disabled)",
+            }}
           >
             Limit
           </button>
@@ -156,21 +154,21 @@ export default function PredictionTradingPanel({ market }: PredictionTradingPane
           <>
             <button
               onClick={() => { setSelectedOption(0); setSide("buy"); }}
-              className={`flex-1 py-2.5 rounded text-[13px] font-mono font-medium transition-colors ${
-                selectedOption === 0 && side === "buy"
-                  ? "bg-[#00c076] text-black"
-                  : "bg-[#1c1c28] text-[#5a5a6a] hover:text-white"
-              }`}
+              className="flex-1 py-2.5 rounded text-[13px] font-mono font-medium transition-colors"
+              style={{
+                background: selectedOption === 0 && side === "buy" ? "var(--buy)" : "var(--surface-container)",
+                color: selectedOption === 0 && side === "buy" ? "#000" : "var(--on-surface-disabled)",
+              }}
             >
               Yes {(yesPrice * 100).toFixed(0)}&cent;
             </button>
             <button
               onClick={() => { setSelectedOption(1); setSide("sell"); }}
-              className={`flex-1 py-2.5 rounded text-[13px] font-mono font-medium transition-colors ${
-                selectedOption === 1 || side === "sell"
-                  ? "bg-[#ff4d4f] text-white"
-                  : "bg-[#1c1c28] text-[#5a5a6a] hover:text-white"
-              }`}
+              className="flex-1 py-2.5 rounded text-[13px] font-mono font-medium transition-colors"
+              style={{
+                background: selectedOption === 1 || side === "sell" ? "var(--sell)" : "var(--surface-container)",
+                color: selectedOption === 1 || side === "sell" ? "#fff" : "var(--on-surface-disabled)",
+              }}
             >
               No {(noPrice * 100).toFixed(0)}&cent;
             </button>
@@ -179,21 +177,21 @@ export default function PredictionTradingPanel({ market }: PredictionTradingPane
           <>
             <button
               onClick={() => setSide("buy")}
-              className={`flex-1 py-2.5 rounded text-[13px] font-mono font-medium transition-colors ${
-                side === "buy"
-                  ? "bg-[#00c076] text-black"
-                  : "bg-[#1c1c28] text-[#5a5a6a] hover:text-white"
-              }`}
+              className="flex-1 py-2.5 rounded text-[13px] font-mono font-medium transition-colors"
+              style={{
+                background: side === "buy" ? "var(--buy)" : "var(--surface-container)",
+                color: side === "buy" ? "#000" : "var(--on-surface-disabled)",
+              }}
             >
               Yes {option?.yesPrice !== undefined ? `${option.yesPrice}¢` : "0.2¢"}
             </button>
             <button
               onClick={() => setSide("sell")}
-              className={`flex-1 py-2.5 rounded text-[13px] font-mono font-medium transition-colors ${
-                side === "sell"
-                  ? "bg-[#ff4d4f] text-white"
-                  : "bg-[#1c1c28] text-[#5a5a6a] hover:text-white"
-              }`}
+              className="flex-1 py-2.5 rounded text-[13px] font-mono font-medium transition-colors"
+              style={{
+                background: side === "sell" ? "var(--sell)" : "var(--surface-container)",
+                color: side === "sell" ? "#fff" : "var(--on-surface-disabled)",
+              }}
             >
               No {option?.noPrice !== undefined ? `${option.noPrice}¢` : "99.9¢"}
             </button>
@@ -205,15 +203,16 @@ export default function PredictionTradingPanel({ market }: PredictionTradingPane
         <>
           {/* Market Order: Amount */}
           <div className="px-4 pb-3">
-            <label className="text-[#5a5a6a] text-[11px] font-mono block mb-1.5">Amount</label>
-            <div className="flex items-center bg-[#12121a] border border-[#1c1c28] rounded px-3 py-3">
-              <span className="text-[#5a5a6a] text-lg font-mono mr-2">$</span>
+            <label className="text-[11px] font-mono block mb-1.5" style={{ color: "var(--on-surface-disabled)" }}>Amount</label>
+            <div className="flex items-center rounded px-3 py-3" style={{ background: "var(--surface-container)", border: "1px solid rgba(66,70,84,0.5)" }}>
+              <span className="text-lg font-mono mr-2" style={{ color: "var(--on-surface-disabled)" }}>$</span>
               <input
                 type="text"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ""))}
                 placeholder="0.00"
-                className="flex-1 bg-transparent text-white text-xl font-mono font-semibold outline-none"
+                className="flex-1 bg-transparent text-xl font-mono font-semibold outline-none"
+                style={{ color: "var(--on-surface)" }}
               />
             </div>
           </div>
@@ -231,7 +230,8 @@ export default function PredictionTradingPanel({ market }: PredictionTradingPane
                     setAmount(String((parseFloat(amount) || 0) + add));
                   }
                 }}
-                className="px-2.5 py-1 text-[11px] font-mono bg-[#1c1c28] text-[#8a8a9a] rounded hover:bg-[#2a2a3a] hover:text-white transition-colors"
+                className="px-2.5 py-1 text-[11px] font-mono rounded transition-colors"
+                style={{ background: "var(--surface-container)", color: "var(--on-surface-muted)" }}
               >
                 {qa}
               </button>
@@ -242,16 +242,16 @@ export default function PredictionTradingPanel({ market }: PredictionTradingPane
           {amountNum > 0 && (
             <div className="px-4 pb-3 space-y-1.5">
               <div className="flex items-center justify-between text-[11px] font-mono">
-                <span className="text-[#5a5a6a]">Est. shares</span>
-                <span className="text-white">{estimatedShares.toLocaleString()}</span>
+                <span style={{ color: "var(--on-surface-disabled)" }}>Est. shares</span>
+                <span style={{ color: "var(--on-surface)" }}>{estimatedShares.toLocaleString()}</span>
               </div>
               <div className="flex items-center justify-between text-[11px] font-mono">
-                <span className="text-[#5a5a6a]">Avg. price</span>
-                <span className="text-white">{(activePrice * 100).toFixed(1)}&cent;</span>
+                <span style={{ color: "var(--on-surface-disabled)" }}>Avg. price</span>
+                <span style={{ color: "var(--on-surface)" }}>{(activePrice * 100).toFixed(1)}&cent;</span>
               </div>
               <div className="flex items-center justify-between text-[11px] font-mono">
-                <span className="text-[#5a5a6a]">Potential return</span>
-                <span className="text-[#00c076]">
+                <span style={{ color: "var(--on-surface-disabled)" }}>Potential return</span>
+                <span style={{ color: "var(--primary)" }}>
                   ${(estimatedShares * 1 - amountNum).toFixed(2)} ({activePrice > 0 ? ((1 / activePrice - 1) * 100).toFixed(0) : 0}%)
                 </span>
               </div>
@@ -262,29 +262,36 @@ export default function PredictionTradingPanel({ market }: PredictionTradingPane
         <>
           {/* Limit Order: Limit Price */}
           <div className="px-4 pb-3">
-            <label className="text-[#5a5a6a] text-[11px] font-mono block mb-1.5">Limit Price</label>
+            <label className="text-[11px] font-mono block mb-1.5" style={{ color: "var(--on-surface-disabled)" }}>Limit Price</label>
             <div className="flex items-center gap-2">
               <button
                 onClick={() => handleLimitPriceStep(-1)}
                 title="Decrease price"
-                className="w-8 h-10 flex items-center justify-center bg-[#1c1c28] rounded text-[#8a8a9a] hover:text-white hover:bg-[#2a2a3a] transition-colors"
+                className="w-8 h-10 flex items-center justify-center rounded transition-colors"
+                style={{ background: "var(--surface-container)", color: "var(--on-surface-muted)" }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = "var(--on-surface)"; (e.currentTarget as HTMLElement).style.background = "var(--surface-container-high)"; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = "var(--on-surface-muted)"; (e.currentTarget as HTMLElement).style.background = "var(--surface-container)"; }}
               >
                 <Minus size={14} />
               </button>
-              <div className="flex-1 flex items-center bg-[#12121a] border border-[#1c1c28] rounded px-3 py-2.5">
+              <div className="flex-1 flex items-center rounded px-3 py-2.5" style={{ background: "var(--surface-container)", border: "1px solid rgba(66,70,84,0.5)" }}>
                 <input
                   type="text"
                   value={limitPrice}
                   onChange={(e) => setLimitPrice(e.target.value.replace(/[^0-9.]/g, ""))}
                   placeholder="0.0"
-                  className="flex-1 bg-transparent text-white text-[15px] font-mono font-semibold outline-none text-center"
+                  className="flex-1 bg-transparent text-[15px] font-mono font-semibold outline-none text-center"
+                  style={{ color: "var(--on-surface)" }}
                 />
-                <span className="text-[#5a5a6a] text-[13px] font-mono ml-1">&cent;</span>
+                <span className="text-[13px] font-mono ml-1" style={{ color: "var(--on-surface-disabled)" }}>&cent;</span>
               </div>
               <button
                 onClick={() => handleLimitPriceStep(1)}
                 title="Increase price"
-                className="w-8 h-10 flex items-center justify-center bg-[#1c1c28] rounded text-[#8a8a9a] hover:text-white hover:bg-[#2a2a3a] transition-colors"
+                className="w-8 h-10 flex items-center justify-center rounded transition-colors"
+                style={{ background: "var(--surface-container)", color: "var(--on-surface-muted)" }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = "var(--on-surface)"; (e.currentTarget as HTMLElement).style.background = "var(--surface-container-high)"; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = "var(--on-surface-muted)"; (e.currentTarget as HTMLElement).style.background = "var(--surface-container)"; }}
               >
                 <Plus size={14} />
               </button>
@@ -293,14 +300,15 @@ export default function PredictionTradingPanel({ market }: PredictionTradingPane
 
           {/* Limit Order: Shares */}
           <div className="px-4 pb-3">
-            <label className="text-[#5a5a6a] text-[11px] font-mono block mb-1.5">Shares</label>
-            <div className="flex items-center bg-[#12121a] border border-[#1c1c28] rounded px-3 py-2.5">
+            <label className="text-[11px] font-mono block mb-1.5" style={{ color: "var(--on-surface-disabled)" }}>Shares</label>
+            <div className="flex items-center rounded px-3 py-2.5" style={{ background: "var(--surface-container)", border: "1px solid rgba(66,70,84,0.5)" }}>
               <input
                 type="text"
                 value={shares}
                 onChange={(e) => setShares(e.target.value.replace(/[^0-9.]/g, ""))}
                 placeholder="0"
-                className="flex-1 bg-transparent text-white text-[15px] font-mono font-semibold outline-none"
+                className="flex-1 bg-transparent text-[15px] font-mono font-semibold outline-none"
+                style={{ color: "var(--on-surface)" }}
               />
             </div>
           </div>
@@ -311,7 +319,8 @@ export default function PredictionTradingPanel({ market }: PredictionTradingPane
               <button
                 key={pct}
                 onClick={() => handleSharePct(pct)}
-                className="flex-1 py-1 text-[11px] font-mono bg-[#1c1c28] text-[#8a8a9a] rounded hover:bg-[#2a2a3a] hover:text-white transition-colors text-center"
+                className="flex-1 py-1 text-[11px] font-mono rounded transition-colors text-center"
+                style={{ background: "var(--surface-container)", color: "var(--on-surface-muted)" }}
               >
                 {pct === 100 ? "Max" : `${pct}%`}
               </button>
@@ -321,13 +330,12 @@ export default function PredictionTradingPanel({ market }: PredictionTradingPane
           {/* Set Expiration */}
           <div className="px-4 pb-3">
             <div className="flex items-center justify-between">
-              <span className="text-[#5a5a6a] text-[11px] font-mono">Set Expiration</span>
+              <span className="text-[11px] font-mono" style={{ color: "var(--on-surface-disabled)" }}>Set Expiration</span>
               <button
                 onClick={() => setShowExpiration(!showExpiration)}
                 title="Toggle expiration"
-                className={`w-8 h-4 rounded-full transition-colors relative ${
-                  showExpiration ? "bg-[#00c076]" : "bg-[#2a2a3a]"
-                }`}
+                className="w-8 h-4 rounded-full transition-colors relative"
+                style={{ background: showExpiration ? "var(--primary)" : "var(--surface-container-high)" }}
               >
                 <span
                   className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-transform ${
@@ -341,7 +349,8 @@ export default function PredictionTradingPanel({ market }: PredictionTradingPane
                 value={expiration}
                 onChange={(e) => setExpiration(e.target.value)}
                 title="Expiration"
-                className="mt-2 w-full bg-[#12121a] border border-[#1c1c28] text-white text-[11px] font-mono rounded px-2 py-1.5 outline-none"
+                className="mt-2 w-full text-[11px] font-mono rounded px-2 py-1.5 outline-none"
+                style={{ background: "var(--surface-container)", color: "var(--on-surface)", border: "1px solid rgba(66,70,84,0.4)" }}
               >
                 {expirations.map((exp) => (
                   <option key={exp} value={exp}>{exp}</option>
@@ -353,14 +362,14 @@ export default function PredictionTradingPanel({ market }: PredictionTradingPane
           {/* Limit Order Totals */}
           <div className="px-4 pb-3 space-y-1.5">
             <div className="flex items-center justify-between text-[11px] font-mono">
-              <span className="text-[#5a5a6a]">Total</span>
-              <span className={limitTotal > 0 ? "text-white" : "text-[#00c076]"}>
+              <span style={{ color: "var(--on-surface-disabled)" }}>Total</span>
+              <span style={{ color: limitTotal > 0 ? "var(--on-surface)" : "var(--primary)" }}>
                 ${limitTotal.toFixed(2)}
               </span>
             </div>
             <div className="flex items-center justify-between text-[11px] font-mono">
-              <span className="text-[#5a5a6a]">To win</span>
-              <span className="text-[#00c076]">
+              <span style={{ color: "var(--on-surface-disabled)" }}>To win</span>
+              <span style={{ color: "var(--primary)" }}>
                 ${limitToWin > 0 ? limitToWin.toFixed(2) : "0"}
               </span>
             </div>
@@ -371,11 +380,11 @@ export default function PredictionTradingPanel({ market }: PredictionTradingPane
       {/* Trade Button */}
       <div className="px-4 pb-4">
         <button
-          className={`w-full py-3 rounded text-[14px] font-mono font-semibold transition-colors ${
-            side === "buy"
-              ? "bg-[#00c076] text-black hover:bg-[#00d884]"
-              : "bg-[#ff4d4f] text-white hover:bg-[#ff6b6b]"
-          }`}
+          className="w-full py-3 rounded text-[14px] font-mono font-semibold transition-colors"
+          style={{
+            background: side === "buy" ? "var(--buy)" : "var(--sell)",
+            color: side === "buy" ? "#000" : "#fff",
+          }}
         >
           {orderType === "limit" ? "Place Limit Order" : "Trade"}
         </button>
@@ -383,9 +392,9 @@ export default function PredictionTradingPanel({ market }: PredictionTradingPane
 
       {/* Terms */}
       <div className="px-4 pb-3 text-center">
-        <span className="text-[#5a5a6a] text-[10px] font-mono">
+        <span className="text-[10px] font-mono" style={{ color: "var(--on-surface-disabled)" }}>
           By trading, you agree to the{" "}
-          <span className="text-[#00c076] cursor-pointer hover:underline">Terms of Use</span>.
+          <span className="cursor-pointer hover:underline" style={{ color: "var(--primary)" }}>Terms of Use</span>.
         </span>
       </div>
     </div>

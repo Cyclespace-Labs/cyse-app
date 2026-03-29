@@ -20,7 +20,12 @@ export default function PredictionCard({ market }: PredictionCardProps) {
   };
 
   return (
-    <Link href={`/predictions/${market.id}`} className="group bg-[#0b0b0e] border border-[#1c1c28] rounded-lg p-4 hover:border-[#00c076]/30 transition-all duration-300 hover:shadow-[0_0_20px_rgba(0,192,118,0.08)] flex flex-col cursor-pointer">
+    <Link
+      href={`/predictions/${market.id}`}
+      className="group rounded-lg p-4 flex flex-col cursor-pointer transition-all duration-300"
+      style={{ background: "var(--surface-container-lowest)", border: "1px solid rgba(66,70,84,0.4)" }}
+      onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.border = "1px solid rgba(14,118,253,0.3)")}
+      onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.border = "1px solid rgba(66,70,84,0.4)")}>
       {/* Header */}
       <div className="flex items-start gap-3 mb-3">
         <div
@@ -29,7 +34,7 @@ export default function PredictionCard({ market }: PredictionCardProps) {
         >
           {market.tokenIcon}
         </div>
-        <h3 className="text-white text-[13px] font-medium leading-snug font-mono flex-1">
+        <h3 className="text-[13px] font-medium leading-snug font-mono flex-1" style={{ color: "var(--on-surface)" }}>
           {market.question}
         </h3>
       </div>
@@ -44,22 +49,22 @@ export default function PredictionCard({ market }: PredictionCardProps) {
                 <path
                   d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
                   fill="none"
-                  stroke="#1c1c28"
+                  stroke="rgba(66,70,84,0.5)"
                   strokeWidth="3"
                 />
                 <path
                   d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
                   fill="none"
-                  stroke="#00c076"
+                  stroke="var(--buy)"
                   strokeWidth="3"
                   strokeDasharray={`${market.options[0].percentage}, 100`}
                 />
               </svg>
               <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-white text-sm font-bold font-mono">
+                <span className="text-sm font-bold font-mono" style={{ color: "var(--on-surface)" }}>
                   {market.options[0].percentage}%
                 </span>
-                <span className="text-[#5a5a6a] text-[9px] font-mono">Up</span>
+                <span className="text-[9px] font-mono" style={{ color: "var(--on-surface-disabled)" }}>Up</span>
               </div>
             </div>
           </div>
@@ -67,13 +72,15 @@ export default function PredictionCard({ market }: PredictionCardProps) {
           <div className="flex gap-2">
             <button 
               onClick={(e) => handleOptionClick(e, 0, "buy")}
-              className="flex-1 py-2 rounded text-[12px] font-medium font-mono bg-[#00c076]/15 text-[#00c076] border border-[#00c076]/20 hover:bg-[#00c076]/25 transition-colors"
+              className="flex-1 py-2 rounded text-[12px] font-medium font-mono transition-colors"
+              style={{ background: "rgba(0,192,118,0.12)", color: "var(--buy)", border: "1px solid rgba(0,192,118,0.2)" }}
             >
               Up
             </button>
             <button 
               onClick={(e) => handleOptionClick(e, 1, "sell")}
-              className="flex-1 py-2 rounded text-[12px] font-medium font-mono bg-[#ff4d4f]/15 text-[#ff4d4f] border border-[#ff4d4f]/20 hover:bg-[#ff4d4f]/25 transition-colors"
+              className="flex-1 py-2 rounded text-[12px] font-medium font-mono transition-colors"
+              style={{ background: "rgba(255,77,79,0.12)", color: "var(--sell)", border: "1px solid rgba(255,77,79,0.2)" }}
             >
               Down
             </button>
@@ -89,26 +96,27 @@ export default function PredictionCard({ market }: PredictionCardProps) {
             >
               <div className="flex items-center gap-2">
                 <span
-                  className={`text-[12px] font-mono ${
-                    option.direction === "up" ? "text-[#00c076]" : "text-[#ff4d4f]"
-                  }`}
+                  className="text-[12px] font-mono"
+              style={{ color: option.direction === "up" ? "var(--buy)" : "var(--sell)" }}
                 >
                   {option.label}
                 </span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-white text-[12px] font-mono">
+                <span className="text-[12px] font-mono" style={{ color: "var(--on-surface)" }}>
                   {option.percentage}%
                 </span>
-                <button 
+                <button
                   onClick={(e) => handleOptionClick(e, i, "buy")}
-                  className="px-2 py-0.5 text-[10px] font-mono bg-[#00c076]/15 text-[#00c076] rounded hover:bg-[#00c076]/25 transition-colors"
+                  className="px-2 py-0.5 text-[10px] font-mono rounded transition-colors"
+                  style={{ background: "rgba(0,192,118,0.12)", color: "var(--buy)" }}
                 >
                   Yes
                 </button>
-                <button 
+                <button
                   onClick={(e) => handleOptionClick(e, i, "sell")}
-                  className="px-2 py-0.5 text-[10px] font-mono bg-[#ff4d4f]/15 text-[#ff4d4f] rounded hover:bg-[#ff4d4f]/25 transition-colors"
+                  className="px-2 py-0.5 text-[10px] font-mono rounded transition-colors"
+                  style={{ background: "rgba(255,77,79,0.12)", color: "var(--sell)" }}
                 >
                   No
                 </button>
@@ -119,26 +127,32 @@ export default function PredictionCard({ market }: PredictionCardProps) {
       )}
 
       {/* Footer */}
-      <div className="flex items-center justify-between pt-2 border-t border-[#1c1c28] mt-auto">
+      <div className="flex items-center justify-between pt-2 mt-auto" style={{ borderTop: "1px solid rgba(66,70,84,0.3)" }}>
         <div className="flex items-center gap-2">
           {market.isLive && (
             <div className="flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#ff4d4f] animate-pulse" />
-              <span className="text-[#ff4d4f] text-[10px] font-mono font-medium">LIVE</span>
+              <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: "var(--sell)" }} />
+              <span className="text-[10px] font-mono font-medium" style={{ color: "var(--sell)" }}>LIVE</span>
             </div>
           )}
-          <span className="text-[#5a5a6a] text-[10px] font-mono">{market.volume}</span>
+          <span className="text-[10px] font-mono" style={{ color: "var(--on-surface-disabled)" }}>{market.volume}</span>
         </div>
         <div className="flex items-center gap-1.5">
           <button
-            className="p-1 text-[#2a2a3a] hover:text-[#8a8a9a] transition-colors"
+            className="p-1 rounded transition-colors"
+            style={{ color: "var(--outline-variant)" }}
             title="Buy"
+            onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.color = "var(--on-surface-muted)")}
+            onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.color = "var(--outline-variant)")}
           >
             <ShoppingCart size={12} />
           </button>
           <button
-            className="p-1 text-[#2a2a3a] hover:text-[#8a8a9a] transition-colors"
+            className="p-1 rounded transition-colors"
+            style={{ color: "var(--outline-variant)" }}
             title="Bookmark"
+            onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.color = "var(--on-surface-muted)")}
+            onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.color = "var(--outline-variant)")}
           >
             <Bookmark size={12} />
           </button>

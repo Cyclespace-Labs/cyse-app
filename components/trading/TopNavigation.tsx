@@ -1,10 +1,11 @@
 "use client";
 
-import { Search, Bell, Settings, Globe } from "lucide-react";
+import { Search, Bell, Settings, Globe, X, Wallet, ChevronDown, CheckCircle2, AlertCircle, Info, Zap, Moon, Sun, Monitor, Volume2, VolumeX, Shield, HelpCircle, LogOut } from "lucide-react";
 import { Tourney } from "next/font/google";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useTheme } from "@/contexts/ThemeContext";
 
 const tourney = Tourney({
   subsets: ["latin"],
@@ -20,169 +21,294 @@ const navItems = [
   { label: "More", href: "#", hasDropdown: true },
 ];
 
+const mockNotifications = [
+  { id: 1, type: "success", icon: CheckCircle2, title: "Order Filled", body: "Buy 0.5 SOL @ $86.13 filled", time: "2m ago", unread: true },
+  { id: 2, type: "warning", icon: AlertCircle, title: "Liquidation Warning", body: "BTC-PERP position near liquidation", time: "14m ago", unread: true },
+  { id: 3, type: "info", icon: Info, title: "Funding Rate", body: "SOL-PERP funding rate: +0.012%", time: "1h ago", unread: false },
+  { id: 4, type: "success", icon: Zap, title: "Prediction Resolved", body: "SOL > $90 by Jan 31 → YES wins", time: "3h ago", unread: false },
+];
+
+const notifIconColor: Record<string, string> = {
+  success: "var(--buy)",
+  warning: "var(--liquidation)",
+  info: "var(--primary)",
+};
+
 export default function TopNavigation() {
   const pathname = usePathname();
+  const { theme, toggleTheme, mounted } = useTheme();
   const [primaryColor, setPrimaryColor] = useState("#0E76FD");
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState(true);
+
+  const searchRef = useRef<HTMLInputElement>(null);
+  const notifRef = useRef<HTMLDivElement>(null);
+  const settingsRef = useRef<HTMLDivElement>(null);
+
+  const unreadCount = mockNotifications.filter((n) => n.unread).length;
 
   useEffect(() => {
     const getCSSVariable = (variableName: string) => {
       if (typeof window !== "undefined") {
-        const root = document.documentElement;
-        const computedStyle = getComputedStyle(root);
-        return computedStyle.getPropertyValue(variableName).trim();
+        return getComputedStyle(document.documentElement).getPropertyValue(variableName).trim();
       }
       return "";
     };
-
-    const updateColors = () => {
-      const primary = getCSSVariable("--primary");
-      setPrimaryColor(primary || "#0E76FD");
-    };
-
+    const updateColors = () => setPrimaryColor(getCSSVariable("--primary") || "#0E76FD");
     updateColors();
-
     const observer = new MutationObserver(updateColors);
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ["class", "data-theme"],
-    });
-
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class", "data-theme"] });
     return () => observer.disconnect();
   }, []);
 
+  useEffect(() => {
+    if (searchOpen) searchRef.current?.focus();
+  }, [searchOpen]);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) setNotifOpen(false);
+      if (settingsRef.current && !settingsRef.current.contains(e.target as Node)) setSettingsOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const iconBtn = (onClick: () => void, title: string, children: React.ReactNode, active?: boolean) => (
+    <button
+      onClick={onClick}
+      title={title}
+      className="relative p-1.5 rounded transition-colors"
+      style={{ color: active ? "var(--on-surface)" : "var(--on-surface-muted)", background: active ? "var(--surface-container)" : "transparent" }}
+      onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = "var(--on-surface)"; (e.currentTarget as HTMLElement).style.background = "var(--surface-container)"; }}
+      onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = active ? "var(--on-surface)" : "var(--on-surface-muted)"; (e.currentTarget as HTMLElement).style.background = active ? "var(--surface-container)" : "transparent"; }}
+    >
+      {children}
+    </button>
+  );
+
   return (
     <header
-      className="flex items-center justify-between h-12 px-4 border-b"
-      style={{
-        background: "var(--surface-container-lowest)",
-        borderColor: "rgba(66,70,84,0.4)",
-      }}
+      className="flex items-center justify-between h-12 px-4 shrink-0 relative z-40"
+      style={{ background: "var(--surface-container-lowest)", borderBottom: "1px solid rgba(66,70,84,0.4)" }}
     >
       {/* Left: Logo + Nav */}
       <div className="flex items-center gap-1">
-        <Link href="/" className="flex items-center justify-start space-x-1 md:space-x-2 pr-5">
-          <div className="p-0 rounded-lg transition-all duration-100 font-sans">
-            <svg
-              width="30"
-              height="30"
-              viewBox="0 0 256 256"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-5 w-5 md:h-5 md:w-5"
-            >
-              <path
-                d="M105 76H38.8466C38.8466 76 33.5426 87.8169 32.5112 92.1876C27.8222 112.059 26.8737 128.971 29.2698 149.33C31.4799 168.107 38.6993 183 38.6993 183H101.759C101.759 183 89.4948 164.979 86.2884 155.157C81.4264 140.265 81.6222 128.124 84.3731 111.613C87.4302 93.2635 105 76 105 76Z"
-                fill={primaryColor}
-              />
-              <path
-                d="M125.807 21.3854C108.841 22.5059 89 33.4938 89 33.4938C89 33.4938 110.862 35.6524 122.776 41.1486C135.785 47.1503 144.604 53.1327 152.654 64.6696C159.034 73.8123 160.737 90 160.737 90H228C228 90 225.957 79.1846 219.484 68.2883C212.123 53.3962 197.111 40.3233 183.254 32.5196C164.979 22.2275 147.371 19.9612 125.807 21.3854Z"
-                fill={primaryColor}
-                stroke={primaryColor}
-              />
-              <path
-                d="M125.807 235.615C108.841 234.494 89 223.506 89 223.506C89 223.506 110.862 221.348 122.776 215.851C135.785 209.85 144.604 203.867 152.654 192.33C159.034 183.188 160.737 167 160.737 167H228C228 167 225.957 177.815 219.484 188.712C212.123 203.604 197.111 216.677 183.254 224.48C164.979 234.773 147.371 237.039 125.807 235.615Z"
-                fill={primaryColor}
-                stroke={primaryColor}
-              />
-            </svg>
-          </div>
-          <span
-            className={`${tourney.className} antialiased text-md sm:text-md md:text-md font-semibold text-gradient-primary`}
-          >
-            CYCLESPACE
-          </span>
+        <Link href="/" className="flex items-center gap-1.5 pr-5">
+          <svg width="20" height="20" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M105 76H38.8466C38.8466 76 33.5426 87.8169 32.5112 92.1876C27.8222 112.059 26.8737 128.971 29.2698 149.33C31.4799 168.107 38.6993 183 38.6993 183H101.759C101.759 183 89.4948 164.979 86.2884 155.157C81.4264 140.265 81.6222 128.124 84.3731 111.613C87.4302 93.2635 105 76 105 76Z" fill={primaryColor} />
+            <path d="M125.807 21.3854C108.841 22.5059 89 33.4938 89 33.4938C89 33.4938 110.862 35.6524 122.776 41.1486C135.785 47.1503 144.604 53.1327 152.654 64.6696C159.034 73.8123 160.737 90 160.737 90H228C228 90 225.957 79.1846 219.484 68.2883C212.123 53.3962 197.111 40.3233 183.254 32.5196C164.979 22.2275 147.371 19.9612 125.807 21.3854Z" fill={primaryColor} stroke={primaryColor} />
+            <path d="M125.807 235.615C108.841 234.494 89 223.506 89 223.506C89 223.506 110.862 221.348 122.776 215.851C135.785 209.85 144.604 203.867 152.654 192.33C159.034 183.188 160.737 167 160.737 167H228C228 167 225.957 177.815 219.484 188.712C212.123 203.604 197.111 216.677 183.254 224.48C164.979 234.773 147.371 237.039 125.807 235.615Z" fill={primaryColor} stroke={primaryColor} />
+          </svg>
+          <span className={`${tourney.className} text-sm font-semibold text-gradient-primary`}>CYCLESPACE</span>
         </Link>
 
-        {/* Nav Items */}
         {navItems.map((item) => {
           const isActive = pathname === item.href;
           return (
             <Link
               key={item.label}
               href={item.href}
-              className="px-3 py-1.5 text-[13px] rounded transition-colors"
-              style={{
-                color: isActive ? "var(--on-surface)" : "var(--on-surface-muted)",
-                background: isActive ? "var(--surface-container)" : "transparent",
-              }}
-              onMouseEnter={(e) => {
-                if (!isActive) {
-                  (e.currentTarget as HTMLElement).style.color = "var(--on-surface)";
-                  (e.currentTarget as HTMLElement).style.background = "var(--surface-container-low)";
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!isActive) {
-                  (e.currentTarget as HTMLElement).style.color = "var(--on-surface-muted)";
-                  (e.currentTarget as HTMLElement).style.background = "transparent";
-                }
-              }}
+              className="flex items-center gap-0.5 px-3 py-1.5 text-[13px] rounded transition-colors"
+              style={{ color: isActive ? "var(--on-surface)" : "var(--on-surface-muted)", background: isActive ? "var(--surface-container)" : "transparent" }}
+              onMouseEnter={(e) => { if (!isActive) { (e.currentTarget as HTMLElement).style.color = "var(--on-surface)"; (e.currentTarget as HTMLElement).style.background = "var(--surface-container-low)"; } }}
+              onMouseLeave={(e) => { if (!isActive) { (e.currentTarget as HTMLElement).style.color = "var(--on-surface-muted)"; (e.currentTarget as HTMLElement).style.background = "transparent"; } }}
             >
               {item.label}
-              {item.hasDropdown && (
-                <span className="ml-1 text-[10px]">▾</span>
-              )}
+              {item.hasDropdown && <ChevronDown size={11} style={{ opacity: 0.6 }} />}
             </Link>
           );
         })}
       </div>
 
       {/* Right: Actions */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1">
+
+        {/* Expandable Search */}
+        <div className="flex items-center">
+          {searchOpen ? (
+            <div
+              className="flex items-center gap-2 rounded-lg px-3 py-1.5 transition-all"
+              style={{ background: "var(--surface-container)", border: "1px solid rgba(66,70,84,0.6)", width: "260px" }}
+            >
+              <Search size={13} style={{ color: "var(--on-surface-disabled)", flexShrink: 0 }} />
+              <input
+                ref={searchRef}
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search markets, tokens..."
+                className="flex-1 bg-transparent text-[12px] outline-none"
+                style={{ color: "var(--on-surface)" }}
+                onKeyDown={(e) => { if (e.key === "Escape") { setSearchOpen(false); setSearchQuery(""); } }}
+              />
+              <button
+                onClick={() => { setSearchOpen(false); setSearchQuery(""); }}
+                title="Close search"
+                className="p-0.5 rounded transition-colors"
+                style={{ color: "var(--on-surface-disabled)" }}
+                onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.color = "var(--on-surface)")}
+                onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.color = "var(--on-surface-disabled)")}
+              >
+                <X size={13} />
+              </button>
+            </div>
+          ) : (
+            iconBtn(() => setSearchOpen(true), "Search (⌘K)", <Search size={15} />)
+          )}
+        </div>
+
+        {iconBtn(() => {}, "Language", <Globe size={15} />)}
+
+        {/* Theme Toggle */}
+        {mounted && iconBtn(toggleTheme, theme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode", theme === "dark" ? <Sun size={15} /> : <Moon size={15} />)}
+
+        {/* Notifications */}
+        <div className="relative" ref={notifRef}>
+          <button
+            onClick={() => { setNotifOpen(!notifOpen); setSettingsOpen(false); }}
+            title="Notifications"
+            className="relative p-1.5 rounded transition-colors"
+            style={{ color: notifOpen ? "var(--on-surface)" : "var(--on-surface-muted)", background: notifOpen ? "var(--surface-container)" : "transparent" }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = "var(--on-surface)"; (e.currentTarget as HTMLElement).style.background = "var(--surface-container)"; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = notifOpen ? "var(--on-surface)" : "var(--on-surface-muted)"; (e.currentTarget as HTMLElement).style.background = notifOpen ? "var(--surface-container)" : "transparent"; }}
+          >
+            <Bell size={15} />
+            {unreadCount > 0 && (
+              <span
+                className="absolute top-0.5 right-0.5 w-3.5 h-3.5 rounded-full flex items-center justify-center text-[8px] font-bold"
+                style={{ background: "var(--sell)", color: "#fff" }}
+              >
+                {unreadCount}
+              </span>
+            )}
+          </button>
+
+          {notifOpen && (
+            <div
+              className="absolute right-0 top-full mt-2 w-[340px] rounded-xl overflow-hidden shadow-2xl z-50"
+              style={{ background: "var(--surface-container-low)", border: "1px solid rgba(66,70,84,0.5)" }}
+            >
+              <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: "1px solid rgba(66,70,84,0.4)" }}>
+                <span className="text-[13px] font-semibold" style={{ color: "var(--on-surface)" }}>Notifications</span>
+                <button className="text-[11px] transition-colors" style={{ color: "var(--primary)" }}>Mark all read</button>
+              </div>
+              <div className="max-h-[320px] overflow-y-auto">
+                {mockNotifications.map((n) => (
+                  <div
+                    key={n.id}
+                    className="flex items-start gap-3 px-4 py-3 cursor-pointer transition-colors"
+                    style={{ borderBottom: "1px solid rgba(66,70,84,0.2)", background: n.unread ? "rgba(14,118,253,0.04)" : "transparent" }}
+                    onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = "var(--surface-container)")}
+                    onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = n.unread ? "rgba(14,118,253,0.04)" : "transparent")}
+                  >
+                    <div className="mt-0.5 shrink-0">
+                      <n.icon size={14} style={{ color: notifIconColor[n.type] }} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[12px] font-medium" style={{ color: "var(--on-surface)" }}>{n.title}</span>
+                        <span className="text-[10px] shrink-0" style={{ color: "var(--on-surface-disabled)" }}>{n.time}</span>
+                      </div>
+                      <p className="text-[11px] mt-0.5 leading-relaxed" style={{ color: "var(--on-surface-muted)" }}>{n.body}</p>
+                    </div>
+                    {n.unread && <div className="w-1.5 h-1.5 rounded-full mt-1.5 shrink-0" style={{ background: "var(--primary)" }} />}
+                  </div>
+                ))}
+              </div>
+              <div className="px-4 py-2.5 text-center" style={{ borderTop: "1px solid rgba(66,70,84,0.3)" }}>
+                <button className="text-[11px] transition-colors" style={{ color: "var(--on-surface-muted)" }}>View all notifications</button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Settings */}
+        <div className="relative" ref={settingsRef}>
+          <button
+            onClick={() => { setSettingsOpen(!settingsOpen); setNotifOpen(false); }}
+            title="Settings"
+            className="p-1.5 rounded transition-colors"
+            style={{ color: settingsOpen ? "var(--on-surface)" : "var(--on-surface-muted)", background: settingsOpen ? "var(--surface-container)" : "transparent" }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = "var(--on-surface)"; (e.currentTarget as HTMLElement).style.background = "var(--surface-container)"; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = settingsOpen ? "var(--on-surface)" : "var(--on-surface-muted)"; (e.currentTarget as HTMLElement).style.background = settingsOpen ? "var(--surface-container)" : "transparent"; }}
+          >
+            <Settings size={15} />
+          </button>
+
+          {settingsOpen && (
+            <div
+              className="absolute right-0 top-full mt-2 w-[260px] rounded-xl overflow-hidden shadow-2xl z-50"
+              style={{ background: "var(--surface-container-low)", border: "1px solid rgba(66,70,84,0.5)" }}
+            >
+              <div className="px-4 py-3" style={{ borderBottom: "1px solid rgba(66,70,84,0.4)" }}>
+                <span className="text-[13px] font-semibold" style={{ color: "var(--on-surface)" }}>Settings</span>
+              </div>
+              <div className="py-1">
+                {/* Sound toggle */}
+                <div className="flex items-center justify-between px-4 py-2.5">
+                  <div className="flex items-center gap-2.5">
+                    {soundEnabled ? <Volume2 size={14} style={{ color: "var(--on-surface-muted)" }} /> : <VolumeX size={14} style={{ color: "var(--on-surface-disabled)" }} />}
+                    <span className="text-[12px]" style={{ color: "var(--on-surface-variant)" }}>Trade Sounds</span>
+                  </div>
+                  <button
+                    onClick={() => setSoundEnabled(!soundEnabled)}
+                    title={soundEnabled ? "Disable trade sounds" : "Enable trade sounds"}
+                    className="w-9 h-5 rounded-full relative transition-colors"
+                    style={{ background: soundEnabled ? "var(--primary)" : "var(--surface-container-high)" }}
+                  >
+                    <span className="absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform" style={{ left: soundEnabled ? "calc(100% - 18px)" : "2px" }} />
+                  </button>
+                </div>
+                <div className="h-px mx-4" style={{ background: "rgba(66,70,84,0.3)" }} />
+                {[
+                  { icon: Monitor, label: "Display Settings" },
+                  { icon: Shield, label: "Security" },
+                  { icon: HelpCircle, label: "Help & Support" },
+                ].map(({ icon: Icon, label }) => (
+                  <button
+                    key={label}
+                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[12px] transition-colors text-left"
+                    style={{ color: "var(--on-surface-variant)" }}
+                    onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "var(--surface-container)"; (e.currentTarget as HTMLElement).style.color = "var(--on-surface)"; }}
+                    onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent"; (e.currentTarget as HTMLElement).style.color = "var(--on-surface-variant)"; }}
+                  >
+                    <Icon size={14} style={{ color: "var(--on-surface-muted)" }} />
+                    {label}
+                  </button>
+                ))}
+                <div className="h-px mx-4" style={{ background: "rgba(66,70,84,0.3)" }} />
+                <button
+                  className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[12px] transition-colors text-left"
+                  style={{ color: "var(--sell)" }}
+                  onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = "rgba(255,77,79,0.06)")}
+                  onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = "transparent")}
+                >
+                  <LogOut size={14} />
+                  Log out
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="w-px h-5 mx-1.5" style={{ background: "rgba(66,70,84,0.5)" }} />
+
+        {/* Connect Wallet */}
         <button
-          title="Search"
-          className="p-1.5 rounded transition-colors"
-          style={{ color: "var(--on-surface-muted)" }}
-          onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.color = "var(--on-surface)")}
-          onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.color = "var(--on-surface-muted)")}
+          className="flex items-center gap-2 px-3.5 py-1.5 text-[13px] font-medium rounded-lg transition-colors"
+          style={{ color: "var(--on-surface-variant)", background: "var(--surface-container)" }}
+          onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = "var(--on-surface)"; (e.currentTarget as HTMLElement).style.background = "var(--surface-container-high)"; }}
+          onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = "var(--on-surface-variant)"; (e.currentTarget as HTMLElement).style.background = "var(--surface-container)"; }}
         >
-          <Search size={16} />
+          <Wallet size={14} />
+          Connect Wallet
         </button>
-        <button
-          title="Language"
-          className="p-1.5 rounded transition-colors"
-          style={{ color: "var(--on-surface-muted)" }}
-          onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.color = "var(--on-surface)")}
-          onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.color = "var(--on-surface-muted)")}
-        >
-          <Globe size={16} />
-        </button>
-        <button
-          title="Notifications"
-          className="p-1.5 rounded transition-colors"
-          style={{ color: "var(--on-surface-muted)" }}
-          onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.color = "var(--on-surface)")}
-          onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.color = "var(--on-surface-muted)")}
-        >
-          <Bell size={16} />
-        </button>
-        <button
-          title="Settings"
-          className="p-1.5 rounded transition-colors"
-          style={{ color: "var(--on-surface-muted)" }}
-          onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.color = "var(--on-surface)")}
-          onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.color = "var(--on-surface-muted)")}
-        >
-          <Settings size={16} />
-        </button>
-        <button
-          className="ml-2 px-4 py-1.5 text-[13px] rounded transition-colors"
-          style={{
-            color: "var(--on-surface-variant)",
-            background: "var(--surface-container)",
-          }}
-          onMouseEnter={(e) => {
-            (e.currentTarget as HTMLElement).style.color = "var(--on-surface)";
-            (e.currentTarget as HTMLElement).style.background = "var(--surface-container-high)";
-          }}
-          onMouseLeave={(e) => {
-            (e.currentTarget as HTMLElement).style.color = "var(--on-surface-variant)";
-            (e.currentTarget as HTMLElement).style.background = "var(--surface-container)";
-          }}
-        >
-          Log in
-        </button>
-        <button className="px-4 py-1.5 text-[13px] font-semibold rounded btn-primary-gradient">
+
+        <button className="px-4 py-1.5 text-[13px] font-semibold rounded-lg btn-primary-gradient">
           Sign up
         </button>
       </div>

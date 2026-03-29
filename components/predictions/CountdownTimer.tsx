@@ -30,27 +30,27 @@ export default function CountdownTimer({ expiryDate }: CountdownTimerProps) {
       {timeLeft.days > 0 && (
         <>
           <div className="flex flex-col items-center">
-            <span className="text-[#ff4d4f] text-xl font-bold leading-none">{pad(timeLeft.days)}</span>
-            <span className="text-[#5a5a6a] text-[9px] uppercase">Days</span>
+            <span className="text-xl font-bold leading-none" style={{ color: "var(--warning)" }}>{pad(timeLeft.days)}</span>
+            <span className="text-[9px] uppercase" style={{ color: "var(--on-surface-disabled)" }}>Days</span>
           </div>
-          <span className="text-[#5a5a6a] text-lg mx-0.5">:</span>
+          <span className="text-lg mx-0.5" style={{ color: "var(--on-surface-disabled)" }}>:</span>
         </>
       )}
       <div className="flex flex-col items-center">
-        <span className="text-[#ff4d4f] text-xl font-bold leading-none">{pad(timeLeft.hours)}</span>
-        <span className="text-[#5a5a6a] text-[9px] uppercase">Hrs</span>
+        <span className="text-xl font-bold leading-none" style={{ color: "var(--warning)" }}>{pad(timeLeft.hours)}</span>
+        <span className="text-[9px] uppercase" style={{ color: "var(--on-surface-disabled)" }}>Hrs</span>
       </div>
-      <span className="text-[#5a5a6a] text-lg mx-0.5">:</span>
+      <span className="text-lg mx-0.5" style={{ color: "var(--on-surface-disabled)" }}>:</span>
       <div className="flex flex-col items-center">
-        <span className="text-[#ff4d4f] text-xl font-bold leading-none">{pad(timeLeft.mins)}</span>
-        <span className="text-[#5a5a6a] text-[9px] uppercase">Mins</span>
+        <span className="text-xl font-bold leading-none" style={{ color: "var(--warning)" }}>{pad(timeLeft.mins)}</span>
+        <span className="text-[9px] uppercase" style={{ color: "var(--on-surface-disabled)" }}>Mins</span>
       </div>
       {timeLeft.days === 0 && (
         <>
-          <span className="text-[#5a5a6a] text-lg mx-0.5">:</span>
+          <span className="text-lg mx-0.5" style={{ color: "var(--on-surface-disabled)" }}>:</span>
           <div className="flex flex-col items-center">
-            <span className="text-[#ff4d4f] text-xl font-bold leading-none">{pad(timeLeft.secs)}</span>
-            <span className="text-[#5a5a6a] text-[9px] uppercase">Secs</span>
+            <span className="text-xl font-bold leading-none" style={{ color: "var(--warning)" }}>{pad(timeLeft.secs)}</span>
+            <span className="text-[9px] uppercase" style={{ color: "var(--on-surface-disabled)" }}>Secs</span>
           </div>
         </>
       )}
