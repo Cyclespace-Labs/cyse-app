@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { PredictionMarketDetail } from "@/types/predictions";
 
 interface PredictionTradingPanelProps {
@@ -10,10 +11,28 @@ interface PredictionTradingPanelProps {
 const quickAmounts = ["+$1", "+$5", "+$10", "+$100", "Max"];
 
 export default function PredictionTradingPanel({ market }: PredictionTradingPanelProps) {
-  const [side, setSide] = useState<"buy" | "sell">("buy");
+  const searchParams = useSearchParams();
+  
+  const getInitialSide = (): "buy" | "sell" => {
+    const sideParam = searchParams.get("side");
+    return sideParam === "sell" ? "sell" : "buy";
+  };
+
+  const getInitialOption = (): number => {
+    const optionParam = searchParams.get("option");
+    if (optionParam !== null) {
+      const optionIndex = parseInt(optionParam, 10);
+      if (!isNaN(optionIndex) && optionIndex >= 0 && optionIndex < market.options.length) {
+        return optionIndex;
+      }
+    }
+    return 0;
+  };
+  
+  const [side, setSide] = useState<"buy" | "sell">(getInitialSide);
   const [orderType, setOrderType] = useState<"market" | "limit">("market");
   const [amount, setAmount] = useState("0");
-  const [selectedOption, setSelectedOption] = useState(0);
+  const [selectedOption, setSelectedOption] = useState(getInitialOption);
 
   const option = market.options[selectedOption];
   const isUpDown = option?.label === "Up" || option?.label === "Down";

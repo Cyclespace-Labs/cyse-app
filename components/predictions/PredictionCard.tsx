@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { PredictionMarket } from "@/types/predictions";
 import { Bookmark, ShoppingCart } from "lucide-react";
 
@@ -9,7 +10,14 @@ interface PredictionCardProps {
 }
 
 export default function PredictionCard({ market }: PredictionCardProps) {
+  const router = useRouter();
   const isUpDown = market.options[0]?.label === "Up" || market.options[0]?.label === "Down";
+
+  const handleOptionClick = (e: React.MouseEvent, optionIndex: number, side: "buy" | "sell") => {
+    e.preventDefault();
+    e.stopPropagation();
+    router.push(`/predictions/${market.id}?side=${side}&option=${optionIndex}`);
+  };
 
   return (
     <Link href={`/predictions/${market.id}`} className="group bg-[#0b0b0e] border border-[#1c1c28] rounded-lg p-4 hover:border-[#00c076]/30 transition-all duration-300 hover:shadow-[0_0_20px_rgba(0,192,118,0.08)] flex flex-col cursor-pointer">
@@ -57,10 +65,16 @@ export default function PredictionCard({ market }: PredictionCardProps) {
           </div>
           {/* Up / Down Buttons */}
           <div className="flex gap-2">
-            <button className="flex-1 py-2 rounded text-[12px] font-medium font-mono bg-[#00c076]/15 text-[#00c076] border border-[#00c076]/20 hover:bg-[#00c076]/25 transition-colors">
+            <button 
+              onClick={(e) => handleOptionClick(e, 0, "buy")}
+              className="flex-1 py-2 rounded text-[12px] font-medium font-mono bg-[#00c076]/15 text-[#00c076] border border-[#00c076]/20 hover:bg-[#00c076]/25 transition-colors"
+            >
               Up
             </button>
-            <button className="flex-1 py-2 rounded text-[12px] font-medium font-mono bg-[#ff4d4f]/15 text-[#ff4d4f] border border-[#ff4d4f]/20 hover:bg-[#ff4d4f]/25 transition-colors">
+            <button 
+              onClick={(e) => handleOptionClick(e, 1, "sell")}
+              className="flex-1 py-2 rounded text-[12px] font-medium font-mono bg-[#ff4d4f]/15 text-[#ff4d4f] border border-[#ff4d4f]/20 hover:bg-[#ff4d4f]/25 transition-colors"
+            >
               Down
             </button>
           </div>
@@ -86,10 +100,16 @@ export default function PredictionCard({ market }: PredictionCardProps) {
                 <span className="text-white text-[12px] font-mono">
                   {option.percentage}%
                 </span>
-                <button className="px-2 py-0.5 text-[10px] font-mono bg-[#00c076]/15 text-[#00c076] rounded hover:bg-[#00c076]/25 transition-colors">
+                <button 
+                  onClick={(e) => handleOptionClick(e, i, "buy")}
+                  className="px-2 py-0.5 text-[10px] font-mono bg-[#00c076]/15 text-[#00c076] rounded hover:bg-[#00c076]/25 transition-colors"
+                >
                   Yes
                 </button>
-                <button className="px-2 py-0.5 text-[10px] font-mono bg-[#ff4d4f]/15 text-[#ff4d4f] rounded hover:bg-[#ff4d4f]/25 transition-colors">
+                <button 
+                  onClick={(e) => handleOptionClick(e, i, "sell")}
+                  className="px-2 py-0.5 text-[10px] font-mono bg-[#ff4d4f]/15 text-[#ff4d4f] rounded hover:bg-[#ff4d4f]/25 transition-colors"
+                >
                   No
                 </button>
               </div>
