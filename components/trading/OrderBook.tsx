@@ -8,7 +8,7 @@ const bookTabs = ["Book", "Trades"];
 
 export default function OrderBook() {
   const [activeTab, setActiveTab] = useState("Book");
-
+  
   const maxAskTotal = Math.max(...askOrders.map((o) => o.total));
   const maxBidTotal = Math.max(...bidOrders.map((o) => o.total));
 

@@ -1,40 +1,20 @@
 import { useState, useCallback } from "react";
-import { Order, Position, TradingUser } from "@/types/trading";
+import { Order, Position } from "@/types/trading";
 import { getBestBidAsk, getTickSize } from "@/lib/tradingData";
-
-const DEFAULT_USER: TradingUser = {
-  isAuthenticated: false,
-  username: "",
-  balance: 0,
-  equity: 0,
-};
-
-const MOCK_AUTH_USER: TradingUser = {
-  isAuthenticated: true,
-  username: "trader_01",
-  balance: 10000,
-  equity: 10000,
-};
+import { WalletState } from "@/contexts/WalletContext";
 
 let orderIdCounter = 1;
 let positionIdCounter = 1;
 
-export function useTradingState(selectedSymbol: string) {
-  const [user, setUser] = useState<TradingUser>(DEFAULT_USER);
+export function useTradingState(
+  selectedSymbol: string,
+  wallet: WalletState,
+  updateBalance: (delta: number) => void,
+) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [positions, setPositions] = useState<Position[]>([]);
   const [orderPending, setOrderPending] = useState(false);
   const [lastNotification, setLastNotification] = useState<{ type: "success" | "error"; message: string } | null>(null);
-
-  const login = useCallback(() => {
-    setUser(MOCK_AUTH_USER);
-  }, []);
-
-  const logout = useCallback(() => {
-    setUser(DEFAULT_USER);
-    setOrders([]);
-    setPositions([]);
-  }, []);
 
   const placeOrder = useCallback(
     (params: {
@@ -46,12 +26,12 @@ export function useTradingState(selectedSymbol: string) {
       tp?: number;
       sl?: number;
     }) => {
-      if (!user.isAuthenticated) return;
+      if (!wallet.connected) return;
 
       const orderValue = params.price * params.quantity;
       const marginRequired = orderValue / params.leverage;
 
-      if (marginRequired > user.balance) {
+      if (marginRequired > wallet.balance) {
         setLastNotification({ type: "error", message: "Insufficient balance" });
         setTimeout(() => setLastNotification(null), 3000);
         return;
@@ -103,10 +83,7 @@ export function useTradingState(selectedSymbol: string) {
           };
 
           setPositions((prev) => [...prev, newPosition]);
-          setUser((prev) => ({
-            ...prev,
-            balance: parseFloat((prev.balance - marginRequired).toFixed(2)),
-          }));
+          updateBalance(-marginRequired);
 
           const filledOrder: Order = { ...newOrder, status: "filled", filled: params.quantity };
           setOrders((prev) => [...prev, filledOrder]);
@@ -117,10 +94,7 @@ export function useTradingState(selectedSymbol: string) {
         } else {
           // Limit orders stay open
           setOrders((prev) => [...prev, newOrder]);
-          setUser((prev) => ({
-            ...prev,
-            balance: parseFloat((prev.balance - marginRequired).toFixed(2)),
-          }));
+          updateBalance(-marginRequired);
           setLastNotification({
             type: "success",
             message: `Limit ${params.side} ${params.quantity} ${selectedSymbol} at ${params.price} placed`,
@@ -131,7 +105,7 @@ export function useTradingState(selectedSymbol: string) {
         setTimeout(() => setLastNotification(null), 3000);
       }, 1200);
     },
-    [user, selectedSymbol]
+    [wallet, selectedSymbol, updateBalance]
   );
 
   const cancelOrder = useCallback(
@@ -141,17 +115,14 @@ export function useTradingState(selectedSymbol: string) {
         if (order && order.status === "open") {
           const orderValue = order.price * order.quantity;
           const marginReturn = orderValue / 10; // approximate
-          setUser((u) => ({
-            ...u,
-            balance: parseFloat((u.balance + marginReturn).toFixed(2)),
-          }));
+          updateBalance(marginReturn);
         }
         return prev.map((o) => (o.id === orderId ? { ...o, status: "cancelled" as const } : o));
       });
       setLastNotification({ type: "success", message: `Order ${orderId} cancelled` });
       setTimeout(() => setLastNotification(null), 3000);
     },
-    []
+    [updateBalance],
   );
 
   const closePosition = useCallback(
@@ -160,17 +131,14 @@ export function useTradingState(selectedSymbol: string) {
         const pos = prev.find((p) => p.id === positionId);
         if (pos) {
           const returnAmount = pos.margin + pos.unrealizedPnl;
-          setUser((u) => ({
-            ...u,
-            balance: parseFloat((u.balance + returnAmount).toFixed(2)),
-          }));
+          updateBalance(returnAmount);
         }
         return prev.filter((p) => p.id !== positionId);
       });
       setLastNotification({ type: "success", message: `Position closed` });
       setTimeout(() => setLastNotification(null), 3000);
     },
-    []
+    [updateBalance],
   );
 
   const updatePositionPnl = useCallback(
@@ -198,15 +166,12 @@ export function useTradingState(selectedSymbol: string) {
   const activePositions = positions.filter((p) => p.symbol === selectedSymbol);
 
   return {
-    user,
     orders,
     positions,
     openOrders,
     activePositions,
     orderPending,
     lastNotification,
-    login,
-    logout,
     placeOrder,
     cancelOrder,
     closePosition,

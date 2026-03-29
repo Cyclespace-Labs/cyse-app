@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Alexandria, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/contexts/ThemeContext";
+import { WalletProvider } from "@/contexts/WalletContext";
 
 const alexandria = Alexandria({
   variable: "--font-alexandria",
@@ -31,7 +32,7 @@ export default function RootLayout({
       className={`${alexandria.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider><WalletProvider>{children}</WalletProvider></ThemeProvider>
       </body>
     </html>
   );

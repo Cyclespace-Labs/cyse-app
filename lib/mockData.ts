@@ -9,7 +9,12 @@ export const askOrders: OrderBookEntry[] = [
   { price: 86.17, size: 3326.55, total: 7504.08 },
   { price: 86.16, size: 3545.07, total: 4177.53 },
   { price: 86.15, size: 1480.97, total: 1632.46 },
-  { price: 86.14, size: 151.49, total: 151.49 },
+  { price: 86.14, size: 151.49, total: 1480.97 },
+  { price: 86.13, size: 151.49, total: 151.49 },
+  { price: 86.12, size: 151.49, total: 151.49 },
+  { price: 86.11, size: 151.49, total: 151.49 },
+  { price: 86.10, size: 151.49, total: 151.49 },
+  { price: 86.09, size: 151.49, total: 151.49 },
 ];
 
 export const bidOrders: OrderBookEntry[] = [
@@ -23,6 +28,10 @@ export const bidOrders: OrderBookEntry[] = [
   { price: 86.06, size: 2598.81, total: 19217.57 },
   { price: 86.05, size: 2626.61, total: 21844.18 },
   { price: 86.04, size: 2024.55, total: 23868.73 },
+  { price: 86.03, size: 2024.55, total: 25893.28 },
+  { price: 86.02, size: 2024.55, total: 27917.83 },
+  { price: 86.01, size: 2024.55, total: 29942.38 },
+  { price: 86.00, size: 2024.55, total: 31966.93 },
 ];
 
 export const tickerItems: TickerItem[] = [

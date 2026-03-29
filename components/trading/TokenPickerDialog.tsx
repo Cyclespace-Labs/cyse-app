@@ -69,7 +69,7 @@ export default function TokenPickerDialog({
   return (
     <div
       ref={backdropRef}
-      className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-xs"
       style={{ background: "rgba(12,15,20,0.85)" }}
       onClick={(e) => {
         if (e.target === backdropRef.current) onClose();
@@ -140,7 +140,7 @@ export default function TokenPickerDialog({
             className="text-left transition-colors"
             style={{ color: sortBy === "volume" ? "var(--on-surface-variant)" : "var(--on-surface-disabled)" }}
           >
-            Market / Volume ↓
+            Market / Volume
           </button>
           <button
             onClick={() => setSortBy("price")}

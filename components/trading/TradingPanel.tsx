@@ -1,23 +1,21 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { ChevronDown, Loader2, X } from "lucide-react";
-import { Order, Position, TradingUser, TokenPriceData } from "@/types/trading";
+import { ChevronDown, Loader2, X, Wallet } from "lucide-react";
+import { Order, Position, TokenPriceData } from "@/types/trading";
 import { getBestBidAsk, getTickSize } from "@/lib/tradingData";
+import { useWallet } from "@/contexts/WalletContext";
 
 const orderTypes = ["Limit", "Market", "Conditional"];
 const pctButtons = [25, 50, 75, 100];
 
 interface TradingPanelProps {
-  user: TradingUser;
   symbol: string;
   tokenPriceData: TokenPriceData | null;
   activePositions: Position[];
   openOrders: Order[];
   orderPending: boolean;
   lastNotification: { type: "success" | "error"; message: string } | null;
-  onLogin: () => void;
-  onLogout: () => void;
   onPlaceOrder: (params: {
     side: "buy" | "sell";
     type: "limit" | "market" | "conditional";
@@ -32,19 +30,17 @@ interface TradingPanelProps {
 }
 
 export default function TradingPanel({
-  user,
   symbol,
   tokenPriceData,
   activePositions,
   openOrders,
   orderPending,
   lastNotification,
-  onLogin,
-  onLogout,
   onPlaceOrder,
   onCancelOrder,
   onClosePosition,
 }: TradingPanelProps) {
+  const { wallet, connect } = useWallet();
   const [activeType, setActiveType] = useState("Limit");
   const [side, setSide] = useState<"buy" | "sell">("buy");
   const [price, setPrice] = useState("");
@@ -80,7 +76,7 @@ export default function TradingPanel({
       : parseFloat((p + liqDist).toFixed(Math.max(2, -Math.floor(Math.log10(tickSize)))));
   }, [side, activeType, currentPrice, priceNum, qtyNum, leverage, tickSize]);
 
-  const insufficientBalance = user.isAuthenticated && marginRequired > user.balance;
+  const insufficientBalance = wallet.connected && marginRequired > wallet.balance;
 
   const handleMid = () => {
     const { mid } = getBestBidAsk(symbol);
@@ -104,10 +100,10 @@ export default function TradingPanel({
   };
 
   const handlePctQuantity = (pct: number) => {
-    if (!user.isAuthenticated || user.balance <= 0) return;
+    if (!wallet.connected || wallet.balance <= 0) return;
     const p = activeType === "Market" ? currentPrice : (priceNum || currentPrice);
     if (p <= 0) return;
-    const maxQty = (user.balance * leverage * (pct / 100)) / p;
+    const maxQty = (wallet.balance * leverage * (pct / 100)) / p;
     setQuantity(String(parseFloat(maxQty.toFixed(4))));
   };
 
@@ -187,7 +183,7 @@ export default function TradingPanel({
         <div className="flex items-center justify-between text-[11px]">
           <span style={{ color: "var(--on-surface-disabled)" }}>Available Equity</span>
           <span style={{ color: "var(--on-surface)" }}>
-            {user.isAuthenticated ? `$${user.balance.toLocaleString("en-US", { minimumFractionDigits: 2 })}` : "$0.00"}
+            {wallet.connected ? `$${wallet.balance.toLocaleString("en-US", { minimumFractionDigits: 2 })}` : "$0.00"}
           </span>
         </div>
 
@@ -267,7 +263,7 @@ export default function TradingPanel({
             <span className="text-[11px] ml-2" style={{ color: "var(--on-surface-disabled)" }}>{symbol}</span>
           </div>
           {/* Percentage buttons */}
-          {user.isAuthenticated && (
+          {wallet.connected && (
             <div className="flex items-center gap-1 mt-1.5">
               {pctButtons.map((pct) => (
                 <button
@@ -383,22 +379,14 @@ export default function TradingPanel({
         )}
 
         {/* Action Buttons */}
-        {!user.isAuthenticated ? (
+        {!wallet.connected ? (
           <div className="space-y-2 pt-1">
             <button
-              onClick={onLogin}
-              className="w-full py-2.5 text-[13px] font-semibold rounded btn-primary-gradient"
+              onClick={connect}
+              className="w-full py-2.5 text-[13px] font-semibold rounded btn-primary-gradient flex items-center justify-center gap-2"
             >
-              Sign up to trade
-            </button>
-            <button
-              onClick={onLogin}
-              className="w-full py-2.5 text-[13px] rounded transition-colors"
-              style={{ background: "var(--surface-container-high)", color: "var(--on-surface-variant)" }}
-              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "var(--surface-bright)"; (e.currentTarget as HTMLElement).style.color = "var(--on-surface)"; }}
-              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "var(--surface-container-high)"; (e.currentTarget as HTMLElement).style.color = "var(--on-surface-variant)"; }}
-            >
-              Log in to trade
+              <Wallet size={14} />
+              Connect Wallet to Trade
             </button>
           </div>
         ) : (
@@ -439,7 +427,7 @@ export default function TradingPanel({
         )}
 
         {/* Order Options */}
-        {user.isAuthenticated && (
+        {wallet.connected && (
           <div className="flex items-center gap-3 pt-1" style={{ borderTop: "1px solid rgba(66,70,84,0.4)" }}>
             <label className="flex items-center gap-1.5 cursor-pointer">
               <input type="checkbox" checked={postOnly} onChange={(e) => setPostOnly(e.target.checked)} />
@@ -457,7 +445,7 @@ export default function TradingPanel({
         )}
 
         {/* Active Positions */}
-        {user.isAuthenticated && activePositions.length > 0 && (
+        {wallet.connected && activePositions.length > 0 && (
           <div className="pt-2" style={{ borderTop: "1px solid rgba(66,70,84,0.4)" }}>
             <span className="text-[11px] mb-2 block" style={{ color: "var(--on-surface-disabled)" }}>Active Positions</span>
             {activePositions.map((pos) => (
@@ -497,7 +485,7 @@ export default function TradingPanel({
         )}
 
         {/* Open Orders */}
-        {user.isAuthenticated && openOrders.length > 0 && (
+        {wallet.connected && openOrders.length > 0 && (
           <div className="pt-2" style={{ borderTop: "1px solid rgba(66,70,84,0.4)" }}>
             <span className="text-[11px] mb-2 block" style={{ color: "var(--on-surface-disabled)" }}>Open Orders</span>
             {openOrders.map((order) => (
@@ -524,19 +512,6 @@ export default function TradingPanel({
         )}
 
         {/* Logout button */}
-        {user.isAuthenticated && (
-          <div className="pt-2" style={{ borderTop: "1px solid rgba(66,70,84,0.4)" }}>
-            <button
-              onClick={onLogout}
-              className="w-full py-2 text-[11px] rounded transition-colors"
-              style={{ color: "var(--on-surface-disabled)", background: "transparent", border: "1px solid rgba(66,70,84,0.4)" }}
-              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = "var(--on-surface)"; (e.currentTarget as HTMLElement).style.background = "var(--surface-container-high)"; }}
-              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = "var(--on-surface-disabled)"; (e.currentTarget as HTMLElement).style.background = "transparent"; }}
-            >
-              Disconnect
-            </button>
-          </div>
-        )}
       </div>
     </div>
   );

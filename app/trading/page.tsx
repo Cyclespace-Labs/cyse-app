@@ -13,6 +13,7 @@ import { TokenMarket } from "@/lib/tokenData";
 import { getTokenPriceData } from "@/lib/tradingData";
 import { TokenPriceData } from "@/types/trading";
 import { useTradingState } from "@/hooks/useTradingState";
+import { useWallet } from "@/contexts/WalletContext";
 
 export default function TradingPage() {
   const [isTokenPickerOpen, setIsTokenPickerOpen] = useState(false);
@@ -20,23 +21,21 @@ export default function TradingPage() {
   const [tokenPriceData, setTokenPriceData] = useState<TokenPriceData | null>(null);
 
   const symbol = selectedToken?.symbol || "SOL";
+  const { wallet, updateBalance } = useWallet();
 
   useEffect(() => {
     setTokenPriceData(getTokenPriceData(symbol));
   }, [symbol]);
 
   const {
-    user,
     openOrders,
     activePositions,
     orderPending,
     lastNotification,
-    login,
-    logout,
     placeOrder,
     cancelOrder,
     closePosition,
-  } = useTradingState(symbol);
+  } = useTradingState(symbol, wallet, updateBalance);
 
   const handleTokenSelect = (token: TokenMarket) => {
     setSelectedToken(token);
@@ -80,7 +79,7 @@ export default function TradingPage() {
             </div>
           </div>
           <BottomTabs
-            isAuthenticated={user.isAuthenticated}
+            isAuthenticated={wallet.connected}
             positions={activePositions}
             orders={openOrders}
             onCancelOrder={cancelOrder}
@@ -92,15 +91,12 @@ export default function TradingPage() {
         {/* Right: Trading Panel */}
         <div className="w-[280px] shrink-0">
           <TradingPanel
-            user={user}
             symbol={symbol}
             tokenPriceData={tokenPriceData}
             activePositions={activePositions}
             openOrders={openOrders}
             orderPending={orderPending}
             lastNotification={lastNotification}
-            onLogin={login}
-            onLogout={logout}
             onPlaceOrder={placeOrder}
             onCancelOrder={cancelOrder}
             onClosePosition={closePosition}

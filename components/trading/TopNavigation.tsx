@@ -6,6 +6,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useTheme } from "@/contexts/ThemeContext";
+import { useWallet } from "@/contexts/WalletContext";
 
 const tourney = Tourney({
   subsets: ["latin"],
@@ -37,6 +38,7 @@ const notifIconColor: Record<string, string> = {
 export default function TopNavigation() {
   const pathname = usePathname();
   const { theme, toggleTheme, mounted } = useTheme();
+  const { wallet, connect, disconnect } = useWallet();
   const [primaryColor, setPrimaryColor] = useState("#0E76FD");
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -280,16 +282,21 @@ export default function TopNavigation() {
                     {label}
                   </button>
                 ))}
-                <div className="h-px mx-4" style={{ background: "rgba(66,70,84,0.3)" }} />
-                <button
-                  className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[12px] transition-colors text-left"
-                  style={{ color: "var(--sell)" }}
-                  onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = "rgba(255,77,79,0.06)")}
-                  onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = "transparent")}
-                >
-                  <LogOut size={14} />
-                  Log out
-                </button>
+                {wallet.connected && (
+                  <>
+                    <div className="h-px mx-4" style={{ background: "rgba(66,70,84,0.3)" }} />
+                    <button
+                      onClick={() => { disconnect(); setSettingsOpen(false); }}
+                      className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[12px] transition-colors text-left"
+                      style={{ color: "var(--sell)" }}
+                      onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = "rgba(255,77,79,0.06)")}
+                      onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = "transparent")}
+                    >
+                      <LogOut size={14} />
+                      Disconnect Wallet
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           )}
@@ -297,20 +304,38 @@ export default function TopNavigation() {
 
         <div className="w-px h-5 mx-1.5" style={{ background: "rgba(66,70,84,0.5)" }} />
 
-        {/* Connect Wallet */}
-        <button
-          className="flex items-center gap-2 px-3.5 py-1.5 text-[13px] font-medium rounded-lg transition-colors"
-          style={{ color: "var(--on-surface-variant)", background: "var(--surface-container)" }}
-          onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = "var(--on-surface)"; (e.currentTarget as HTMLElement).style.background = "var(--surface-container-high)"; }}
-          onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = "var(--on-surface-variant)"; (e.currentTarget as HTMLElement).style.background = "var(--surface-container)"; }}
-        >
-          <Wallet size={14} />
-          Connect Wallet
-        </button>
-
-        <button className="px-4 py-1.5 text-[13px] font-semibold rounded-lg btn-primary-gradient">
-          Sign up
-        </button>
+        {/* Wallet */}
+        {wallet.connected ? (
+          <div className="flex items-center gap-2">
+            <div
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-[12px] font-mono"
+              style={{ background: "var(--surface-container)", color: "var(--on-surface-variant)" }}
+            >
+              <div className="w-2 h-2 rounded-full" style={{ background: "var(--buy)" }} />
+              <span style={{ color: "var(--on-surface)" }}>${wallet.balance.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
+              <span className="opacity-50">|</span>
+              <span>{wallet.shortAddress}</span>
+            </div>
+            <button
+              onClick={disconnect}
+              title="Disconnect wallet"
+              className="px-3 py-1.5 text-[12px] font-mono rounded-lg transition-colors"
+              style={{ color: "var(--on-surface-disabled)", background: "var(--surface-container)" }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = "var(--sell)"; (e.currentTarget as HTMLElement).style.background = "var(--surface-container-high)"; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = "var(--on-surface-disabled)"; (e.currentTarget as HTMLElement).style.background = "var(--surface-container)"; }}
+            >
+              Disconnect
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={connect}
+            className="flex items-center gap-2 px-4 py-1.5 text-[13px] font-semibold rounded-lg btn-primary-gradient"
+          >
+            <Wallet size={14} />
+            Connect Wallet
+          </button>
+        )}
       </div>
     </header>
   );

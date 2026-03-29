@@ -22,7 +22,7 @@ export default function CandlestickChart({ symbol = "SOL", orders = [], position
       return {
         background: "#ffffff",
         textColor: "#9a9daa",
-        gridColor: "#d0d4e0",
+        gridColor: "#DEDEDE",
         crosshairColor: "#5a5d70",
         buy: "#00a866",
         sell: "#e53935",
@@ -32,7 +32,7 @@ export default function CandlestickChart({ symbol = "SOL", orders = [], position
     return {
       background: "#0c0f14",
       textColor: "#5a5d70",
-      gridColor: "#424654",
+      gridColor: "#1C232C",
       crosshairColor: "#8a8da0",
       buy: "#00c076",
       sell: "#ff4d4f",

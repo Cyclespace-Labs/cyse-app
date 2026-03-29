@@ -13,7 +13,7 @@ export default function VaultPage() {
   const [activeTimeRange, setActiveTimeRange] = useState("Total");
 
   return (
-    <div className="flex flex-col h-screen bg-black text-white overflow-hidden">
+    <div className="flex flex-col h-screen overflow-hidden" style={{ background: "var(--surface)", color: "var(--on-surface)" }}>
       <TopNavigation />
 
       <div className="flex-1 overflow-y-auto scrollbar-hide">
@@ -21,10 +21,10 @@ export default function VaultPage() {
         <div className="px-5 pt-6 pb-4">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-white text-[32px] font-semibold font-mono tracking-tight">
+              <h1 className="text-[32px] font-semibold font-mono tracking-tight" style={{ color: "var(--on-surface)" }}>
                 ${totalTVL.toLocaleString()}
               </h1>
-              <p className="text-[#5a5a6a] text-[13px] font-mono mt-1">
+              <p className="text-[13px] font-mono mt-1" style={{ color: "var(--on-surface-disabled)" }}>
                 TVL in vaults and pools
               </p>
             </div>
@@ -33,11 +33,11 @@ export default function VaultPage() {
                 <button
                   key={range}
                   onClick={() => setActiveTimeRange(range)}
-                  className={`px-3 py-1.5 text-[11px] font-mono rounded transition-colors ${
-                    activeTimeRange === range
-                      ? "bg-[#0E76FD] text-white"
-                      : "text-[#5a5a6a] hover:text-white hover:bg-[#1c1c28]"
-                  }`}
+                  className="px-3 py-1.5 text-[11px] font-mono rounded transition-colors"
+                  style={{
+                    background: activeTimeRange === range ? "var(--primary)" : "transparent",
+                    color: activeTimeRange === range ? "#fff" : "var(--on-surface-disabled)",
+                  }}
                 >
                   {range}
                 </button>
