@@ -18,17 +18,27 @@ export default function CandlestickChart({ symbol = "SOL", orders = [], position
   const { theme } = useTheme();
 
   const getThemeColors = useCallback(() => {
-    const root = document.documentElement;
-    const style = getComputedStyle(root);
+    if (theme === "light") {
+      return {
+        background: "#ffffff",
+        textColor: "#9a9daa",
+        gridColor: "#d0d4e0",
+        crosshairColor: "#5a5d70",
+        buy: "#00a866",
+        sell: "#e53935",
+        liquidation: "#ff6b35",
+      };
+    }
     return {
-      background: style.getPropertyValue("--surface-container-lowest").trim() || "#0c0f14",
-      textColor: style.getPropertyValue("--on-surface-disabled").trim() || "#5a5d70",
-      gridColor: style.getPropertyValue("--outline-variant").trim() || "#424654",
-      crosshairColor: style.getPropertyValue("--on-surface-muted").trim() || "#8a8da0",
-      buy: style.getPropertyValue("--buy").trim() || "#00c076",
-      sell: style.getPropertyValue("--sell").trim() || "#ff4d4f",
+      background: "#0c0f14",
+      textColor: "#5a5d70",
+      gridColor: "#424654",
+      crosshairColor: "#8a8da0",
+      buy: "#00c076",
+      sell: "#ff4d4f",
+      liquidation: "#ff6b35",
     };
-  }, []);
+  }, [theme]);
 
   useEffect(() => {
     if (!chartContainerRef.current) return;
@@ -137,7 +147,6 @@ export default function CandlestickChart({ symbol = "SOL", orders = [], position
     }
 
     // Render position entry lines
-    const liquidationColor = getComputedStyle(document.documentElement).getPropertyValue("--liquidation").trim() || "#ff6b35";
     for (const pos of positions) {
       candleSeries.createPriceLine({
         price: pos.entryPrice,
@@ -150,7 +159,7 @@ export default function CandlestickChart({ symbol = "SOL", orders = [], position
 
       candleSeries.createPriceLine({
         price: pos.liquidationPrice,
-        color: liquidationColor,
+        color: colors.liquidation ?? "#ff6b35",
         lineWidth: 1,
         lineStyle: 3,
         axisLabelVisible: true,
