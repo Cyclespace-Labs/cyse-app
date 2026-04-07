@@ -114,7 +114,7 @@ export default function ChartSection({ symbol = "SOL", orders = [], positions = 
 
       {/* Pair info bar */}
       <div className="flex items-center gap-2 px-3 py-1 text-[11px]" style={{ color: "var(--on-surface-disabled)", borderBottom: "1px solid rgba(66,70,84,0.4)" }}>
-        <span style={{ color: "var(--on-surface)" }}>{symbol}-PERP · 1 · Backpack</span>
+        <span style={{ color: "var(--on-surface)" }}>{symbol}-PERP · 1 · Cyclespace</span>
         <span style={{ color: "var(--on-surface-muted)" }}>·</span>
         {tokenPriceData && (
           <>

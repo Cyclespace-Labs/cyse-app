@@ -29,7 +29,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${alexandria.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${alexandria.variable} ${geistMono.variable} h-full font-sans antialiased`}
     >
       <body className="min-h-full flex flex-col">
         <ThemeProvider><WalletProvider>{children}</WalletProvider></ThemeProvider>
