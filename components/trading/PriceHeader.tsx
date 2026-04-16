@@ -1,6 +1,5 @@
 "use client";
 
-import { priceHeaderData } from "@/lib/mockData";
 import { formatPrice, formatVolume } from "@/lib/formatters";
 import { ChevronDown } from "lucide-react";
 import { TokenPriceData } from "@/types/trading";
@@ -12,8 +11,11 @@ interface PriceHeaderProps {
 }
 
 export default function PriceHeader({ onTokenPickerOpen, selectedSymbol, tokenPriceData }: PriceHeaderProps) {
-  const d = tokenPriceData ?? priceHeaderData;
-  const displaySymbol = selectedSymbol || d.symbol;
+  const d = tokenPriceData ?? null;
+  const displaySymbol = selectedSymbol || d?.symbol || "—";
+  const na = "—";
+
+  const changeColor = d && d.changePct24h >= 0 ? "var(--buy)" : "var(--sell)";
 
   return (
     <div
@@ -41,7 +43,7 @@ export default function PriceHeader({ onTokenPickerOpen, selectedSymbol, tokenPr
             className="px-1.5 py-0.5 text-[10px] font-semibold rounded tracking-wide"
             style={{ color: "var(--tertiary)", background: "rgba(255,182,143,0.1)" }}
           >
-            {d.leverage}
+            {d?.leverage ?? na}
           </span>
           <ChevronDown size={14} style={{ color: "var(--on-surface-muted)" }} />
         </div>
@@ -50,9 +52,11 @@ export default function PriceHeader({ onTokenPickerOpen, selectedSymbol, tokenPr
       {/* Price */}
       <div className="flex flex-col mr-5 shrink-0">
         <span className="text-lg font-bold leading-tight" style={{ color: "var(--buy)" }}>
-          {formatPrice(d.price)}
+          {d ? formatPrice(d.price) : na}
         </span>
-        <span className="text-[11px]" style={{ color: "var(--on-surface-muted)" }}>{formatPrice(d.price)}</span>
+        <span className="text-[11px]" style={{ color: "var(--on-surface-muted)" }}>
+          {d ? formatPrice(d.price) : na}
+        </span>
       </div>
 
       {/* Ghost Divider */}
@@ -61,14 +65,14 @@ export default function PriceHeader({ onTokenPickerOpen, selectedSymbol, tokenPr
       {/* Index Price */}
       <div className="flex flex-col mr-5 shrink-0">
         <span className="text-[10px] uppercase tracking-wide" style={{ color: "var(--on-surface-disabled)" }}>Index Price</span>
-        <span className="text-xs" style={{ color: "var(--on-surface)" }}>{formatPrice(d.indexPrice)}</span>
+        <span className="text-xs" style={{ color: "var(--on-surface)" }}>{d ? formatPrice(d.indexPrice) : na}</span>
       </div>
 
       {/* 24h Change */}
       <div className="flex flex-col mr-5 shrink-0">
         <span className="text-[10px] uppercase tracking-wide" style={{ color: "var(--on-surface-disabled)" }}>24h Change</span>
-        <span className="text-xs" style={{ color: "var(--sell)" }}>
-          {d.change24h.toFixed(2)} / {d.changePct24h.toFixed(2)}%
+        <span className="text-xs" style={{ color: changeColor }}>
+          {d ? `${d.change24h.toFixed(2)} / ${d.changePct24h.toFixed(2)}%` : na}
         </span>
       </div>
 
@@ -76,38 +80,38 @@ export default function PriceHeader({ onTokenPickerOpen, selectedSymbol, tokenPr
       <div className="flex flex-col mr-5 shrink-0">
         <span className="text-[10px] uppercase tracking-wide" style={{ color: "var(--on-surface-disabled)" }}>1h Funding / Countdown</span>
         <span className="text-xs" style={{ color: "var(--on-surface)" }}>
-          {d.funding} / {d.countdown}
+          {d ? `${d.funding} / ${d.countdown}` : na}
         </span>
       </div>
 
       {/* 24h High */}
       <div className="flex flex-col mr-5 shrink-0">
         <span className="text-[10px] uppercase tracking-wide" style={{ color: "var(--on-surface-disabled)" }}>24H High</span>
-        <span className="text-xs" style={{ color: "var(--on-surface)" }}>{formatPrice(d.high24h)}</span>
+        <span className="text-xs" style={{ color: "var(--on-surface)" }}>{d ? formatPrice(d.high24h) : na}</span>
       </div>
 
       {/* 24h Low */}
       <div className="flex flex-col mr-5 shrink-0">
         <span className="text-[10px] uppercase tracking-wide" style={{ color: "var(--on-surface-disabled)" }}>24H Low</span>
-        <span className="text-xs" style={{ color: "var(--on-surface)" }}>{formatPrice(d.low24h)}</span>
+        <span className="text-xs" style={{ color: "var(--on-surface)" }}>{d ? formatPrice(d.low24h) : na}</span>
       </div>
 
       {/* 24h Volume */}
       <div className="flex flex-col mr-5 shrink-0">
         <span className="text-[10px] uppercase tracking-wide" style={{ color: "var(--on-surface-disabled)" }}>24H Volume (USD)</span>
-        <span className="text-xs" style={{ color: "var(--on-surface)" }}>{formatVolume(d.volume24h)}</span>
+        <span className="text-xs" style={{ color: "var(--on-surface)" }}>{d ? formatVolume(d.volume24h) : na}</span>
       </div>
 
       {/* Open Interest */}
       <div className="flex flex-col mr-5 shrink-0">
-        <span className="text-[10px] uppercase tracking-wide" style={{ color: "var(--on-surface-disabled)" }}>Open Interest (SOL)</span>
-        <span className="text-xs" style={{ color: "var(--on-surface)" }}>{formatVolume(d.openInterest)}</span>
+        <span className="text-[10px] uppercase tracking-wide" style={{ color: "var(--on-surface-disabled)" }}>Open Interest</span>
+        <span className="text-xs" style={{ color: "var(--on-surface)" }}>{d ? formatVolume(d.openInterest) : na}</span>
       </div>
 
       {/* Profit APY */}
       <div className="flex flex-col shrink-0">
         <span className="text-[10px] uppercase tracking-wide" style={{ color: "var(--on-surface-disabled)" }}>Profit APY</span>
-        <span className="text-xs" style={{ color: "var(--buy)" }}>{d.profitApy} ↑</span>
+        <span className="text-xs" style={{ color: "var(--buy)" }}>{d?.profitApy ?? na} {d ? "↑" : ""}</span>
       </div>
     </div>
   );

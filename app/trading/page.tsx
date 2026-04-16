@@ -9,27 +9,73 @@ import TradingPanel from "@/components/trading/TradingPanel";
 import BottomTabs from "@/components/trading/BottomTabs";
 import BottomTicker from "@/components/trading/BottomTicker";
 import TokenPickerDialog from "@/components/trading/TokenPickerDialog";
-import { TokenMarket } from "@/lib/tokenData";
+import { tokenMarkets, TokenMarket } from "@/lib/tokenData";
 import { getTokenPriceData } from "@/lib/tradingData";
 import { TokenPriceData } from "@/types/trading";
 import { useWallet } from "@/contexts/WalletContext";
+import { useAllPositions } from "@/hooks/useAllPositions";
+import { useOpenOrders } from "@/hooks/useOpenOrders";
+import { usePriceOracle } from "@/hooks/usePriceOracle";
 import { contracts } from "@/lib/protocol/contracts";
+import { formatUnits } from "viem";
+import { OnChainIncreaseOrder, OnChainDecreaseOrder } from "@/types/protocol";
+import { Order } from "@/types/trading";
 
-const TOKEN_INDEX_MAP: Record<string, `0x${string}`> = {
-  WETH: contracts.weth.address,
-  ETH: contracts.weth.address,
+const ETH_TOKEN = tokenMarkets.find((t) => t.symbol === "ETH")!;
+
+const ADDRESS_TO_SYMBOL: Record<string, string> = {
+  [contracts.weth.address.toLowerCase()]: "ETH",
+  [contracts.btc.address.toLowerCase()]: "BTC",
 };
+
+function onChainOrdersToUI(
+  increases: OnChainIncreaseOrder[],
+  decreases: OnChainDecreaseOrder[]
+): Order[] {
+  const inc: Order[] = increases.map((o) => ({
+    id: `inc-${o.index}`,
+    symbol: `${ADDRESS_TO_SYMBOL[o.indexToken.toLowerCase()] ?? "?"}-PERP`,
+    side: o.isLong ? "buy" : "sell",
+    type: "limit",
+    price: parseFloat(formatUnits(o.triggerPrice, 30)),
+    quantity: parseFloat(formatUnits(o.sizeDelta, 30)),
+    filled: 0,
+    status: "open",
+    createdAt: Date.now(),
+  }));
+  const dec: Order[] = decreases.map((o) => ({
+    id: `dec-${o.index}`,
+    symbol: `${ADDRESS_TO_SYMBOL[o.indexToken.toLowerCase()] ?? "?"}-PERP`,
+    side: o.isLong ? "sell" : "buy",
+    type: "conditional",
+    price: parseFloat(formatUnits(o.triggerPrice, 30)),
+    quantity: parseFloat(formatUnits(o.sizeDelta, 30)),
+    filled: 0,
+    status: "open",
+    createdAt: Date.now(),
+  }));
+  return [...inc, ...dec];
+}
 
 export default function TradingPage() {
   const [isTokenPickerOpen, setIsTokenPickerOpen] = useState(false);
-  const [selectedToken, setSelectedToken] = useState<TokenMarket | null>(null);
+  const [selectedToken, setSelectedToken] = useState<TokenMarket>(ETH_TOKEN);
   const [tokenPriceData, setTokenPriceData] = useState<TokenPriceData | null>(null);
 
-  const symbol = selectedToken?.symbol || "SOL";
   const { wallet } = useWallet();
+  const { positions } = useAllPositions();
+  const { increaseOrders, decreaseOrders } = useOpenOrders();
 
-  const indexToken: `0x${string}` | undefined = TOKEN_INDEX_MAP[symbol.toUpperCase()];
-  const collateralToken: `0x${string}` | undefined = indexToken;
+  const symbol = selectedToken.symbol;
+  const indexToken: `0x${string}` = (selectedToken.indexAddress ?? contracts.weth.address) as `0x${string}`;
+  const collateralToken: `0x${string}` = indexToken;
+
+  // Page-level oracle: feeds chart + order book so all panels stay in sync.
+  // TradingPanel has its own internal usePriceOracle call; wagmi deduplicates the RPC request.
+  const { price: livePrice } = usePriceOracle(indexToken);
+  const currentPrice = livePrice ?? tokenPriceData?.price ?? 0;
+
+  const orders = onChainOrdersToUI(increaseOrders, decreaseOrders);
 
   useEffect(() => {
     setTokenPriceData(getTokenPriceData(symbol));
@@ -57,19 +103,20 @@ export default function TradingPage() {
             <div className="flex-1 min-h-0">
               <ChartSection
                 symbol={symbol}
-                orders={[]}
-                positions={[]}
+                orders={orders}
+                positions={positions}
                 tokenPriceData={tokenPriceData}
+                currentPrice={currentPrice}
               />
             </div>
             <div className="w-[260px] shrink-0">
-              <OrderBook />
+              <OrderBook symbol={symbol} currentPrice={currentPrice} />
             </div>
           </div>
           <BottomTabs
             isAuthenticated={wallet.connected}
-            positions={[]}
-            orders={[]}
+            positions={positions}
+            orders={orders}
             onCancelOrder={() => {}}
             onClosePosition={() => {}}
           />

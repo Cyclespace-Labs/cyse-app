@@ -1,20 +1,39 @@
 "use client";
 
 import { useEffect, useRef, useCallback } from "react";
-import { createChart, ColorType, CandlestickSeries, HistogramSeries, IChartApi } from "lightweight-charts";
+import { createChart, ColorType, CandlestickSeries, HistogramSeries, IChartApi, ISeriesApi } from "lightweight-charts";
 import { generateCandlestickDataForToken } from "@/lib/tradingData";
 import { Order, Position } from "@/types/trading";
 import { useTheme } from "@/contexts/ThemeContext";
+
+interface LiveCandle {
+  time: number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+}
 
 interface CandlestickChartProps {
   symbol?: string;
   orders?: Order[];
   positions?: Position[];
+  currentPrice?: number;
 }
 
-export default function CandlestickChart({ symbol = "SOL", orders = [], positions = [] }: CandlestickChartProps) {
+export default function CandlestickChart({
+  symbol = "SOL",
+  orders = [],
+  positions = [],
+  currentPrice,
+}: CandlestickChartProps) {
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const candleSeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const priceLinesRef = useRef<any[]>([]);
+  const latestCandleRef = useRef<LiveCandle | null>(null);
   const { theme } = useTheme();
 
   const getThemeColors = useCallback(() => {
@@ -40,6 +59,7 @@ export default function CandlestickChart({ symbol = "SOL", orders = [], position
     };
   }, [theme]);
 
+  // Effect 1 — Chart init: only re-runs on symbol or theme change
   useEffect(() => {
     if (!chartContainerRef.current) return;
 
@@ -85,15 +105,16 @@ export default function CandlestickChart({ symbol = "SOL", orders = [], position
       wickUpColor: colors.buy,
     });
 
+    candleSeriesRef.current = candleSeries;
+    priceLinesRef.current = [];
+
     const volumeSeries = chart.addSeries(HistogramSeries, {
       color: "#26a69a",
       priceFormat: { type: "volume" },
       priceScaleId: "",
     });
 
-    volumeSeries.priceScale().applyOptions({
-      scaleMargins: { top: 0.8, bottom: 0 },
-    });
+    volumeSeries.priceScale().applyOptions({ scaleMargins: { top: 0.8, bottom: 0 } });
 
     const formattedCandles = tokenData.map((d) => ({
       time: (new Date(d.time).getTime() / 1000) as unknown as string,
@@ -112,59 +133,16 @@ export default function CandlestickChart({ symbol = "SOL", orders = [], position
     candleSeries.setData(formattedCandles);
     volumeSeries.setData(formattedVolume);
 
-    // Render limit order lines
-    const openOrders = orders.filter((o) => o.status === "open");
-    for (const order of openOrders) {
-      candleSeries.createPriceLine({
-        price: order.price,
-        color: order.side === "buy" ? colors.buy : colors.sell,
-        lineWidth: 1,
-        lineStyle: 2,
-        axisLabelVisible: true,
-        title: `${order.side === "buy" ? "BUY" : "SELL"} ${order.quantity} @ ${order.price}`,
-      });
-
-      if (order.tp) {
-        candleSeries.createPriceLine({
-          price: order.tp,
-          color: colors.buy,
-          lineWidth: 1,
-          lineStyle: 3,
-          axisLabelVisible: true,
-          title: `TP ${order.tp}`,
-        });
-      }
-      if (order.sl) {
-        candleSeries.createPriceLine({
-          price: order.sl,
-          color: colors.sell,
-          lineWidth: 1,
-          lineStyle: 3,
-          axisLabelVisible: true,
-          title: `SL ${order.sl}`,
-        });
-      }
-    }
-
-    // Render position entry lines
-    for (const pos of positions) {
-      candleSeries.createPriceLine({
-        price: pos.entryPrice,
-        color: pos.side === "long" ? colors.buy : colors.sell,
-        lineWidth: 2,
-        lineStyle: 0,
-        axisLabelVisible: true,
-        title: `${pos.side === "long" ? "LONG" : "SHORT"} Entry ${pos.entryPrice}`,
-      });
-
-      candleSeries.createPriceLine({
-        price: pos.liquidationPrice,
-        color: colors.liquidation ?? "#ff6b35",
-        lineWidth: 1,
-        lineStyle: 3,
-        axisLabelVisible: true,
-        title: `LIQ ${pos.liquidationPrice}`,
-      });
+    // Store last candle for live updates
+    const last = tokenData[tokenData.length - 1];
+    if (last) {
+      latestCandleRef.current = {
+        time: new Date(last.time).getTime() / 1000,
+        open: last.open,
+        high: last.high,
+        low: last.low,
+        close: last.close,
+      };
     }
 
     chart.timeScale().fitContent();
@@ -182,10 +160,122 @@ export default function CandlestickChart({ symbol = "SOL", orders = [], position
 
     return () => {
       window.removeEventListener("resize", handleResize);
+      priceLinesRef.current = [];
+      latestCandleRef.current = null;
+      candleSeriesRef.current = null;
       chart.remove();
       chartRef.current = null;
     };
-  }, [symbol, orders, positions, theme, getThemeColors]);
+  }, [symbol, theme, getThemeColors]);
+
+  // Effect 2 — Live price: update the latest candle close in real time
+  useEffect(() => {
+    if (!candleSeriesRef.current || !currentPrice || currentPrice <= 0) return;
+    const latest = latestCandleRef.current;
+    if (!latest) return;
+
+    const updated = {
+      time: latest.time as unknown as string,
+      open: latest.open,
+      high: Math.max(latest.high, currentPrice),
+      low: Math.min(latest.low, currentPrice),
+      close: currentPrice,
+    };
+
+    try {
+      candleSeriesRef.current.update(updated);
+      latestCandleRef.current = {
+        ...latest,
+        high: updated.high,
+        low: updated.low,
+        close: currentPrice,
+      };
+    } catch {
+      // Chart may have been destroyed between renders
+    }
+  }, [currentPrice]);
+
+  // Effect 3 — Overlay lines: positions and orders (no chart rebuild)
+  useEffect(() => {
+    const series = candleSeriesRef.current;
+    if (!series) return;
+
+    const colors = getThemeColors();
+
+    // Remove existing price lines
+    for (const line of priceLinesRef.current) {
+      try { series.removePriceLine(line); } catch { /* ignore */ }
+    }
+    priceLinesRef.current = [];
+
+    // Order lines
+    for (const order of orders.filter((o) => o.status === "open")) {
+      if (order.price > 0) {
+        priceLinesRef.current.push(
+          series.createPriceLine({
+            price: order.price,
+            color: order.side === "buy" ? colors.buy : colors.sell,
+            lineWidth: 1,
+            lineStyle: 2,
+            axisLabelVisible: true,
+            title: `${order.side === "buy" ? "BUY" : "SELL"} @ ${order.price}`,
+          })
+        );
+      }
+      if (order.tp) {
+        priceLinesRef.current.push(
+          series.createPriceLine({
+            price: order.tp,
+            color: colors.buy,
+            lineWidth: 1,
+            lineStyle: 3,
+            axisLabelVisible: true,
+            title: `TP ${order.tp}`,
+          })
+        );
+      }
+      if (order.sl) {
+        priceLinesRef.current.push(
+          series.createPriceLine({
+            price: order.sl,
+            color: colors.sell,
+            lineWidth: 1,
+            lineStyle: 3,
+            axisLabelVisible: true,
+            title: `SL ${order.sl}`,
+          })
+        );
+      }
+    }
+
+    // Position entry + liquidation lines
+    for (const pos of positions) {
+      if (pos.entryPrice > 0) {
+        priceLinesRef.current.push(
+          series.createPriceLine({
+            price: pos.entryPrice,
+            color: pos.side === "long" ? colors.buy : colors.sell,
+            lineWidth: 2,
+            lineStyle: 0,
+            axisLabelVisible: true,
+            title: `${pos.side === "long" ? "LONG" : "SHORT"} ${pos.quantity > 0 ? `$${pos.quantity.toFixed(0)}` : ""}`,
+          })
+        );
+      }
+      if (pos.liquidationPrice > 0) {
+        priceLinesRef.current.push(
+          series.createPriceLine({
+            price: pos.liquidationPrice,
+            color: colors.liquidation,
+            lineWidth: 1,
+            lineStyle: 3,
+            axisLabelVisible: true,
+            title: `LIQ ${pos.liquidationPrice.toFixed(2)}`,
+          })
+        );
+      }
+    }
+  }, [orders, positions, getThemeColors]);
 
   return <div ref={chartContainerRef} className="w-full h-full" />;
 }

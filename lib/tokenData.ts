@@ -12,6 +12,10 @@ export interface TokenMarket {
   isFavorite: boolean;
   category: "perpetual" | "spot" | "lend";
   tags?: string[];
+  /** On-chain index token address — only set for live deployed pairs */
+  indexAddress?: `0x${string}`;
+  /** True when the pair has a live deployed contract on the active network */
+  isLive?: boolean;
 }
 
 export const tokenMarkets: TokenMarket[] = [
@@ -57,6 +61,8 @@ export const tokenMarkets: TokenMarket[] = [
     isFavorite: true,
     category: "perpetual",
     tags: ["Fess"],
+    isLive: true,
+    indexAddress: "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
   },
   {
     symbol: "ETH",
@@ -71,6 +77,8 @@ export const tokenMarkets: TokenMarket[] = [
     iconSecondary: "#627eea",
     isFavorite: true,
     category: "perpetual",
+    isLive: true,
+    indexAddress: "0x5FbDB2315678afecb367f032d93F642f64180aa3",
   },
   {
     symbol: "USDT",

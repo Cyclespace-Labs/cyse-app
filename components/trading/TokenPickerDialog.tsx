@@ -46,14 +46,21 @@ export default function TokenPickerDialog({
 
   if (!isOpen) return null;
 
-  const filtered = tokenMarkets.filter(
-    (t) =>
-      t.symbol.toLowerCase().includes(search.toLowerCase()) ||
-      t.name.toLowerCase().includes(search.toLowerCase()) ||
-      t.pair.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = tokenMarkets.filter((t) => {
+    const q = search.toLowerCase();
+    const matchesSearch =
+      t.symbol.toLowerCase().includes(q) ||
+      t.name.toLowerCase().includes(q) ||
+      t.pair.toLowerCase().includes(q);
+    if (activeTab === "Futures") return matchesSearch;
+    if (activeTab === "Spot") return matchesSearch && t.category === "spot";
+    if (activeTab === "Lend") return matchesSearch && t.category === "lend";
+    return matchesSearch;
+  });
 
   const sorted = [...filtered].sort((a, b) => {
+    if (a.isLive && !b.isLive) return -1;
+    if (!a.isLive && b.isLive) return 1;
     if (sortBy === "volume") return b.volume24h - a.volume24h;
     if (sortBy === "price") return b.price - a.price;
     return b.marketCap - a.marketCap;
@@ -186,7 +193,15 @@ export default function TokenPickerDialog({
                     <span className="text-[13px] font-medium truncate" style={{ color: "var(--on-surface)" }}>
                       {token.pair}
                     </span>
-                    {token.leverage && (
+                    {token.isLive && (
+                      <span
+                        className="px-1 py-0.5 text-[9px] font-semibold rounded shrink-0"
+                        style={{ color: "var(--buy)", background: "rgba(0,192,118,0.12)", border: "1px solid rgba(0,192,118,0.25)" }}
+                      >
+                        Live
+                      </span>
+                    )}
+                  {token.leverage && (
                       <span
                         className="px-1 py-0.5 text-[9px] font-semibold rounded shrink-0"
                         style={{ color: "var(--tertiary)", background: "rgba(255,182,143,0.1)" }}

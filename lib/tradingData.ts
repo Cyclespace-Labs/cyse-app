@@ -204,6 +204,7 @@ export function getTokenPriceData(symbol: string): TokenPriceData {
     pair: config.pair,
     leverage: config.leverage,
     price: currentPrice,
+    openPrice: parseFloat(firstCandle.open.toFixed(getDecimals(firstCandle.open))),
     indexPrice: parseFloat((currentPrice * 1.0004).toFixed(getDecimals(currentPrice))),
     change24h: parseFloat(change24h.toFixed(getDecimals(currentPrice))),
     changePct24h: parseFloat(changePct.toFixed(2)),

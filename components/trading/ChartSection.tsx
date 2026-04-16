@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import CandlestickChart from "./CandlestickChart";
 import {
   Crosshair,
@@ -21,11 +21,23 @@ interface ChartSectionProps {
   orders?: Order[];
   positions?: Position[];
   tokenPriceData?: TokenPriceData | null;
+  currentPrice?: number;
 }
 
-export default function ChartSection({ symbol = "SOL", orders = [], positions = [], tokenPriceData }: ChartSectionProps) {
+export default function ChartSection({ symbol = "SOL", orders = [], positions = [], tokenPriceData, currentPrice }: ChartSectionProps) {
   const [activeTab, setActiveTab] = useState("Chart");
   const [activeTimeframe, setActiveTimeframe] = useState("1m");
+  const [utcClock, setUtcClock] = useState("");
+
+  useEffect(() => {
+    const tick = () => {
+      const now = new Date();
+      setUtcClock(now.toISOString().slice(11, 19) + " [UTC]");
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, []);
 
   return (
     <div className="flex flex-col h-full" style={{ background: "var(--surface-container-lowest)", borderRight: "1px solid rgba(66,70,84,0.4)" }}>
@@ -119,15 +131,22 @@ export default function ChartSection({ symbol = "SOL", orders = [], positions = 
         {tokenPriceData && (
           <>
             <span>
-              O <span style={{ color: "var(--on-surface)" }}>{formatPrice(tokenPriceData.price)}</span> H{" "}
-              <span style={{ color: "var(--on-surface)" }}>{formatPrice(tokenPriceData.high24h)}</span> L{" "}
-              <span style={{ color: "var(--on-surface)" }}>{formatPrice(tokenPriceData.low24h)}</span> C{" "}
-              <span style={{ color: tokenPriceData.change24h >= 0 ? "var(--buy)" : "var(--sell)" }}>
+              O <span style={{ color: "var(--on-surface)" }}>{formatPrice(tokenPriceData.openPrice ?? tokenPriceData.price)}</span>{" "}
+              H <span style={{ color: "var(--on-surface)" }}>{formatPrice(tokenPriceData.high24h)}</span>{" "}
+              L <span style={{ color: "var(--on-surface)" }}>{formatPrice(tokenPriceData.low24h)}</span>{" "}
+              C <span style={{ color: tokenPriceData.change24h >= 0 ? "var(--buy)" : "var(--sell)" }}>
                 {formatPrice(tokenPriceData.price)}
               </span>
             </span>
             <span style={{ color: tokenPriceData.change24h >= 0 ? "var(--buy)" : "var(--sell)" }}>
               {tokenPriceData.change24h >= 0 ? "+" : ""}{formatPrice(tokenPriceData.change24h)} ({tokenPriceData.changePct24h.toFixed(2)}%)
+            </span>
+            <span style={{ color: "var(--on-surface-disabled)" }}>
+              Vol <span style={{ color: "var(--on-surface-muted)" }}>{tokenPriceData.volume24h >= 1e9
+                ? `$${(tokenPriceData.volume24h / 1e9).toFixed(2)}B`
+                : tokenPriceData.volume24h >= 1e6
+                  ? `$${(tokenPriceData.volume24h / 1e6).toFixed(1)}M`
+                  : `$${(tokenPriceData.volume24h / 1e3).toFixed(0)}K`}</span>
             </span>
           </>
         )}
@@ -135,7 +154,7 @@ export default function ChartSection({ symbol = "SOL", orders = [], positions = 
 
       {/* Chart */}
       <div className="flex-1 relative min-h-0">
-        <CandlestickChart symbol={symbol} orders={orders} positions={positions} />
+        <CandlestickChart symbol={symbol} orders={orders} positions={positions} currentPrice={currentPrice} />
         {/* TradingView Watermark */}
         <div className="absolute bottom-3 left-3 flex items-center gap-1.5 opacity-40">
           <div className="w-5 h-5 rounded flex items-center justify-center" style={{ background: "var(--primary)" }}>
@@ -162,7 +181,7 @@ export default function ChartSection({ symbol = "SOL", orders = [], positions = 
           </button>
         ))}
         <div className="ml-auto flex items-center gap-2" style={{ color: "var(--on-surface-disabled)" }}>
-          <span>06:56:25 [UTC+2]</span>
+          <span>{utcClock}</span>
           <span>%</span>
           <span>log</span>
           <span>auto</span>

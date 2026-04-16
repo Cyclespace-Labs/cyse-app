@@ -66,6 +66,7 @@ export interface TokenPriceData {
   pair: string;
   leverage: string;
   price: number;
+  openPrice: number;
   indexPrice: number;
   change24h: number;
   changePct24h: number;

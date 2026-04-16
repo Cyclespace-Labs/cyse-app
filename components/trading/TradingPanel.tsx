@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useMemo, useCallback, useEffect } from "react";
-import { ChevronDown, Loader2, X, Wallet, ExternalLink, AlertTriangle, Shield, Clock } from "lucide-react";
+import { ChevronDown, Loader2, X, AlertTriangle, Shield } from "lucide-react";
 import { TokenPriceData } from "@/types/trading";
-import { getBestBidAsk, getTickSize } from "@/lib/tradingData";
+import { getTickSize } from "@/lib/tradingData";
 import { useWallet } from "@/contexts/WalletContext";
 import { useTradingActions } from "@/hooks/useTradingActions";
 import { useOpenOrders } from "@/hooks/useOpenOrders";
@@ -32,7 +32,7 @@ export default function TradingPanel({
   indexToken = contracts.weth.address,
   collateralToken = contracts.weth.address,
 }: TradingPanelProps) {
-  const { wallet, CustomConnectButton, disconnect } = useWallet();
+  const { wallet, CustomConnectButton } = useWallet();
 
   const [activeType, setActiveType] = useState("Limit");
   const [side, setSide] = useState<"buy" | "sell">("buy");
@@ -54,19 +54,12 @@ export default function TradingPanel({
     isValid: isOracleValid,
     isStale: isOracleStale,
     source: oracleSource,
-    networkStatus,
     websocketConnected,
     validatePrice,
     calculatePriceImpact,
-    updateMockPythPrice,
-    mockPythPrice,
   } = usePriceOracle(indexToken);
 
   const currentPrice = oraclePrice ?? tokenPriceData?.price ?? 0;
-  
-  // For testing: show MockPyth price if available
-  const displayPrice = mockPythPrice || currentPrice;
-  const tickSize = getTickSize(currentPrice);
   const priceNum = parseFloat(price) || 0;
   const qtyNum = parseFloat(quantity) || 0;
   const isLong = side === "buy";
@@ -147,11 +140,12 @@ export default function TradingPanel({
     if (qtyNum <= 0 || leverage <= 0) return null;
     const p = activeType === "Market" ? currentPrice : priceNum;
     const liqDist = p / leverage;
-    const decimals = Math.max(2, -Math.floor(Math.log10(tickSize)));
+    const ts = getTickSize(p);
+    const decimals = ts > 0 ? Math.max(2, -Math.floor(Math.log10(ts))) : 2;
     return side === "buy"
       ? parseFloat((p - liqDist).toFixed(decimals))
       : parseFloat((p + liqDist).toFixed(decimals));
-  }, [side, activeType, currentPrice, priceNum, qtyNum, leverage, tickSize]);
+  }, [side, activeType, currentPrice, priceNum, qtyNum, leverage]);
 
   const insufficientBalance = wallet.connected && marginRequired > wallet.balance;
 
@@ -165,24 +159,6 @@ export default function TradingPanel({
 
   const orderPending = isPending;
 
-  const handleMid = () => setPrice(String(getBestBidAsk(symbol).mid));
-  const handleBBO = () => {
-    const { bid, ask } = getBestBidAsk(symbol);
-    setPrice(String(side === "buy" ? bid : ask));
-  };
-  const handleTickUp = () => {
-    const current = parseFloat(price) || currentPrice;
-    const decimals = Math.max(2, -Math.floor(Math.log10(tickSize)));
-    setPrice(String(parseFloat((current + tickSize).toFixed(decimals))));
-  };
-  const handleTickDown = () => {
-    const current = parseFloat(price) || currentPrice;
-    const next = current - tickSize;
-    if (next > 0) {
-      const decimals = Math.max(2, -Math.floor(Math.log10(tickSize)));
-      setPrice(String(parseFloat(next.toFixed(decimals))));
-    }
-  };
   const handlePctQuantity = (pct: number) => {
     if (!wallet.connected || wallet.balance <= 0) return;
     const p = activeType === "Market" ? currentPrice : priceNum || currentPrice;
@@ -269,42 +245,21 @@ export default function TradingPanel({
         </div>
       )}
 
-      {/* Oracle Status */}
+      {/* Oracle Status — subtle pill */}
       <div
-        className="px-3 py-1.5 flex items-center justify-between text-[10px]"
-        style={{
-          background: isOracleStale ? "rgba(255,165,0,0.08)" : "rgba(14,118,253,0.05)",
-          borderBottom: "1px solid rgba(66,70,84,0.3)",
-        }}
+        className="px-3 py-1 flex items-center justify-between text-[10px]"
+        style={{ borderBottom: "1px solid rgba(66,70,84,0.3)" }}
       >
-        <div className="flex items-center gap-1.5">
-          {isOracleStale ? (
-            <Clock size={10} style={{ color: "#FFA500" }} />
-          ) : (
-            <Shield size={10} style={{ color: isOracleValid ? "var(--buy)" : "var(--sell)" }} />
-          )}
-          <span style={{ color: "var(--on-surface-muted)" }}>
-            Oracle: {oracleSource}
-            {websocketConnected && <span className="ml-1 text-[var(--buy)]">● Live</span>}
-          </span>
+        <div className="flex items-center gap-1.5" style={{ color: "var(--on-surface-disabled)" }}>
+          <Shield size={9} style={{ color: isOracleValid ? "var(--buy)" : "var(--sell)" }} />
+          <span>{oracleSource}{websocketConnected ? " · Live" : isOracleStale ? " · Stale" : ""}</span>
         </div>
-        <div className="flex items-center gap-2">
-          <span
-            className="font-mono"
-            style={{
-              color: isOracleStale ? "#FFA500" : isOracleValid ? "var(--buy)" : "var(--sell)",
-            }}
-          >
-            {currentPrice > 0 ? currentPrice.toFixed(4) : "—"}
-            {isOracleStale && " (stale)"}
-          </span>
-          {networkStatus === "offline" && (
-            <span style={{ color: "var(--sell)" }}>● Offline</span>
-          )}
-          {networkStatus === "degraded" && (
-            <span style={{ color: "#FFA500" }}>● Degraded</span>
-          )}
-        </div>
+        <span
+          className="font-mono text-[10px]"
+          style={{ color: isOracleValid ? "var(--on-surface-muted)" : "var(--sell)" }}
+        >
+          {currentPrice > 0 ? `$${currentPrice.toLocaleString("en-US", { maximumFractionDigits: 4 })}` : "—"}
+        </span>
       </div>
 
       {/* Buy/Sell Toggle */}
@@ -358,62 +313,32 @@ export default function TradingPanel({
           </span>
         </div>
 
-        {/* Price Input */}
+        {/* Limit Price Input */}
         {activeType !== "Market" && (
           <div>
             <div className="flex items-center justify-between mb-1">
-              <label htmlFor="price-input" className="text-[11px]" style={{ color: "var(--on-surface-disabled)" }}>Price</label>
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={handleMid}
-                  className="px-1.5 py-0.5 text-[10px] rounded transition-colors"
-                  style={{ color: "var(--on-surface-muted)", background: "transparent" }}
-                  onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = "var(--on-surface)"; (e.currentTarget as HTMLElement).style.background = "var(--surface-container-high)"; }}
-                  onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = "var(--on-surface-muted)"; (e.currentTarget as HTMLElement).style.background = "transparent"; }}
-                >
-                  Mid
-                </button>
-                <button
-                  onClick={handleBBO}
-                  className="px-1.5 py-0.5 text-[10px] rounded transition-colors"
-                  style={{ color: "var(--tertiary)", background: "rgba(255,182,143,0.1)" }}
-                  onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = "rgba(255,182,143,0.2)")}
-                  onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = "rgba(255,182,143,0.1)")}
-                >
-                  BBO
-                </button>
-              </div>
+              <label htmlFor="price-input" className="text-[11px]" style={{ color: "var(--on-surface-disabled)" }}>Limit Price</label>
+              <span className="text-[10px] font-mono" style={{ color: "var(--on-surface-disabled)" }}>USD</span>
             </div>
             <div className="flex items-center rounded px-3 py-2" style={{ background: "var(--surface-container-low)", borderBottom: "2px solid var(--outline-variant)" }}>
               <input
                 id="price-input"
-                type="text"
+                type="number"
                 value={price}
                 onChange={(e) => setPrice(e.target.value)}
-                placeholder={String(currentPrice)}
+                placeholder={currentPrice > 0 ? currentPrice.toFixed(2) : "0.00"}
                 className="flex-1 bg-transparent text-sm outline-none font-mono"
                 style={{ color: "var(--on-surface)" }}
               />
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={handleTickDown}
-                  className="w-5 h-5 flex items-center justify-center rounded text-xs transition-colors"
-                  style={{ color: "var(--on-surface-muted)", background: "var(--surface-container-high)" }}
-                  onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.color = "var(--on-surface)")}
-                  onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.color = "var(--on-surface-muted)")}
-                >
-                  −
-                </button>
-                <button
-                  onClick={handleTickUp}
-                  className="w-5 h-5 flex items-center justify-center rounded text-xs transition-colors"
-                  style={{ color: "var(--on-surface-muted)", background: "var(--surface-container-high)" }}
-                  onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.color = "var(--on-surface)")}
-                  onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.color = "var(--on-surface-muted)")}
-                >
-                  +
-                </button>
-              </div>
+              <button
+                onClick={() => setPrice(currentPrice > 0 ? currentPrice.toFixed(2) : "")}
+                className="text-[10px] px-1.5 py-0.5 rounded transition-colors ml-2 shrink-0"
+                style={{ color: "var(--on-surface-muted)", background: "var(--surface-container-high)" }}
+                onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.color = "var(--on-surface)")}
+                onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.color = "var(--on-surface-muted)")}
+              >
+                Mark
+              </button>
             </div>
           </div>
         )}
@@ -630,53 +555,6 @@ export default function TradingPanel({
                 `${side === "buy" ? "Buy / Long" : "Sell / Short"} ${symbol}`
               )}
             </button>
-          </div>
-        )}
-
-        {/* MockPyth Price Testing Controls */}
-        {mockPythPrice && wallet.connected && (
-          <div className="pt-1 space-y-2" style={{ borderTop: "1px solid rgba(66,70,84,0.4)" }}>
-            <div className="flex items-center justify-between text-[11px]" style={{ color: "var(--on-surface-variant)" }}>
-              <div className="flex items-center gap-1.5">
-                <Clock size={12} />
-                <span>MockPyth Price</span>
-              </div>
-              <span style={{ color: "var(--on-surface)" }}>${mockPythPrice.toFixed(2)}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <input
-                type="number"
-                placeholder="New Price"
-                className="flex-1 bg-transparent text-[11px] outline-none font-mono px-2 py-1 rounded"
-                style={{ background: "var(--surface-container-low)", border: "1px solid var(--outline-variant)", color: "var(--on-surface)" }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    const target = e.target as HTMLInputElement;
-                    const newPrice = parseFloat(target.value);
-                    if (newPrice > 0) {
-                      updateMockPythPrice("0xff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace", newPrice);
-                      target.value = "";
-                    }
-                  }
-                }}
-              />
-              <button
-                onClick={() => {
-                  const input = document.querySelector('input[type="number"]') as HTMLInputElement;
-                  if (input) {
-                    const newPrice = parseFloat(input.value);
-                    if (newPrice > 0) {
-                      updateMockPythPrice("0xff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace", newPrice);
-                      input.value = "";
-                    }
-                  }
-                }}
-                className="px-2 py-1 text-[11px] rounded"
-                style={{ background: "var(--surface-container)", border: "1px solid var(--outline-variant)", color: "var(--on-surface)" }}
-              >
-                Update
-              </button>
-            </div>
           </div>
         )}
 
