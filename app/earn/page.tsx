@@ -21,7 +21,7 @@ import { useWallet } from "@/contexts/WalletContext";
 const earnTabs = ["Portfolio", "Discover", "Additional opportunities", "Distributions", "Buyback Tracker"];
 
 export default function EarnPage() {
-  const { wallet, connect } = useWallet();
+  const { wallet, CustomConnectButton } = useWallet();
   const [activeTab, setActiveTab] = useState("Portfolio");
   const [showBuyDialog, setShowBuyDialog] = useState(false);
   const [buyTokenName, setBuyTokenName] = useState("CYSE");
@@ -86,13 +86,7 @@ export default function EarnPage() {
                     <p className="text-[13px] font-mono mb-4" style={{ color: "var(--on-surface-disabled)" }}>
                       Connect wallet to see your assets
                     </p>
-                    <button
-                      onClick={connect}
-                      className="flex items-center gap-2 px-5 py-2.5 text-[13px] font-mono font-semibold rounded btn-primary-gradient"
-                    >
-                      <Wallet size={15} />
-                      Connect Wallet
-                    </button>
+                    <CustomConnectButton />
                   </div>
                 ) : (
                   <div

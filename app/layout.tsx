@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
 import { Alexandria, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import "@rainbow-me/rainbowkit/styles.css";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { WalletProvider } from "@/contexts/WalletContext";
+import { Providers } from "@/components/Providers";
 
 const alexandria = Alexandria({
   variable: "--font-alexandria",
@@ -32,7 +34,7 @@ export default function RootLayout({
       className={`${alexandria.variable} ${geistMono.variable} h-full font-sans antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <ThemeProvider><WalletProvider>{children}</WalletProvider></ThemeProvider>
+        <ThemeProvider><Providers><WalletProvider>{children}</WalletProvider></Providers></ThemeProvider>
       </body>
     </html>
   );

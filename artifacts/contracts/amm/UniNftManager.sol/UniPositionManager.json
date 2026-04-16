@@ -1,0 +1,258 @@
+{
+  "_format": "hh-sol-artifact-1",
+  "contractName": "UniPositionManager",
+  "sourceName": "contracts/amm/UniNftManager.sol",
+  "abi": [
+    {
+      "inputs": [
+        {
+          "components": [
+            {
+              "internalType": "uint256",
+              "name": "tokenId",
+              "type": "uint256"
+            },
+            {
+              "internalType": "address",
+              "name": "recipient",
+              "type": "address"
+            },
+            {
+              "internalType": "uint128",
+              "name": "amount0Max",
+              "type": "uint128"
+            },
+            {
+              "internalType": "uint128",
+              "name": "amount1Max",
+              "type": "uint128"
+            }
+          ],
+          "internalType": "struct UniPositionManager.CollectParams",
+          "name": "",
+          "type": "tuple"
+        }
+      ],
+      "name": "collect",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "amount0",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "amount1",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "pure",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "components": [
+            {
+              "components": [
+                {
+                  "internalType": "address",
+                  "name": "currency0",
+                  "type": "address"
+                },
+                {
+                  "internalType": "address",
+                  "name": "currency1",
+                  "type": "address"
+                },
+                {
+                  "internalType": "uint24",
+                  "name": "fee",
+                  "type": "uint24"
+                },
+                {
+                  "internalType": "int24",
+                  "name": "tickSpacing",
+                  "type": "int24"
+                },
+                {
+                  "internalType": "address",
+                  "name": "hooks",
+                  "type": "address"
+                }
+              ],
+              "internalType": "struct UniPositionManager.PoolKey",
+              "name": "poolKey",
+              "type": "tuple"
+            },
+            {
+              "internalType": "int24",
+              "name": "tickLower",
+              "type": "int24"
+            },
+            {
+              "internalType": "int24",
+              "name": "tickUpper",
+              "type": "int24"
+            },
+            {
+              "internalType": "uint256",
+              "name": "amount0Desired",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "amount1Desired",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "amount0Min",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "amount1Min",
+              "type": "uint256"
+            },
+            {
+              "internalType": "address",
+              "name": "recipient",
+              "type": "address"
+            },
+            {
+              "internalType": "uint256",
+              "name": "deadline",
+              "type": "uint256"
+            }
+          ],
+          "internalType": "struct UniPositionManager.MintParams",
+          "name": "",
+          "type": "tuple"
+        }
+      ],
+      "name": "mint",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "tokenId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint128",
+          "name": "liquidity",
+          "type": "uint128"
+        },
+        {
+          "internalType": "uint256",
+          "name": "amount0",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "amount1",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "pure",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "nextTokenId",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "tokenId",
+          "type": "uint256"
+        }
+      ],
+      "name": "ownerOf",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "tokenId",
+          "type": "uint256"
+        }
+      ],
+      "name": "positions",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "address",
+              "name": "currency0",
+              "type": "address"
+            },
+            {
+              "internalType": "address",
+              "name": "currency1",
+              "type": "address"
+            },
+            {
+              "internalType": "uint24",
+              "name": "fee",
+              "type": "uint24"
+            },
+            {
+              "internalType": "int24",
+              "name": "tickSpacing",
+              "type": "int24"
+            },
+            {
+              "internalType": "address",
+              "name": "hooks",
+              "type": "address"
+            }
+          ],
+          "internalType": "struct UniPositionManager.PoolKey",
+          "name": "poolKey",
+          "type": "tuple"
+        },
+        {
+          "internalType": "int24",
+          "name": "tickLower",
+          "type": "int24"
+        },
+        {
+          "internalType": "int24",
+          "name": "tickUpper",
+          "type": "int24"
+        },
+        {
+          "internalType": "uint128",
+          "name": "liquidity",
+          "type": "uint128"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    }
+  ],
+  "bytecode": "0x60808060405234610016576102a9908161001c8239f35b600080fdfe6080604090808252600436101561001557600080fd5b600090813560e01c9081636352211e146102095750806375794a3c146101ea57806379b5e7d7146101bc57806399fbab881461007b5763fc6f78651461005a57600080fd5b34610078576080366003190112610078578151908082526020820152f35b80fd5b5090346101b857602091826003193601126100785780608061009b61023d565b828152828682015282858201528260608201520152600435815280835281812091805191608083019083821067ffffffffffffffff8311176101a4575091816060936101009693526100eb61023d565b809560018060a01b03928382541683526001820154918684019685841688528285019086600362ffffff94858860a01c1685528c89019760b81c60020b885260808360028301541699019889528d8b520154998a60020b998a848201526fffffffffffffffffffffffffffffffff8c60181c60020b9c8d8984015260301c169c8d9101528186519d51168d525116908b01525116908801525160020b60608701525116608085015260a084015260c083015260e0820152f35b634e487b7160e01b81526041600452602490fd5b5080fd5b5090346101b8576101a03660031901126101b857816080928251928184528160208501528301526060820152f35b5090346101b857816003193601126101b8576020906002549051908152f35b90508234610239576020366003190112610239576004358352600160209081529220546001600160a01b03168152f35b8280fd5b6040519060a0820182811067ffffffffffffffff82111761025d57604052565b634e487b7160e01b600052604160045260246000fdfea2646970667358221220df36143e5126af14d81ee7c9a9c9b76f6288586ad72e5395b90ab3b2879b3d9764736f6c63430008140033",
+  "deployedBytecode": "0x6080604090808252600436101561001557600080fd5b600090813560e01c9081636352211e146102095750806375794a3c146101ea57806379b5e7d7146101bc57806399fbab881461007b5763fc6f78651461005a57600080fd5b34610078576080366003190112610078578151908082526020820152f35b80fd5b5090346101b857602091826003193601126100785780608061009b61023d565b828152828682015282858201528260608201520152600435815280835281812091805191608083019083821067ffffffffffffffff8311176101a4575091816060936101009693526100eb61023d565b809560018060a01b03928382541683526001820154918684019685841688528285019086600362ffffff94858860a01c1685528c89019760b81c60020b885260808360028301541699019889528d8b520154998a60020b998a848201526fffffffffffffffffffffffffffffffff8c60181c60020b9c8d8984015260301c169c8d9101528186519d51168d525116908b01525116908801525160020b60608701525116608085015260a084015260c083015260e0820152f35b634e487b7160e01b81526041600452602490fd5b5080fd5b5090346101b8576101a03660031901126101b857816080928251928184528160208501528301526060820152f35b5090346101b857816003193601126101b8576020906002549051908152f35b90508234610239576020366003190112610239576004358352600160209081529220546001600160a01b03168152f35b8280fd5b6040519060a0820182811067ffffffffffffffff82111761025d57604052565b634e487b7160e01b600052604160045260246000fdfea2646970667358221220df36143e5126af14d81ee7c9a9c9b76f6288586ad72e5395b90ab3b2879b3d9764736f6c63430008140033",
+  "linkReferences": {},
+  "deployedLinkReferences": {}
+}

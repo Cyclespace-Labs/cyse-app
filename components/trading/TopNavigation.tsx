@@ -1,6 +1,6 @@
 "use client";
 
-import { Search, Bell, Settings, Globe, X, Wallet, ChevronDown, CheckCircle2, AlertCircle, Info, Zap, Moon, Sun, Monitor, Volume2, VolumeX, Shield, HelpCircle, LogOut } from "lucide-react";
+import { Search, Bell, Settings, Globe, X, Wallet, ChevronDown, CheckCircle2, AlertCircle, Info, Zap, Moon, Sun, Monitor, Volume2, VolumeX, Shield, HelpCircle, LogOut, Loader2, AlertTriangle } from "lucide-react";
 import { Tourney } from "next/font/google";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -38,7 +38,7 @@ const notifIconColor: Record<string, string> = {
 export default function TopNavigation() {
   const pathname = usePathname();
   const { theme, toggleTheme, mounted } = useTheme();
-  const { wallet, connect, disconnect } = useWallet();
+  const { wallet, CustomConnectButton, disconnect } = useWallet();
   const [primaryColor, setPrimaryColor] = useState("#0E76FD");
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -307,12 +307,54 @@ export default function TopNavigation() {
         {/* Wallet */}
         {wallet.connected ? (
           <div className="flex items-center gap-2">
+            {/* Security/Network Warnings */}
+            {!wallet.isCorrectNetwork && (
+              <button
+                onClick={() => {}}
+                className="flex items-center gap-1 px-2 py-1 rounded text-[10px]"
+                style={{ background: "rgba(255,165,0,0.1)", color: "#FFA500" }}
+                title="Wrong network detected"
+              >
+                <AlertTriangle size={10} />
+                <span>Wrong Network</span>
+              </button>
+            )}
+            {wallet.isHardwareWallet && (
+              <div
+                className="flex items-center gap-1 px-2 py-1 rounded text-[10px]"
+                style={{ background: "rgba(0,192,118,0.1)", color: "var(--buy)" }}
+                title="Hardware wallet connected"
+              >
+                <Shield size={10} />
+                <span>{wallet.walletType === "ledger" ? "Ledger" : "Trezor"}</span>
+              </div>
+            )}
+            {wallet.isCorrectNetwork && (
+              <div
+                className="flex items-center gap-1 px-2 py-1 rounded text-[10px]"
+                style={{ background: "rgba(14,118,253,0.1)", color: "var(--primary)" }}
+                title={`Connected to ${wallet.chainName}`}
+              >
+                <Globe size={10} />
+                <span>{wallet.chainName}</span>
+              </div>
+            )}
+
             <div
               className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-[12px] font-mono"
               style={{ background: "var(--surface-container)", color: "var(--on-surface-variant)" }}
             >
-              <div className="w-2 h-2 rounded-full" style={{ background: "var(--buy)" }} />
-              <span style={{ color: "var(--on-surface)" }}>${wallet.balance.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
+              <div
+                className="w-2 h-2 rounded-full"
+                style={{
+                  background: wallet.isCorrectNetwork
+                    ? wallet.securityLevel === "secure"
+                      ? "var(--buy)"
+                      : "var(--primary)"
+                    : "#FFA500",
+                }}
+              />
+              <span style={{ color: "var(--on-surface)" }}>{wallet.balance.toLocaleString("en-US", { minimumFractionDigits: 4 })} {wallet.nativeCurrencySymbol}</span>
               <span className="opacity-50">|</span>
               <span>{wallet.shortAddress}</span>
             </div>
@@ -328,13 +370,9 @@ export default function TopNavigation() {
             </button>
           </div>
         ) : (
-          <button
-            onClick={connect}
-            className="flex items-center gap-2 px-4 py-1.5 text-[13px] font-semibold rounded-lg btn-primary-gradient"
-          >
-            <Wallet size={14} />
-            Connect Wallet
-          </button>
+          <div className="flex items-center">
+            <CustomConnectButton variant="small" />
+          </div>
         )}
       </div>
     </header>

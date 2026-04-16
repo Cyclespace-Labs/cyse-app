@@ -1,0 +1,52 @@
+{
+  "_format": "hh-sol-artifact-1",
+  "contractName": "MockPancakePair",
+  "sourceName": "contracts/test/MockPancakePair.sol",
+  "abi": [
+    {
+      "inputs": [],
+      "name": "getReserves",
+      "outputs": [
+        {
+          "internalType": "uint112",
+          "name": "",
+          "type": "uint112"
+        },
+        {
+          "internalType": "uint112",
+          "name": "",
+          "type": "uint112"
+        },
+        {
+          "internalType": "uint32",
+          "name": "",
+          "type": "uint32"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint112",
+          "name": "_reserve0",
+          "type": "uint112"
+        },
+        {
+          "internalType": "uint112",
+          "name": "_reserve1",
+          "type": "uint112"
+        }
+      ],
+      "name": "setReserves",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    }
+  ],
+  "bytecode": "0x6080806040523461001657610107908161001c8239f35b600080fdfe6080806040526004361015601257600080fd5b600090813560e01c9081630902f1ac14609857506375ea5f2e14603457600080fd5b3460955760403660031901126095576004356001600160701b0390818116809103609157602435918216820360915760709190911b6dffffffffffffffffffffffffffff60701b16174260e01b6001600160e01b03191617815580f35b8280fd5b80fd5b90503460cd578160031936011260cd57606091546001600160701b0380821683528160701c16602083015260e01c6040820152f35b5080fdfea2646970667358221220cb70a5c5cdf22af97fd033d3c0c1b82287b434527f2cc03b0a9ee1bcc38a5a4a64736f6c63430008140033",
+  "deployedBytecode": "0x6080806040526004361015601257600080fd5b600090813560e01c9081630902f1ac14609857506375ea5f2e14603457600080fd5b3460955760403660031901126095576004356001600160701b0390818116809103609157602435918216820360915760709190911b6dffffffffffffffffffffffffffff60701b16174260e01b6001600160e01b03191617815580f35b8280fd5b80fd5b90503460cd578160031936011260cd57606091546001600160701b0380821683528160701c16602083015260e01c6040820152f35b5080fdfea2646970667358221220cb70a5c5cdf22af97fd033d3c0c1b82287b434527f2cc03b0a9ee1bcc38a5a4a64736f6c63430008140033",
+  "linkReferences": {},
+  "deployedLinkReferences": {}
+}

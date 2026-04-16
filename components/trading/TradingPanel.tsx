@@ -1,10 +1,20 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { ChevronDown, Loader2, X, Wallet } from "lucide-react";
-import { Order, Position, TokenPriceData } from "@/types/trading";
+import { useState, useMemo, useCallback, useEffect } from "react";
+import { ChevronDown, Loader2, X, Wallet, ExternalLink, AlertTriangle, Shield, Clock } from "lucide-react";
+import { TokenPriceData } from "@/types/trading";
 import { getBestBidAsk, getTickSize } from "@/lib/tradingData";
 import { useWallet } from "@/contexts/WalletContext";
+import { useTradingActions } from "@/hooks/useTradingActions";
+import { useOpenOrders } from "@/hooks/useOpenOrders";
+import { useVaultPosition } from "@/hooks/useVaultPosition";
+import { usePriceOracle } from "@/hooks/usePriceOracle";
+import { usePositionHealth } from "@/hooks/usePositionHealth";
+import { validateOrder, validateTPSL, formatValidationErrors } from "@/lib/validation/trading";
+import { parseUnits, formatUnits } from "viem";
+import { contracts } from "@/lib/protocol/contracts";
+import SlippageSelector from "./SlippageSelector";
+import LiquidationGauge from "./LiquidationGauge";
 
 const orderTypes = ["Limit", "Market", "Conditional"];
 const pctButtons = [25, 50, 75, 100];
@@ -12,35 +22,18 @@ const pctButtons = [25, 50, 75, 100];
 interface TradingPanelProps {
   symbol: string;
   tokenPriceData: TokenPriceData | null;
-  activePositions: Position[];
-  openOrders: Order[];
-  orderPending: boolean;
-  lastNotification: { type: "success" | "error"; message: string } | null;
-  onPlaceOrder: (params: {
-    side: "buy" | "sell";
-    type: "limit" | "market" | "conditional";
-    price: number;
-    quantity: number;
-    leverage: number;
-    tp?: number;
-    sl?: number;
-  }) => void;
-  onCancelOrder: (orderId: string) => void;
-  onClosePosition: (positionId: string) => void;
+  indexToken?: `0x${string}`;
+  collateralToken?: `0x${string}`;
 }
 
 export default function TradingPanel({
   symbol,
   tokenPriceData,
-  activePositions,
-  openOrders,
-  orderPending,
-  lastNotification,
-  onPlaceOrder,
-  onCancelOrder,
-  onClosePosition,
+  indexToken = contracts.weth.address,
+  collateralToken = contracts.weth.address,
 }: TradingPanelProps) {
-  const { wallet, connect } = useWallet();
+  const { wallet, CustomConnectButton, disconnect } = useWallet();
+
   const [activeType, setActiveType] = useState("Limit");
   const [side, setSide] = useState<"buy" | "sell">("buy");
   const [price, setPrice] = useState("");
@@ -52,89 +45,267 @@ export default function TradingPanel({
   const [tpsl, setTpsl] = useState(false);
   const [tpPrice, setTpPrice] = useState("");
   const [slPrice, setSlPrice] = useState("");
+  const [slippageBps, setSlippageBps] = useState(30); // 0.3% default
 
-  const currentPrice = tokenPriceData?.price ?? 0;
+  // Price oracle with validation
+  const {
+    price: oraclePrice,
+    priceRaw: oraclePriceRaw,
+    isValid: isOracleValid,
+    isStale: isOracleStale,
+    source: oracleSource,
+    networkStatus,
+    websocketConnected,
+    validatePrice,
+    calculatePriceImpact,
+    updateMockPythPrice,
+    mockPythPrice,
+  } = usePriceOracle(indexToken);
+
+  const currentPrice = oraclePrice ?? tokenPriceData?.price ?? 0;
+  
+  // For testing: show MockPyth price if available
+  const displayPrice = mockPythPrice || currentPrice;
   const tickSize = getTickSize(currentPrice);
   const priceNum = parseFloat(price) || 0;
   const qtyNum = parseFloat(quantity) || 0;
+  const isLong = side === "buy";
+
+  const {
+    txStatus,
+    isPending,
+    placeMarketOrder,
+    placeLimitOrder,
+    placeTPSLOrders,
+    cancelIncreaseOrder,
+    cancelDecreaseOrder,
+    closeMarketPosition,
+    resetTxStatus,
+  } = useTradingActions();
+
+  const { increaseOrders, decreaseOrders } = useOpenOrders(indexToken);
+
+  const { position: longPosition } = useVaultPosition({ collateralToken, indexToken, isLong: true });
+  const { position: shortPosition } = useVaultPosition({ collateralToken, indexToken, isLong: false });
+
+  // Position health tracking
+  const activePosition = isLong ? longPosition : shortPosition;
+  const positionWithSide = activePosition ? { ...activePosition, isLong } : null;
+  const { healthScore, status: healthStatus, liquidationPrice } = usePositionHealth({
+    position: positionWithSide,
+    currentPrice,
+  });
+
+  // Real-time validation
+  const validationErrors = useMemo(() => {
+    if (!wallet.connected) return [];
+    return validateOrder({
+      price: priceNum,
+      quantity: qtyNum,
+      leverage,
+      side,
+      orderType: activeType.toLowerCase() as "market" | "limit" | "conditional",
+      availableBalance: wallet.balance,
+      oraclePrice: currentPrice,
+      slippageBps,
+    });
+  }, [wallet.connected, wallet.balance, priceNum, qtyNum, leverage, side, activeType, currentPrice, slippageBps]);
+
+  const { errors: validationErrorMessages, warnings: validationWarnings } = formatValidationErrors(validationErrors);
+  const hasErrors = validationErrorMessages.length > 0;
+
+  // TP/SL validation
+  const tpslErrors = useMemo(() => {
+    if (!tpsl || !currentPrice) return [];
+    return validateTPSL(
+      tpPrice ? parseFloat(tpPrice) : null,
+      slPrice ? parseFloat(slPrice) : null,
+      currentPrice,
+      isLong
+    );
+  }, [tpsl, tpPrice, slPrice, currentPrice, isLong]);
+
+  const { errors: tpslErrorMessages } = formatValidationErrors(tpslErrors);
 
   const orderValue = useMemo(() => {
     const p = activeType === "Market" ? currentPrice : priceNum;
     return parseFloat((p * qtyNum).toFixed(2));
   }, [activeType, currentPrice, priceNum, qtyNum]);
 
-  const marginRequired = useMemo(() => {
-    return leverage > 0 ? parseFloat((orderValue / leverage).toFixed(2)) : 0;
-  }, [orderValue, leverage]);
+  const marginRequired = useMemo(
+    () => (leverage > 0 ? parseFloat((orderValue / leverage).toFixed(2)) : 0),
+    [orderValue, leverage]
+  );
+
+  // Calculate price impact for large orders
+  const priceImpact = useMemo(() => {
+    if (orderValue <= 0) return { impact: 0, warning: null };
+    return calculatePriceImpact(orderValue);
+  }, [orderValue, calculatePriceImpact]);
 
   const estLiquidation = useMemo(() => {
     if (qtyNum <= 0 || leverage <= 0) return null;
     const p = activeType === "Market" ? currentPrice : priceNum;
     const liqDist = p / leverage;
+    const decimals = Math.max(2, -Math.floor(Math.log10(tickSize)));
     return side === "buy"
-      ? parseFloat((p - liqDist).toFixed(Math.max(2, -Math.floor(Math.log10(tickSize)))))
-      : parseFloat((p + liqDist).toFixed(Math.max(2, -Math.floor(Math.log10(tickSize)))));
+      ? parseFloat((p - liqDist).toFixed(decimals))
+      : parseFloat((p + liqDist).toFixed(decimals));
   }, [side, activeType, currentPrice, priceNum, qtyNum, leverage, tickSize]);
 
   const insufficientBalance = wallet.connected && marginRequired > wallet.balance;
 
-  const handleMid = () => {
-    const { mid } = getBestBidAsk(symbol);
-    setPrice(String(mid));
-  };
+  const notification = useMemo(() => {
+    if (txStatus.state === "submitted")
+      return { type: "success" as const, message: `Tx submitted: ${txStatus.hash?.slice(0, 10)}…` };
+    if (txStatus.state === "failed")
+      return { type: "error" as const, message: txStatus.error ?? "Transaction failed" };
+    return null;
+  }, [txStatus]);
 
+  const orderPending = isPending;
+
+  const handleMid = () => setPrice(String(getBestBidAsk(symbol).mid));
   const handleBBO = () => {
     const { bid, ask } = getBestBidAsk(symbol);
     setPrice(String(side === "buy" ? bid : ask));
   };
-
   const handleTickUp = () => {
     const current = parseFloat(price) || currentPrice;
-    setPrice(String(parseFloat((current + tickSize).toFixed(Math.max(2, -Math.floor(Math.log10(tickSize)))))));
+    const decimals = Math.max(2, -Math.floor(Math.log10(tickSize)));
+    setPrice(String(parseFloat((current + tickSize).toFixed(decimals))));
   };
-
   const handleTickDown = () => {
     const current = parseFloat(price) || currentPrice;
     const next = current - tickSize;
-    if (next > 0) setPrice(String(parseFloat(next.toFixed(Math.max(2, -Math.floor(Math.log10(tickSize)))))));
+    if (next > 0) {
+      const decimals = Math.max(2, -Math.floor(Math.log10(tickSize)));
+      setPrice(String(parseFloat(next.toFixed(decimals))));
+    }
   };
-
   const handlePctQuantity = (pct: number) => {
     if (!wallet.connected || wallet.balance <= 0) return;
-    const p = activeType === "Market" ? currentPrice : (priceNum || currentPrice);
+    const p = activeType === "Market" ? currentPrice : priceNum || currentPrice;
     if (p <= 0) return;
-    const maxQty = (wallet.balance * leverage * (pct / 100)) / p;
-    setQuantity(String(parseFloat(maxQty.toFixed(4))));
+    setQuantity(String(parseFloat(((wallet.balance * leverage * pct) / 100 / p).toFixed(4))));
   };
 
-  const handlePlaceOrder = () => {
+  const handlePlaceOrder = useCallback(async () => {
     const p = activeType === "Market" ? currentPrice : priceNum;
-    if (p <= 0 || qtyNum <= 0) return;
-    onPlaceOrder({
-      side,
-      type: activeType.toLowerCase() as "limit" | "market" | "conditional",
-      price: p,
-      quantity: qtyNum,
-      leverage,
-      tp: tpsl && tpPrice ? parseFloat(tpPrice) : undefined,
-      sl: tpsl && slPrice ? parseFloat(slPrice) : undefined,
-    });
-  };
+    if (p <= 0 || qtyNum <= 0 || !wallet.address) return;
+
+    // Validate against oracle
+    if (!isOracleValid) {
+      console.error("Oracle price not valid");
+      return;
+    }
+
+    const collateralAmount = parseUnits(qtyNum.toFixed(8), 18);
+    const sizeDelta = parseUnits((p * qtyNum).toFixed(8), 30);
+
+    // Calculate acceptable price with slippage
+    const BASIS_POINTS = 10000n;
+    const slippageBpsBigInt = BigInt(slippageBps);
+    const priceRaw = oraclePriceRaw ?? parseUnits(p.toFixed(8), 30);
+
+    // For longs: acceptablePrice = price * (1 + slippage)
+    // For shorts: acceptablePrice = price * (1 - slippage)
+    const acceptablePrice = isLong
+      ? (priceRaw * (BASIS_POINTS + slippageBpsBigInt)) / BASIS_POINTS
+      : (priceRaw * (BASIS_POINTS - slippageBpsBigInt)) / BASIS_POINTS;
+
+    // Place main order
+    if (activeType === "Market") {
+      await placeMarketOrder({
+        collateralToken,
+        indexToken,
+        collateralAmount,
+        sizeDelta,
+        isLong,
+        acceptablePrice,
+      });
+    } else {
+      await placeLimitOrder({
+        collateralToken,
+        indexToken,
+        collateralAmount,
+        sizeDelta,
+        isLong,
+        triggerPrice: priceRaw,
+        triggerAboveThreshold: !isLong,
+      });
+    }
+
+    // Place TP/SL orders if enabled
+    if (tpsl && (tpPrice || slPrice)) {
+      const tpPriceRaw = tpPrice ? parseUnits(tpPrice, 30) : null;
+      const slPriceRaw = slPrice ? parseUnits(slPrice, 30) : null;
+
+      await placeTPSLOrders({
+        collateralToken,
+        indexToken,
+        collateralDelta: collateralAmount,
+        sizeDelta,
+        isLong,
+        tpPrice: tpPriceRaw,
+        slPrice: slPriceRaw,
+      });
+    }
+  }, [activeType, currentPrice, priceNum, qtyNum, wallet.address, collateralToken, indexToken, isLong, placeMarketOrder, placeLimitOrder, placeTPSLOrders, isOracleValid, oraclePriceRaw, slippageBps, tpsl, tpPrice, slPrice]);
 
   return (
     <div className="flex flex-col h-full" style={{ background: "var(--surface-container-lowest)", color: "var(--on-surface)" }}>
       {/* Notification */}
-      {lastNotification && (
+      {notification && (
         <div
-          className="px-3 py-2 text-[11px] font-mono"
+          className="px-3 py-2 text-[11px] font-mono flex items-center justify-between"
           style={{
-            background: lastNotification.type === "success" ? "rgba(0,192,118,0.1)" : "rgba(255,77,79,0.1)",
-            color: lastNotification.type === "success" ? "var(--buy)" : "var(--sell)",
+            background: notification.type === "success" ? "rgba(0,192,118,0.1)" : "rgba(255,77,79,0.1)",
+            color: notification.type === "success" ? "var(--buy)" : "var(--sell)",
           }}
         >
-          {lastNotification.message}
+          <span className="truncate">{notification.message}</span>
+          <button onClick={resetTxStatus} className="ml-2 opacity-60 hover:opacity-100 shrink-0"><X size={10} /></button>
         </div>
       )}
+
+      {/* Oracle Status */}
+      <div
+        className="px-3 py-1.5 flex items-center justify-between text-[10px]"
+        style={{
+          background: isOracleStale ? "rgba(255,165,0,0.08)" : "rgba(14,118,253,0.05)",
+          borderBottom: "1px solid rgba(66,70,84,0.3)",
+        }}
+      >
+        <div className="flex items-center gap-1.5">
+          {isOracleStale ? (
+            <Clock size={10} style={{ color: "#FFA500" }} />
+          ) : (
+            <Shield size={10} style={{ color: isOracleValid ? "var(--buy)" : "var(--sell)" }} />
+          )}
+          <span style={{ color: "var(--on-surface-muted)" }}>
+            Oracle: {oracleSource}
+            {websocketConnected && <span className="ml-1 text-[var(--buy)]">● Live</span>}
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span
+            className="font-mono"
+            style={{
+              color: isOracleStale ? "#FFA500" : isOracleValid ? "var(--buy)" : "var(--sell)",
+            }}
+          >
+            {currentPrice > 0 ? currentPrice.toFixed(4) : "—"}
+            {isOracleStale && " (stale)"}
+          </span>
+          {networkStatus === "offline" && (
+            <span style={{ color: "var(--sell)" }}>● Offline</span>
+          )}
+          {networkStatus === "degraded" && (
+            <span style={{ color: "#FFA500" }}>● Degraded</span>
+          )}
+        </div>
+      </div>
 
       {/* Buy/Sell Toggle */}
       <div className="flex" style={{ borderBottom: "1px solid rgba(66,70,84,0.4)" }}>
@@ -183,7 +354,7 @@ export default function TradingPanel({
         <div className="flex items-center justify-between text-[11px]">
           <span style={{ color: "var(--on-surface-disabled)" }}>Available Equity</span>
           <span style={{ color: "var(--on-surface)" }}>
-            {wallet.connected ? `$${wallet.balance.toLocaleString("en-US", { minimumFractionDigits: 2 })}` : "$0.00"}
+            {wallet.connected ? `${wallet.balance.toLocaleString("en-US", { minimumFractionDigits: 4 })} ${wallet.nativeCurrencySymbol}` : "—"}
           </span>
         </div>
 
@@ -262,7 +433,6 @@ export default function TradingPanel({
             />
             <span className="text-[11px] ml-2" style={{ color: "var(--on-surface-disabled)" }}>{symbol}</span>
           </div>
-          {/* Percentage buttons */}
           {wallet.connected && (
             <div className="flex items-center gap-1 mt-1.5">
               {pctButtons.map((pct) => (
@@ -319,6 +489,23 @@ export default function TradingPanel({
             </span>
           </div>
         </div>
+
+        {/* Price Impact */}
+        {orderValue > 0 && priceImpact.impact > 0.1 && (
+          <div>
+            <span className="text-[11px] mb-1 block" style={{ color: "var(--on-surface-disabled)" }}>Price Impact</span>
+            <div className="flex items-center rounded px-3 py-2" style={{ background: priceImpact.impact > 1 ? "rgba(255,77,79,0.1)" : "rgba(255,165,0,0.05)" }}>
+              <span className="text-sm font-mono" style={{ color: priceImpact.impact > 1 ? "var(--sell)" : "#FFA500" }}>
+                {priceImpact.impact.toFixed(2)}%
+              </span>
+              {priceImpact.warning && (
+                <span className="ml-2 text-[10px]" style={{ color: priceImpact.impact > 1 ? "var(--sell)" : "#FFA500" }}>
+                  {priceImpact.warning}
+                </span>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Margin Required & Est. Liquidation */}
         <div className="space-y-1.5">
@@ -378,47 +565,67 @@ export default function TradingPanel({
           </div>
         )}
 
+        {/* Validation Messages */}
+        {(validationErrorMessages.length > 0 || validationWarnings.length > 0 || tpslErrorMessages.length > 0) && (
+          <div className="space-y-1">
+            {validationErrorMessages.map((err, i) => (
+              <div key={`err-${i}`} className="flex items-center gap-1.5 text-[10px]" style={{ color: "var(--sell)" }}>
+                <AlertTriangle size={10} />
+                <span>{err}</span>
+              </div>
+            ))}
+            {tpslErrorMessages.map((err, i) => (
+              <div key={`tpsl-err-${i}`} className="flex items-center gap-1.5 text-[10px]" style={{ color: "var(--sell)" }}>
+                <AlertTriangle size={10} />
+                <span>{err}</span>
+              </div>
+            ))}
+            {validationWarnings.map((warn, i) => (
+              <div key={`warn-${i}`} className="flex items-center gap-1.5 text-[10px]" style={{ color: "#FFA500" }}>
+                <AlertTriangle size={10} />
+                <span>{warn}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
         {/* Action Buttons */}
         {!wallet.connected ? (
           <div className="space-y-2 pt-1">
-            <button
-              onClick={connect}
-              className="w-full py-2.5 text-[13px] font-semibold rounded btn-primary-gradient flex items-center justify-center gap-2"
-            >
-              <Wallet size={14} />
-              Connect Wallet to Trade
-            </button>
+            <CustomConnectButton variant="large" />
           </div>
         ) : (
           <div className="space-y-2 pt-1">
             <button
               onClick={handlePlaceOrder}
-              disabled={orderPending || insufficientBalance || qtyNum <= 0}
+              disabled={orderPending || hasErrors || !isOracleValid || qtyNum <= 0}
               className="w-full py-2.5 text-[13px] font-semibold rounded transition-colors flex items-center justify-center gap-2"
-            style={{
-              background: orderPending || insufficientBalance || qtyNum <= 0
-                ? "var(--surface-container-high)"
-                : side === "buy"
-                ? "linear-gradient(135deg, var(--buy) 0%, var(--buy-bright) 100%)"
-                : "linear-gradient(135deg, var(--sell) 0%, var(--sell-bright) 100%)",
-              color: orderPending || insufficientBalance || qtyNum <= 0
-                ? "var(--on-surface-disabled)"
-                : side === "buy" ? "#000" : "var(--on-primary)",
-              cursor: orderPending || insufficientBalance || qtyNum <= 0 ? "not-allowed" : "pointer",
-              boxShadow: orderPending || insufficientBalance || qtyNum <= 0
-                ? "none"
-                : side === "buy"
-                ? "0 0 16px 2px rgba(0,192,118,0.25)"
-                : "0 0 16px 2px rgba(255,77,79,0.25)",
-            }}
+              style={{
+                background: orderPending || hasErrors || !isOracleValid || qtyNum <= 0
+                  ? "var(--surface-container-high)"
+                  : side === "buy"
+                  ? "linear-gradient(135deg, var(--buy) 0%, var(--buy-bright) 100%)"
+                  : "linear-gradient(135deg, var(--sell) 0%, var(--sell-bright) 100%)",
+                color: orderPending || hasErrors || !isOracleValid || qtyNum <= 0
+                  ? "var(--on-surface-disabled)"
+                  : side === "buy" ? "#000" : "var(--on-primary)",
+                cursor: orderPending || hasErrors || !isOracleValid || qtyNum <= 0 ? "not-allowed" : "pointer",
+                boxShadow: orderPending || hasErrors || !isOracleValid || qtyNum <= 0
+                  ? "none"
+                  : side === "buy"
+                  ? "0 0 16px 2px rgba(0,192,118,0.25)"
+                  : "0 0 16px 2px rgba(255,77,79,0.25)",
+              }}
             >
               {orderPending ? (
                 <>
                   <Loader2 size={14} className="animate-spin" />
-                  Placing Order...
+                  {txStatus.state === "submitted" ? "Confirming…" : "Placing Order…"}
                 </>
-              ) : insufficientBalance ? (
-                "Insufficient Balance"
+              ) : !isOracleValid ? (
+                "Oracle Unavailable"
+              ) : hasErrors ? (
+                "Fix Errors to Trade"
               ) : (
                 `${side === "buy" ? "Buy / Long" : "Sell / Short"} ${symbol}`
               )}
@@ -426,78 +633,182 @@ export default function TradingPanel({
           </div>
         )}
 
-        {/* Order Options */}
-        {wallet.connected && (
-          <div className="flex items-center gap-3 pt-1" style={{ borderTop: "1px solid rgba(66,70,84,0.4)" }}>
-            <label className="flex items-center gap-1.5 cursor-pointer">
-              <input type="checkbox" checked={postOnly} onChange={(e) => setPostOnly(e.target.checked)} />
-              <span className="text-[11px]" style={{ color: "var(--on-surface-variant)" }}>Post Only</span>
-            </label>
-            <label className="flex items-center gap-1.5 cursor-pointer">
-              <input type="checkbox" checked={ioc} onChange={(e) => setIoc(e.target.checked)} />
-              <span className="text-[11px]" style={{ color: "var(--on-surface-variant)" }}>IOC</span>
-            </label>
-            <label className="flex items-center gap-1.5 cursor-pointer">
-              <input type="checkbox" checked={reduceOnly} onChange={(e) => setReduceOnly(e.target.checked)} />
-              <span className="text-[11px]" style={{ color: "var(--on-surface-variant)" }}>Reduce Only</span>
-            </label>
+        {/* MockPyth Price Testing Controls */}
+        {mockPythPrice && wallet.connected && (
+          <div className="pt-1 space-y-2" style={{ borderTop: "1px solid rgba(66,70,84,0.4)" }}>
+            <div className="flex items-center justify-between text-[11px]" style={{ color: "var(--on-surface-variant)" }}>
+              <div className="flex items-center gap-1.5">
+                <Clock size={12} />
+                <span>MockPyth Price</span>
+              </div>
+              <span style={{ color: "var(--on-surface)" }}>${mockPythPrice.toFixed(2)}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                placeholder="New Price"
+                className="flex-1 bg-transparent text-[11px] outline-none font-mono px-2 py-1 rounded"
+                style={{ background: "var(--surface-container-low)", border: "1px solid var(--outline-variant)", color: "var(--on-surface)" }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    const target = e.target as HTMLInputElement;
+                    const newPrice = parseFloat(target.value);
+                    if (newPrice > 0) {
+                      updateMockPythPrice("0xff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace", newPrice);
+                      target.value = "";
+                    }
+                  }
+                }}
+              />
+              <button
+                onClick={() => {
+                  const input = document.querySelector('input[type="number"]') as HTMLInputElement;
+                  if (input) {
+                    const newPrice = parseFloat(input.value);
+                    if (newPrice > 0) {
+                      updateMockPythPrice("0xff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace", newPrice);
+                      input.value = "";
+                    }
+                  }
+                }}
+                className="px-2 py-1 text-[11px] rounded"
+                style={{ background: "var(--surface-container)", border: "1px solid var(--outline-variant)", color: "var(--on-surface)" }}
+              >
+                Update
+              </button>
+            </div>
           </div>
         )}
 
-        {/* Active Positions */}
-        {wallet.connected && activePositions.length > 0 && (
+        {/* Order Options */}
+        {wallet.connected && (
+          <div className="pt-1 space-y-2" style={{ borderTop: "1px solid rgba(66,70,84,0.4)" }}>
+            <SlippageSelector value={slippageBps} onChange={setSlippageBps} disabled={orderPending} />
+            <div className="flex items-center gap-3">
+              <label className="flex items-center gap-1.5 cursor-pointer">
+                <input type="checkbox" checked={postOnly} onChange={(e) => setPostOnly(e.target.checked)} />
+                <span className="text-[11px]" style={{ color: "var(--on-surface-variant)" }}>Post Only</span>
+              </label>
+              <label className="flex items-center gap-1.5 cursor-pointer">
+                <input type="checkbox" checked={ioc} onChange={(e) => setIoc(e.target.checked)} />
+                <span className="text-[11px]" style={{ color: "var(--on-surface-variant)" }}>IOC</span>
+              </label>
+              <label className="flex items-center gap-1.5 cursor-pointer">
+                <input type="checkbox" checked={reduceOnly} onChange={(e) => setReduceOnly(e.target.checked)} />
+                <span className="text-[11px]" style={{ color: "var(--on-surface-variant)" }}>Reduce Only</span>
+              </label>
+            </div>
+          </div>
+        )}
+
+        {/* Active Positions (on-chain) */}
+        {wallet.connected && (longPosition || shortPosition) && (
           <div className="pt-2" style={{ borderTop: "1px solid rgba(66,70,84,0.4)" }}>
             <span className="text-[11px] mb-2 block" style={{ color: "var(--on-surface-disabled)" }}>Active Positions</span>
-            {activePositions.map((pos) => (
-              <div key={pos.id} className="rounded p-2.5 mb-2" style={{ background: "var(--surface-container-low)" }}>
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-[11px] font-mono font-medium" style={{ color: pos.side === "long" ? "var(--buy)" : "var(--sell)" }}>
-                    {pos.side.toUpperCase()} {pos.quantity} {pos.symbol}
+            {([longPosition ? { ...longPosition, isLong: true } : null, shortPosition ? { ...shortPosition, isLong: false } : null] as const)
+              .filter(Boolean)
+              .map((pos) => {
+                if (!pos) return null;
+                const pnlColor = pos.unrealizedPnlUsd >= 0 ? "var(--buy)" : "var(--sell)";
+                return (
+                  <div key={pos.isLong ? "long" : "short"} className="rounded p-2.5 mb-2" style={{ background: "var(--surface-container-low)" }}>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-[11px] font-mono font-medium" style={{ color: pos.isLong ? "var(--buy)" : "var(--sell)" }}>
+                        {pos.isLong ? "LONG" : "SHORT"} {symbol}
+                      </span>
+                      <span className="text-[10px]" style={{ color: "var(--on-surface-disabled)" }}>
+                        ${pos.sizeUsd.toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between text-[10px] mb-1">
+                      <span style={{ color: "var(--on-surface-disabled)" }}>Entry</span>
+                      <span className="font-mono" style={{ color: "var(--on-surface)" }}>{pos.avgPriceFormatted.toFixed(4)}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-[10px] mb-1">
+                      <span style={{ color: "var(--on-surface-disabled)" }}>Liq. Price</span>
+                      <span className="font-mono" style={{ color: "var(--liquidation)" }}>{pos.liquidationPrice.toFixed(4)}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-[10px] mb-2">
+                      <span style={{ color: "var(--on-surface-disabled)" }}>Unrealized PnL</span>
+                      <span className="font-mono" style={{ color: pnlColor }}>
+                        {pos.unrealizedPnlUsd >= 0 ? "+" : ""}${pos.unrealizedPnlUsd.toFixed(2)} ({pos.unrealizedPnlPct.toFixed(2)}%)
+                      </span>
+                    </div>
+
+                    {/* Position Health Gauge */}
+                    {pos.isLong === isLong && (
+                      <div className="mb-2">
+                        <LiquidationGauge
+                          healthScore={healthScore}
+                          status={healthStatus}
+                          liquidationPrice={liquidationPrice}
+                          currentPrice={currentPrice}
+                          isLong={pos.isLong}
+                        />
+                      </div>
+                    )}
+
+                    <button
+                      onClick={() =>
+                        closeMarketPosition({
+                          collateralToken,
+                          indexToken,
+                          sizeDelta: pos.size,
+                          collateralDelta: pos.collateral,
+                          isLong: pos.isLong,
+                          acceptablePrice: pos.averagePrice,
+                        })
+                      }
+                      disabled={orderPending}
+                      className="w-full py-1.5 text-[11px] font-mono rounded transition-colors"
+                      style={{ border: "1px solid rgba(255,77,79,0.3)", color: "var(--sell)", background: "transparent" }}
+                      onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = "rgba(255,77,79,0.08)")}
+                      onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = "transparent")}
+                    >
+                      Close Position
+                    </button>
+                  </div>
+                );
+              })}
+          </div>
+        )}
+
+        {/* Open Orders (on-chain) */}
+        {wallet.connected && (increaseOrders.length > 0 || decreaseOrders.length > 0) && (
+          <div className="pt-2" style={{ borderTop: "1px solid rgba(66,70,84,0.4)" }}>
+            <span className="text-[11px] mb-2 block" style={{ color: "var(--on-surface-disabled)" }}>Open Orders</span>
+            {increaseOrders.map((order) => (
+              <div key={`inc-${order.index}`} className="flex items-center justify-between rounded p-2 mb-1.5" style={{ background: "var(--surface-container-low)" }}>
+                <div>
+                  <span className="text-[10px] font-mono font-medium" style={{ color: order.isLong ? "var(--buy)" : "var(--sell)" }}>
+                    {order.isLong ? "BUY" : "SELL"} @ {parseFloat(formatUnits(order.triggerPrice, 30)).toFixed(4)}
                   </span>
-                  <span className="text-[10px]" style={{ color: "var(--on-surface-disabled)" }}>{pos.leverage}x</span>
-                </div>
-                <div className="flex items-center justify-between text-[10px] mb-1">
-                  <span style={{ color: "var(--on-surface-disabled)" }}>Entry</span>
-                  <span className="font-mono" style={{ color: "var(--on-surface)" }}>{pos.entryPrice}</span>
-                </div>
-                <div className="flex items-center justify-between text-[10px] mb-1">
-                  <span style={{ color: "var(--on-surface-disabled)" }}>Liq. Price</span>
-                  <span className="font-mono" style={{ color: "var(--liquidation)" }}>{pos.liquidationPrice}</span>
-                </div>
-                <div className="flex items-center justify-between text-[10px] mb-2">
-                  <span style={{ color: "var(--on-surface-disabled)" }}>Unrealized PnL</span>
-                  <span className="font-mono" style={{ color: pos.unrealizedPnl >= 0 ? "var(--buy)" : "var(--sell)" }}>
-                    {pos.unrealizedPnl >= 0 ? "+" : ""}${pos.unrealizedPnl.toFixed(2)} ({pos.unrealizedPnlPct.toFixed(2)}%)
-                  </span>
+                  <span className="text-[9px] ml-2" style={{ color: "var(--on-surface-disabled)" }}>Limit</span>
                 </div>
                 <button
-                  onClick={() => onClosePosition(pos.id)}
-                  className="w-full py-1.5 text-[11px] font-mono rounded transition-colors"
-                  style={{ border: "1px solid rgba(255,77,79,0.3)", color: "var(--sell)", background: "transparent" }}
-                  onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = "rgba(255,77,79,0.08)")}
-                  onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = "transparent")}
+                  onClick={() => cancelIncreaseOrder(order.index)}
+                  disabled={orderPending}
+                  className="p-1 rounded transition-colors"
+                  style={{ color: "var(--on-surface-disabled)" }}
+                  title="Cancel order"
+                  onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.color = "var(--sell)")}
+                  onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.color = "var(--on-surface-disabled)")}
                 >
-                  Close Position
+                  <X size={12} />
                 </button>
               </div>
             ))}
-          </div>
-        )}
-
-        {/* Open Orders */}
-        {wallet.connected && openOrders.length > 0 && (
-          <div className="pt-2" style={{ borderTop: "1px solid rgba(66,70,84,0.4)" }}>
-            <span className="text-[11px] mb-2 block" style={{ color: "var(--on-surface-disabled)" }}>Open Orders</span>
-            {openOrders.map((order) => (
-              <div key={order.id} className="flex items-center justify-between rounded p-2 mb-1.5" style={{ background: "var(--surface-container-low)" }}>
+            {decreaseOrders.map((order) => (
+              <div key={`dec-${order.index}`} className="flex items-center justify-between rounded p-2 mb-1.5" style={{ background: "var(--surface-container-low)" }}>
                 <div>
-                  <span className="text-[10px] font-mono font-medium" style={{ color: order.side === "buy" ? "var(--buy)" : "var(--sell)" }}>
-                    {order.side.toUpperCase()} {order.quantity} @ {order.price}
+                  <span className="text-[10px] font-mono font-medium" style={{ color: "var(--sell)" }}>
+                    CLOSE @ {parseFloat(formatUnits(order.triggerPrice, 30)).toFixed(4)}
                   </span>
-                  <span className="text-[9px] ml-2" style={{ color: "var(--on-surface-disabled)" }}>{order.type}</span>
+                  <span className="text-[9px] ml-2" style={{ color: "var(--on-surface-disabled)" }}>TP/SL</span>
                 </div>
                 <button
-                  onClick={() => onCancelOrder(order.id)}
+                  onClick={() => cancelDecreaseOrder(order.index)}
+                  disabled={orderPending}
                   className="p-1 rounded transition-colors"
                   style={{ color: "var(--on-surface-disabled)" }}
                   title="Cancel order"
@@ -510,8 +821,6 @@ export default function TradingPanel({
             ))}
           </div>
         )}
-
-        {/* Logout button */}
       </div>
     </div>
   );

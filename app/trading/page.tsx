@@ -12,8 +12,13 @@ import TokenPickerDialog from "@/components/trading/TokenPickerDialog";
 import { TokenMarket } from "@/lib/tokenData";
 import { getTokenPriceData } from "@/lib/tradingData";
 import { TokenPriceData } from "@/types/trading";
-import { useTradingState } from "@/hooks/useTradingState";
 import { useWallet } from "@/contexts/WalletContext";
+import { contracts } from "@/lib/protocol/contracts";
+
+const TOKEN_INDEX_MAP: Record<string, `0x${string}`> = {
+  WETH: contracts.weth.address,
+  ETH: contracts.weth.address,
+};
 
 export default function TradingPage() {
   const [isTokenPickerOpen, setIsTokenPickerOpen] = useState(false);
@@ -21,90 +26,65 @@ export default function TradingPage() {
   const [tokenPriceData, setTokenPriceData] = useState<TokenPriceData | null>(null);
 
   const symbol = selectedToken?.symbol || "SOL";
-  const { wallet, updateBalance } = useWallet();
+  const { wallet } = useWallet();
+
+  const indexToken: `0x${string}` | undefined = TOKEN_INDEX_MAP[symbol.toUpperCase()];
+  const collateralToken: `0x${string}` | undefined = indexToken;
 
   useEffect(() => {
     setTokenPriceData(getTokenPriceData(symbol));
   }, [symbol]);
 
-  const {
-    openOrders,
-    activePositions,
-    orderPending,
-    lastNotification,
-    placeOrder,
-    cancelOrder,
-    closePosition,
-  } = useTradingState(symbol, wallet, updateBalance);
-
-  const handleTokenSelect = (token: TokenMarket) => {
-    setSelectedToken(token);
-  };
-
   return (
     <div className="flex flex-col h-screen bg-black text-white overflow-hidden">
-      {/* Top Navigation */}
       <TopNavigation />
 
-      {/* Price Header */}
       <PriceHeader
         onTokenPickerOpen={() => setIsTokenPickerOpen(true)}
         selectedSymbol={`${symbol}-PERP`}
         tokenPriceData={tokenPriceData}
       />
 
-      {/* Token Picker Dialog */}
       <TokenPickerDialog
         isOpen={isTokenPickerOpen}
         onClose={() => setIsTokenPickerOpen(false)}
-        onSelect={handleTokenSelect}
+        onSelect={(token: TokenMarket) => setSelectedToken(token)}
       />
 
-      {/* Main Content: Chart + OrderBook + Trading Panel */}
       <div className="flex flex-1 min-h-0 overflow-hidden">
-        {/* Left: Chart + Bottom Tabs */}
         <div className="flex flex-col flex-1 min-w-0">
           <div className="flex flex-1 min-h-0">
             <div className="flex-1 min-h-0">
               <ChartSection
                 symbol={symbol}
-                orders={openOrders}
-                positions={activePositions}
+                orders={[]}
+                positions={[]}
                 tokenPriceData={tokenPriceData}
               />
             </div>
-            {/* Center: Order Book */}
             <div className="w-[260px] shrink-0">
               <OrderBook />
             </div>
           </div>
           <BottomTabs
             isAuthenticated={wallet.connected}
-            positions={activePositions}
-            orders={openOrders}
-            onCancelOrder={cancelOrder}
-            onClosePosition={closePosition}
+            positions={[]}
+            orders={[]}
+            onCancelOrder={() => {}}
+            onClosePosition={() => {}}
           />
         </div>
 
-
-        {/* Right: Trading Panel */}
         <div className="w-[280px] shrink-0">
           <TradingPanel
             symbol={symbol}
             tokenPriceData={tokenPriceData}
-            activePositions={activePositions}
-            openOrders={openOrders}
-            orderPending={orderPending}
-            lastNotification={lastNotification}
-            onPlaceOrder={placeOrder}
-            onCancelOrder={cancelOrder}
-            onClosePosition={closePosition}
+            indexToken={indexToken}
+            collateralToken={collateralToken}
           />
         </div>
       </div>
 
-      {/* Bottom Ticker */}
       <BottomTicker />
     </div>
   );

@@ -1,0 +1,59 @@
+{
+  "_format": "hh-sol-artifact-1",
+  "contractName": "PositionRouterCallbackReceiverTest",
+  "sourceName": "contracts/test/PositionRouterCallbackReceiverTest.sol",
+  "abi": [
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "bytes32",
+          "name": "positionKey",
+          "type": "bytes32"
+        },
+        {
+          "indexed": false,
+          "internalType": "bool",
+          "name": "isExecuted",
+          "type": "bool"
+        },
+        {
+          "indexed": false,
+          "internalType": "bool",
+          "name": "isIncrease",
+          "type": "bool"
+        }
+      ],
+      "name": "CallbackCalled",
+      "type": "event"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "positionKey",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "bool",
+          "name": "isExecuted",
+          "type": "bool"
+        },
+        {
+          "internalType": "bool",
+          "name": "isIncrease",
+          "type": "bool"
+        }
+      ],
+      "name": "cysePositionCallback",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    }
+  ],
+  "bytecode": "0x608080604052346100155760ca908161001b8239f35b600080fdfe6080806040526004361015601257600080fd5b600090813560e01c63c3ef4c1a14602857600080fd5b346090576060366003190112609057602435801515809103608c57604435918215158093036088577f4c5b183c9c52e97ac4369ee0a4685a3af880b74946655c4b6e7366b6af17338092606092600435835260208301526040820152a180f35b8380fd5b8280fd5b5080fdfea264697066735822122080e3175a842aa3d5508f953b032d8efad5cacb0d26b8c6be9c028584e0ed30de64736f6c63430008140033",
+  "deployedBytecode": "0x6080806040526004361015601257600080fd5b600090813560e01c63c3ef4c1a14602857600080fd5b346090576060366003190112609057602435801515809103608c57604435918215158093036088577f4c5b183c9c52e97ac4369ee0a4685a3af880b74946655c4b6e7366b6af17338092606092600435835260208301526040820152a180f35b8380fd5b8280fd5b5080fdfea264697066735822122080e3175a842aa3d5508f953b032d8efad5cacb0d26b8c6be9c028584e0ed30de64736f6c63430008140033",
+  "linkReferences": {},
+  "deployedLinkReferences": {}
+}
