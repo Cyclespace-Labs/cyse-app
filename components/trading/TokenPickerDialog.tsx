@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Search, Star, X } from "lucide-react";
+import { Search, Star, X, ShieldCheck } from "lucide-react";
 import { tokenMarkets, TokenMarket } from "@/lib/tokenData";
 import { formatVolume } from "@/lib/formatters";
+import { useVaultWhitelist } from "@/hooks/useVaultWhitelist";
 
 const tabs = ["Spot", "Futures", "Lend"];
 
@@ -21,8 +22,11 @@ export default function TokenPickerDialog({
   const [search, setSearch] = useState("");
   const [activeTab, setActiveTab] = useState("Futures");
   const [sortBy, setSortBy] = useState<"volume" | "price" | "marketCap">("volume");
+  const [whitelistOnly, setWhitelistOnly] = useState(true);
   const backdropRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
+
+  const { whitelistedAddresses, isLoading: whitelistLoading } = useVaultWhitelist();
 
   useEffect(() => {
     if (isOpen && searchRef.current) {
@@ -46,13 +50,20 @@ export default function TokenPickerDialog({
 
   if (!isOpen) return null;
 
+  const isTokenWhitelisted = (t: TokenMarket) =>
+    !!t.indexAddress && whitelistedAddresses.has(t.indexAddress.toLowerCase());
+
   const filtered = tokenMarkets.filter((t) => {
     const q = search.toLowerCase();
     const matchesSearch =
       t.symbol.toLowerCase().includes(q) ||
       t.name.toLowerCase().includes(q) ||
       t.pair.toLowerCase().includes(q);
-    if (activeTab === "Futures") return matchesSearch;
+    if (activeTab === "Futures") {
+      const passesWhitelist =
+        !whitelistOnly || whitelistLoading || isTokenWhitelisted(t);
+      return matchesSearch && passesWhitelist;
+    }
     if (activeTab === "Spot") return matchesSearch && t.category === "spot";
     if (activeTab === "Lend") return matchesSearch && t.category === "lend";
     return matchesSearch;
@@ -121,20 +132,37 @@ export default function TokenPickerDialog({
         </div>
 
         {/* Tabs */}
-        <div className="flex items-center gap-1 px-4 pb-2">
-          {tabs.map((tab) => (
+        <div className="flex items-center justify-between px-4 pb-2">
+          <div className="flex items-center gap-1">
+            {tabs.map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className="px-3 py-1.5 text-[11px] rounded transition-colors"
+                style={{
+                  color: activeTab === tab ? "var(--on-surface)" : "var(--on-surface-disabled)",
+                  background: activeTab === tab ? "var(--surface-container-high)" : "transparent",
+                }}
+              >
+                {tab}
+              </button>
+            ))}
+          </div>
+          {activeTab === "Futures" && (
             <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className="px-3 py-1.5 text-[11px] rounded transition-colors"
+              onClick={() => setWhitelistOnly((v) => !v)}
+              className="flex items-center gap-1 px-2 py-1 rounded text-[10px] transition-colors"
               style={{
-                color: activeTab === tab ? "var(--on-surface)" : "var(--on-surface-disabled)",
-                background: activeTab === tab ? "var(--surface-container-high)" : "transparent",
+                color: whitelistOnly ? "var(--buy)" : "var(--on-surface-disabled)",
+                background: whitelistOnly ? "rgba(0,192,118,0.1)" : "transparent",
+                border: `1px solid ${whitelistOnly ? "rgba(0,192,118,0.3)" : "rgba(66,70,84,0.4)"}`,
               }}
+              title={whitelistOnly ? "Showing vault-whitelisted only" : "Showing all markets"}
             >
-              {tab}
+              <ShieldCheck size={11} />
+              Vault Pairs
             </button>
-          ))}
+          )}
         </div>
 
         {/* Column Headers */}
@@ -193,7 +221,7 @@ export default function TokenPickerDialog({
                     <span className="text-[13px] font-medium truncate" style={{ color: "var(--on-surface)" }}>
                       {token.pair}
                     </span>
-                    {token.isLive && (
+                    {isTokenWhitelisted(token) && (
                       <span
                         className="px-1 py-0.5 text-[9px] font-semibold rounded shrink-0"
                         style={{ color: "var(--buy)", background: "rgba(0,192,118,0.12)", border: "1px solid rgba(0,192,118,0.25)" }}

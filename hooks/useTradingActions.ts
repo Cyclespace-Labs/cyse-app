@@ -136,12 +136,24 @@ export function useTradingActions() {
       try {
         const slippedPrice = applySlippage(acceptablePrice, isLong);
         const path: [`0x${string}`] = [collateralToken];
+        const isEth = collateralToken.toLowerCase() === contracts.weth.address.toLowerCase();
 
-        const hash = await writeContractAsync({
-          ...contracts.router,
-          functionName: "increasePosition",
-          args: [path, indexToken, collateralAmount, 0n, sizeDelta, isLong, slippedPrice],
-        });
+        // For ETH collateral: use increasePositionETH so the Router wraps native ETH
+        // internally — avoids ERC20 transferFrom which would revert if user has no WETH.
+        // For any other ERC20 collateral: use increasePosition (requires prior approval).
+        const hash = isEth
+          ? await writeContractAsync({
+              ...contracts.router,
+              functionName: "increasePositionETH",
+              args: [path, indexToken, 0n, sizeDelta, isLong, slippedPrice],
+              value: collateralAmount,
+            })
+          : await writeContractAsync({
+              ...contracts.router,
+              functionName: "increasePosition",
+              args: [path, indexToken, collateralAmount, 0n, sizeDelta, isLong, slippedPrice],
+            });
+
         setPendingHash(hash);
         setTxStatus({ state: "submitted", hash });
         return hash;
@@ -174,9 +186,12 @@ export function useTradingActions() {
       setTxStatus({ state: "pending" });
       try {
         const slippedPrice = applySlippage(acceptablePrice, !isLong);
+        const isEth = collateralToken.toLowerCase() === contracts.weth.address.toLowerCase();
+
+        // For ETH collateral: use decreasePositionETH so proceeds are unwrapped to native ETH.
         const hash = await writeContractAsync({
           ...contracts.router,
-          functionName: "decreasePosition",
+          functionName: isEth ? "decreasePositionETH" : "decreasePosition",
           args: [collateralToken, indexToken, collateralDelta, sizeDelta, isLong, address, slippedPrice],
         });
         setPendingHash(hash);
