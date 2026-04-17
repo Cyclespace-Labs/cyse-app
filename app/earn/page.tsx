@@ -16,7 +16,6 @@ import {
   Layers,
   Droplets,
   Loader2,
-  ArrowRight,
   RefreshCw,
 } from "lucide-react";
 import { useWallet } from "@/contexts/WalletContext";

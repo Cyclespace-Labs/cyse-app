@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { useAccount, useReadContracts, useReadContract } from "wagmi";
+import { useAccount, useReadContracts } from "wagmi";
 import { formatUnits } from "viem";
 import { contracts } from "@/lib/protocol/contracts";
 

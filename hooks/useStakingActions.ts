@@ -1,14 +1,13 @@
 "use client";
 
 import { useCallback } from "react";
-import { useAccount, useWriteContract, usePublicClient } from "wagmi";
+import { useAccount, useWriteContract } from "wagmi";
 import { parseUnits } from "viem";
 import { contracts } from "@/lib/protocol/contracts";
 
 export function useStakingActions() {
   const { address } = useAccount();
   const { writeContractAsync, isPending } = useWriteContract();
-  const publicClient = usePublicClient();
 
   // ── Stake CYSE ─────────────────────────────────────────────────
   const stakeCyse = useCallback(

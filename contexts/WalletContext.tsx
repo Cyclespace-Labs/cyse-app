@@ -13,6 +13,7 @@ import {
   useDisconnect,
   useBalance,
   useReadContract,
+  useReadContracts,
   useChainId,
   useChains,
 } from "wagmi";
@@ -118,6 +119,21 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     query: { enabled: !!address },
   });
 
+  // Live staking data from reward trackers
+  const stakingCalls = useMemo(() => {
+    if (!address) return [];
+    return [
+      { ...contracts.stakedCyseTracker, functionName: "stakedAmounts" as const, args: [address] as const },
+      { ...contracts.feeCyseTracker, functionName: "claimable" as const, args: [address] as const },
+      { ...contracts.feeCylpTracker, functionName: "claimable" as const, args: [address] as const },
+    ];
+  }, [address]);
+
+  const { data: stakingData } = useReadContracts({
+    contracts: stakingCalls,
+    query: { enabled: stakingCalls.length > 0, refetchInterval: 10_000 },
+  });
+
   // Detect wallet type
   const walletType = useMemo(() => {
     if (connector?.id) {
@@ -143,6 +159,18 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     ? parseFloat(formatUnits(cyseBalanceRaw as bigint, 18))
     : 0;
 
+  const stakedCyseRaw =
+    stakingData?.[0]?.status === "success" ? (stakingData[0].result as bigint) : 0n;
+  const feeCyseClaimableRaw =
+    stakingData?.[1]?.status === "success" ? (stakingData[1].result as bigint) : 0n;
+  const feeCylpClaimableRaw =
+    stakingData?.[2]?.status === "success" ? (stakingData[2].result as bigint) : 0n;
+
+  const stakedCyseNum = parseFloat(parseFloat(formatUnits(stakedCyseRaw, 18)).toFixed(4));
+  const pendingRewardsNum = parseFloat(
+    (parseFloat(formatUnits(feeCyseClaimableRaw, 18)) + parseFloat(formatUnits(feeCylpClaimableRaw, 18))).toFixed(6)
+  );
+
   // Idle timer for session security
   const { isWarning: isIdleWarning, timeRemaining: idleTimeRemaining, reset: resetIdleTimer } =
     useIdleTimer({
@@ -166,8 +194,8 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     equity: parseFloat(balanceNum.toFixed(4)),
     nativeCurrencySymbol,
     cyseBalance: parseFloat(cyseBalance.toFixed(4)),
-    stakedCyse: 0,
-    pendingRewards: 0,
+    stakedCyse: stakedCyseNum,
+    pendingRewards: pendingRewardsNum,
     // Security fields
     walletType,
     securityLevel,
