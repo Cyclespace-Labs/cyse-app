@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import CandlestickChart from "./CandlestickChart";
 import {
   Crosshair,
@@ -12,9 +12,29 @@ import {
 } from "lucide-react";
 import { Order, Position, TokenPriceData } from "@/types/trading";
 import { formatPrice } from "@/lib/formatters";
+import { TV_PYTH_SYMBOLS } from "@/lib/pyth/config";
 
 const chartTabs = ["Chart", "Depth", "Margin", "Funding", "Market Info"];
 const timeframes = ["1m", "3m", "5m", "15m", "1h", "4h", "1d"];
+
+// TradingView script loader (singleton)
+let tvScriptPromise: Promise<void> | null = null;
+function loadTradingViewScript(): Promise<void> {
+  if (tvScriptPromise) return tvScriptPromise;
+  tvScriptPromise = new Promise((resolve) => {
+    if (typeof window !== "undefined" && "TradingView" in window) {
+      resolve();
+      return;
+    }
+    const script = document.createElement("script");
+    script.id = "tradingview-widget-loading-script";
+    script.src = "https://s3.tradingview.com/tv.js";
+    script.type = "text/javascript";
+    script.onload = () => resolve();
+    document.head.appendChild(script);
+  });
+  return tvScriptPromise;
+}
 
 interface ChartSectionProps {
   symbol?: string;
@@ -28,6 +48,9 @@ export default function ChartSection({ symbol = "SOL", orders = [], positions = 
   const [activeTab, setActiveTab] = useState("Chart");
   const [activeTimeframe, setActiveTimeframe] = useState("1m");
   const [utcClock, setUtcClock] = useState("");
+  const [tvReady, setTvReady] = useState(false);
+  const tvContainerRef = useRef<HTMLDivElement>(null);
+  const tvWidgetRef = useRef<unknown>(null);
 
   useEffect(() => {
     const tick = () => {
@@ -38,6 +61,48 @@ export default function ChartSection({ symbol = "SOL", orders = [], positions = 
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
   }, []);
+
+  // Load TradingView widget with PYTH data feed
+  const tvSymbol = TV_PYTH_SYMBOLS[symbol] ?? `PYTH:${symbol}USD`;
+
+  useEffect(() => {
+    if (activeTab !== "Chart") return;
+
+    loadTradingViewScript().then(() => {
+      setTvReady(true);
+      if (!tvContainerRef.current) return;
+      // Clear previous widget
+      tvContainerRef.current.innerHTML = "";
+      tvWidgetRef.current = null;
+
+      try {
+        const TradingView = (window as unknown as Record<string, unknown>).TradingView as {
+          widget: new (config: Record<string, unknown>) => unknown;
+        };
+        if (!TradingView?.widget) return;
+
+        tvWidgetRef.current = new TradingView.widget({
+          autosize: true,
+          symbol: tvSymbol,
+          interval: activeTimeframe === "1d" ? "D" : activeTimeframe.replace("m", "").replace("h", "60"),
+          timezone: "Etc/UTC",
+          theme: "dark",
+          style: "1",
+          locale: "en",
+          toolbar_bg: "#0e0e11",
+          enable_publishing: false,
+          allow_symbol_change: false,
+          hide_side_toolbar: false,
+          container_id: "tradingview-chart-container",
+          backgroundColor: "#0e0e11",
+          gridColor: "rgba(66,70,84,0.15)",
+        });
+      } catch (e) {
+        console.error("[ChartSection] TradingView widget error:", e);
+      }
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tvSymbol, activeTimeframe, activeTab]);
 
   return (
     <div className="flex flex-col h-full" style={{ background: "var(--surface-container-lowest)", borderRight: "1px solid rgba(66,70,84,0.4)" }}>
@@ -152,19 +217,17 @@ export default function ChartSection({ symbol = "SOL", orders = [], positions = 
         )}
       </div>
 
-      {/* Chart */}
+      {/* Chart — TradingView widget (PYTH data) with lightweight-charts fallback */}
       <div className="flex-1 relative min-h-0">
-        <CandlestickChart symbol={symbol} orders={orders} positions={positions} currentPrice={currentPrice} />
-        {/* TradingView Watermark */}
-        <div className="absolute bottom-3 left-3 flex items-center gap-1.5 opacity-40">
-          <div className="w-5 h-5 rounded flex items-center justify-center" style={{ background: "var(--primary)" }}>
-            <span className="text-[9px] font-bold" style={{ color: "var(--on-primary)" }}>TV</span>
-          </div>
-        </div>
-        {/* Volume SMA label */}
-        <div className="absolute bottom-16 left-3 text-[10px]" style={{ color: "var(--on-surface-disabled)" }}>
-          Volume SMA <span style={{ color: "var(--on-surface-muted)" }}>11.5K</span>
-        </div>
+        {activeTab === "Chart" && tvReady ? (
+          <div
+            ref={tvContainerRef}
+            id="tradingview-chart-container"
+            className="absolute inset-0"
+          />
+        ) : (
+          <CandlestickChart symbol={symbol} orders={orders} positions={positions} currentPrice={currentPrice} />
+        )}
       </div>
 
       {/* Timerange bar */}

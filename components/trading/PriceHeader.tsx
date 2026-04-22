@@ -8,12 +8,21 @@ interface PriceHeaderProps {
   onTokenPickerOpen?: () => void;
   selectedSymbol?: string;
   tokenPriceData?: TokenPriceData | null;
+  /** Live price from Pyth SSE / oracle (overrides tokenPriceData.price) */
+  livePrice?: number;
+  /** Whether Pyth SSE is connected */
+  pythConnected?: boolean;
+  /** Oracle source label */
+  oracleSource?: string;
 }
 
-export default function PriceHeader({ onTokenPickerOpen, selectedSymbol, tokenPriceData }: PriceHeaderProps) {
+export default function PriceHeader({ onTokenPickerOpen, selectedSymbol, tokenPriceData, livePrice, pythConnected, oracleSource }: PriceHeaderProps) {
   const d = tokenPriceData ?? null;
   const displaySymbol = selectedSymbol || d?.symbol || "—";
   const na = "—";
+
+  // Use livePrice (from Pyth/oracle) if available, otherwise fall back to tokenPriceData
+  const currentDisplayPrice = livePrice && livePrice > 0 ? livePrice : d?.price ?? 0;
 
   const changeColor = d && d.changePct24h >= 0 ? "var(--buy)" : "var(--sell)";
 
@@ -49,23 +58,31 @@ export default function PriceHeader({ onTokenPickerOpen, selectedSymbol, tokenPr
         </div>
       </button>
 
-      {/* Price */}
+      {/* Price — live from Pyth SSE */}
       <div className="flex flex-col mr-5 shrink-0">
-        <span className="text-lg font-bold leading-tight" style={{ color: "var(--buy)" }}>
-          {d ? formatPrice(d.price) : na}
-        </span>
+        <div className="flex items-center gap-1.5">
+          <span className="text-lg font-bold leading-tight" style={{ color: "var(--buy)" }}>
+            {currentDisplayPrice > 0 ? formatPrice(currentDisplayPrice) : na}
+          </span>
+          {pythConnected && (
+            <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: "var(--buy)" }} title="Pyth SSE live" />
+          )}
+        </div>
         <span className="text-[11px]" style={{ color: "var(--on-surface-muted)" }}>
-          {d ? formatPrice(d.price) : na}
+          {currentDisplayPrice > 0 ? formatPrice(currentDisplayPrice) : na}
+          {oracleSource && <span className="ml-1 opacity-60">{oracleSource === "pyth" ? "PYTH" : oracleSource.toUpperCase()}</span>}
         </span>
       </div>
 
       {/* Ghost Divider */}
       <div className="w-px h-8 mr-4 shrink-0" style={{ background: "rgba(66,70,84,0.3)" }} />
 
-      {/* Index Price */}
+      {/* Index Price — from oracle or tokenPriceData */}
       <div className="flex flex-col mr-5 shrink-0">
         <span className="text-[10px] uppercase tracking-wide" style={{ color: "var(--on-surface-disabled)" }}>Index Price</span>
-        <span className="text-xs" style={{ color: "var(--on-surface)" }}>{d ? formatPrice(d.indexPrice) : na}</span>
+        <span className="text-xs" style={{ color: "var(--on-surface)" }}>
+          {currentDisplayPrice > 0 ? formatPrice(currentDisplayPrice) : d ? formatPrice(d.indexPrice) : na}
+        </span>
       </div>
 
       {/* 24h Change */}

@@ -6,14 +6,14 @@ import { WagmiProvider, useChainId, usePublicClient } from "wagmi";
 import { wagmiConfig } from "@/lib/wagmi";
 import { runProtocolStartupSanityCheck } from "@/lib/protocol/contracts";
 import type { ReactNode } from "react";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
+import { Toaster, toast } from "sonner";
 
 const queryClient = new QueryClient();
 
 function ProtocolSanityGate({ children }: { children: ReactNode }) {
   const publicClient = usePublicClient();
   const chainId = useChainId();
-  const [sanityError, setSanityError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!publicClient) return;
@@ -23,12 +23,13 @@ function ProtocolSanityGate({ children }: { children: ReactNode }) {
     async function validate() {
       try {
         await runProtocolStartupSanityCheck(publicClient);
-        if (!cancelled) {
-          setSanityError(null);
-        }
       } catch (error) {
         if (!cancelled) {
-          setSanityError((error as Error).message);
+          toast.error("Startup contract sanity-check failed", {
+            description: (error as Error).message,
+            duration: Infinity,
+            closeButton: true,
+          });
         }
       }
     }
@@ -40,14 +41,6 @@ function ProtocolSanityGate({ children }: { children: ReactNode }) {
     };
   }, [publicClient, chainId]);
 
-  if (sanityError) {
-    return (
-      <div className="m-4 rounded-lg border border-red-500/40 bg-red-500/10 p-4 text-sm text-red-200">
-        Startup contract sanity-check failed: {sanityError}
-      </div>
-    );
-  }
-
   return <>{children}</>;
 }
 
@@ -57,6 +50,7 @@ export function Providers({ children }: { children: ReactNode }) {
       <QueryClientProvider client={queryClient}>
         <RainbowKitProvider>
           <ProtocolSanityGate>{children}</ProtocolSanityGate>
+          <Toaster position="bottom-right" richColors theme="dark" />
         </RainbowKitProvider>
       </QueryClientProvider>
     </WagmiProvider>

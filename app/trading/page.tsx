@@ -70,9 +70,14 @@ export default function TradingPage() {
   const indexToken: `0x${string}` = (selectedToken.indexAddress ?? contracts.weth.address) as `0x${string}`;
   const collateralToken: `0x${string}` = indexToken;
 
-  // Page-level oracle: feeds chart + order book so all panels stay in sync.
-  // TradingPanel has its own internal usePriceOracle call; wagmi deduplicates the RPC request.
-  const { price: livePrice } = usePriceOracle(indexToken);
+  // Page-level oracle: Pyth SSE (1s) as primary, VaultPriceFeed as on-chain fallback.
+  // TradingPanel has its own internal usePriceOracle call — but only one SSE/RPC per feed
+  // because Pyth SSE is de-duplicated per feed ID and wagmi batches on-chain reads.
+  const {
+    price: livePrice,
+    source: oracleSource,
+    pythConnected,
+  } = usePriceOracle(indexToken);
   const currentPrice = livePrice ?? tokenPriceData?.price ?? 0;
 
   const orders = onChainOrdersToUI(increaseOrders, decreaseOrders);
@@ -89,6 +94,9 @@ export default function TradingPage() {
         onTokenPickerOpen={() => setIsTokenPickerOpen(true)}
         selectedSymbol={`${symbol}-PERP`}
         tokenPriceData={tokenPriceData}
+        livePrice={currentPrice}
+        pythConnected={pythConnected}
+        oracleSource={oracleSource}
       />
 
       <TokenPickerDialog

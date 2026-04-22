@@ -51,6 +51,9 @@ export default function TradingPanel({
   const {
     price: oraclePrice,
     priceRaw: oraclePriceRaw,
+    maxPrice: oracleMaxPrice,
+    minPrice: oracleMinPrice,
+    spread: oracleSpread,
     isValid: isOracleValid,
     isStale: isOracleStale,
     source: oracleSource,
@@ -67,6 +70,8 @@ export default function TradingPanel({
   const {
     txStatus,
     isPending,
+    isSubmitted,
+    isConfirmed,
     placeMarketOrder,
     placeLimitOrder,
     placeTPSLOrders,
@@ -150,14 +155,17 @@ export default function TradingPanel({
   const insufficientBalance = wallet.connected && marginRequired > wallet.balance;
 
   const notification = useMemo(() => {
-    if (txStatus.state === "submitted")
-      return { type: "success" as const, message: `Tx submitted: ${txStatus.hash?.slice(0, 10)}…` };
+    if (isConfirmed)
+      return { type: "success" as const, message: `✓ Confirmed: ${txStatus.hash?.slice(0, 10)}…` };
+    if (isSubmitted)
+      return { type: "info" as const, message: `Tx submitted: ${txStatus.hash?.slice(0, 10)}…` };
     if (txStatus.state === "failed")
       return { type: "error" as const, message: txStatus.error ?? "Transaction failed" };
     return null;
-  }, [txStatus]);
+  }, [txStatus, isSubmitted, isConfirmed]);
 
-  const orderPending = isPending;
+  // Only block UI during wallet-signing phase; submitted/confirmed don't lock the panel
+  const orderSigning = isPending;
 
   const handlePctQuantity = (pct: number) => {
     if (!wallet.connected || wallet.balance <= 0) return;
@@ -167,67 +175,56 @@ export default function TradingPanel({
   };
 
   const handlePlaceOrder = useCallback(async () => {
-    const p = activeType === "Market" ? currentPrice : priceNum;
-    if (p <= 0 || qtyNum <= 0 || !wallet.address) return;
-
-    // Validate against oracle
+    if (qtyNum <= 0 || !wallet.address) return;
     if (!isOracleValid) {
-      console.error("Oracle price not valid");
+      console.error("[handlePlaceOrder] oracle not valid — aborting");
       return;
     }
 
-    const collateralAmount = parseUnits(qtyNum.toFixed(8), 18);
-    const sizeDelta = parseUnits((p * qtyNum).toFixed(8), 30);
+    const collateralAmount = parseUnits(qtyNum.toFixed(8), 18); // ETH collateral (18 dec)
 
-    // Calculate acceptable price with slippage
-    const BASIS_POINTS = 10000n;
+    // Oracle price for market orders — must come from VaultPriceFeed
+    const oraclePriceForOrder = oraclePriceRaw ?? parseUnits(currentPrice.toFixed(8), 30);
+
+    const BASIS_POINTS      = 10000n;
     const slippageBpsBigInt = BigInt(slippageBps);
-    const priceRaw = oraclePriceRaw ?? parseUnits(p.toFixed(8), 30);
 
-    // For longs: acceptablePrice = price * (1 + slippage)
-    // For shorts: acceptablePrice = price * (1 - slippage)
+    // acceptablePrice: worst price the user will accept (market slippage bounds)
     const acceptablePrice = isLong
-      ? (priceRaw * (BASIS_POINTS + slippageBpsBigInt)) / BASIS_POINTS
-      : (priceRaw * (BASIS_POINTS - slippageBpsBigInt)) / BASIS_POINTS;
+      ? (oraclePriceForOrder * (BASIS_POINTS + slippageBpsBigInt)) / BASIS_POINTS
+      : (oraclePriceForOrder * (BASIS_POINTS - slippageBpsBigInt)) / BASIS_POINTS;
 
-    // Place main order
     if (activeType === "Market") {
-      await placeMarketOrder({
-        collateralToken,
-        indexToken,
-        collateralAmount,
-        sizeDelta,
-        isLong,
-        acceptablePrice,
-      });
+      // sizeDelta = collateral USD * leverage = (qty * oracle_price * leverage)
+      const sizeDelta = parseUnits((currentPrice * qtyNum * leverage).toFixed(8), 30);
+      console.log("[handlePlaceOrder] Market", { currentPrice, qtyNum, leverage, sizeDelta: sizeDelta.toString(), acceptablePrice: acceptablePrice.toString() });
+      await placeMarketOrder({ collateralToken, indexToken, collateralAmount, sizeDelta, isLong, acceptablePrice });
     } else {
-      await placeLimitOrder({
-        collateralToken,
-        indexToken,
-        collateralAmount,
-        sizeDelta,
-        isLong,
-        triggerPrice: priceRaw,
-        triggerAboveThreshold: !isLong,
-      });
+      // Limit / Conditional: triggerPrice = user's entered limit price (NOT oracle price)
+      if (priceNum <= 0) {
+        console.error("[handlePlaceOrder] limit price required for", activeType);
+        return;
+      }
+      const triggerPriceRaw = parseUnits(priceNum.toFixed(8), 30);
+      const sizeDelta        = parseUnits((priceNum * qtyNum * leverage).toFixed(8), 30);
+      // triggerAboveThreshold:
+      //   Long  limit: execute when oracle price ≤ triggerPrice (price dropped to your buy level) → false
+      //   Short limit: execute when oracle price ≥ triggerPrice (price rose to your sell level) → true
+      const triggerAboveThreshold = !isLong;
+      console.log("[handlePlaceOrder]", activeType, { priceNum, qtyNum, leverage, sizeDelta: sizeDelta.toString(), triggerPrice: triggerPriceRaw.toString(), triggerAboveThreshold });
+      await placeLimitOrder({ collateralToken, indexToken, collateralAmount, sizeDelta, isLong, triggerPrice: triggerPriceRaw, triggerAboveThreshold });
     }
 
-    // Place TP/SL orders if enabled
+    // TP/SL orders attached to the position
     if (tpsl && (tpPrice || slPrice)) {
-      const tpPriceRaw = tpPrice ? parseUnits(tpPrice, 30) : null;
-      const slPriceRaw = slPrice ? parseUnits(slPrice, 30) : null;
-
-      await placeTPSLOrders({
-        collateralToken,
-        indexToken,
-        collateralDelta: collateralAmount,
-        sizeDelta,
-        isLong,
-        tpPrice: tpPriceRaw,
-        slPrice: slPriceRaw,
-      });
+      const sizeDeltaForTPSL = parseUnits(
+        ((activeType === "Market" ? currentPrice : priceNum) * qtyNum * leverage).toFixed(8), 30
+      );
+      const tpPriceRaw = tpPrice ? parseUnits(parseFloat(tpPrice).toFixed(8), 30) : null;
+      const slPriceRaw = slPrice ? parseUnits(parseFloat(slPrice).toFixed(8), 30) : null;
+      await placeTPSLOrders({ collateralToken, indexToken, collateralDelta: collateralAmount, sizeDelta: sizeDeltaForTPSL, isLong, tpPrice: tpPriceRaw, slPrice: slPriceRaw });
     }
-  }, [activeType, currentPrice, priceNum, qtyNum, wallet.address, collateralToken, indexToken, isLong, placeMarketOrder, placeLimitOrder, placeTPSLOrders, isOracleValid, oraclePriceRaw, slippageBps, tpsl, tpPrice, slPrice]);
+  }, [activeType, currentPrice, priceNum, qtyNum, leverage, wallet.address, collateralToken, indexToken, isLong, placeMarketOrder, placeLimitOrder, placeTPSLOrders, isOracleValid, oraclePriceRaw, slippageBps, tpsl, tpPrice, slPrice]);
 
   return (
     <div className="flex flex-col h-full" style={{ background: "var(--surface-container-lowest)", color: "var(--on-surface)" }}>
@@ -236,8 +233,16 @@ export default function TradingPanel({
         <div
           className="px-3 py-2 text-[11px] font-mono flex items-center justify-between"
           style={{
-            background: notification.type === "success" ? "rgba(0,192,118,0.1)" : "rgba(255,77,79,0.1)",
-            color: notification.type === "success" ? "var(--buy)" : "var(--sell)",
+            background: notification.type === "success"
+              ? "rgba(0,192,118,0.1)"
+              : notification.type === "info"
+              ? "rgba(99,179,255,0.1)"
+              : "rgba(255,77,79,0.1)",
+            color: notification.type === "success"
+              ? "var(--buy)"
+              : notification.type === "info"
+              ? "#63b3ff"
+              : "var(--sell)",
           }}
         >
           <span className="truncate">{notification.message}</span>
@@ -245,21 +250,36 @@ export default function TradingPanel({
         </div>
       )}
 
-      {/* Oracle Status — subtle pill */}
+      {/* Oracle Status — Pyth SSE / Vault indicator */}
       <div
         className="px-3 py-1 flex items-center justify-between text-[10px]"
         style={{ borderBottom: "1px solid rgba(66,70,84,0.3)" }}
       >
         <div className="flex items-center gap-1.5" style={{ color: "var(--on-surface-disabled)" }}>
           <Shield size={9} style={{ color: isOracleValid ? "var(--buy)" : "var(--sell)" }} />
-          <span>{oracleSource}{websocketConnected ? " · Live" : isOracleStale ? " · Stale" : ""}</span>
+          <span>
+            {oracleSource === "pyth" ? "PYTH" : oracleSource.toUpperCase()}
+            {websocketConnected ? " · 1s" : isOracleStale ? " · Stale" : ""}
+          </span>
+          {oracleSpread > 0 && (
+            <span className="font-mono text-[9px]" style={{ color: "var(--on-surface-disabled)", opacity: 0.7 }}>
+              spread ${oracleSpread.toLocaleString("en-US", { maximumFractionDigits: 2 })}
+            </span>
+          )}
         </div>
-        <span
-          className="font-mono text-[10px]"
-          style={{ color: isOracleValid ? "var(--on-surface-muted)" : "var(--sell)" }}
-        >
-          {currentPrice > 0 ? `$${currentPrice.toLocaleString("en-US", { maximumFractionDigits: 4 })}` : "—"}
-        </span>
+        <div className="flex items-center gap-1.5">
+          {oracleMinPrice !== null && oracleMaxPrice !== null && (
+            <span className="font-mono text-[9px]" style={{ color: "var(--on-surface-disabled)", opacity: 0.6 }}>
+              {oracleMinPrice.toLocaleString("en-US", { maximumFractionDigits: 2 })}–{oracleMaxPrice.toLocaleString("en-US", { maximumFractionDigits: 2 })}
+            </span>
+          )}
+          <span
+            className="font-mono text-[10px]"
+            style={{ color: isOracleValid ? "var(--on-surface-muted)" : "var(--sell)" }}
+          >
+            {currentPrice > 0 ? `$${currentPrice.toLocaleString("en-US", { maximumFractionDigits: 4 })}` : "—"}
+          </span>
+        </div>
       </div>
 
       {/* Buy/Sell Toggle */}
@@ -523,29 +543,29 @@ export default function TradingPanel({
           <div className="space-y-2 pt-1">
             <button
               onClick={handlePlaceOrder}
-              disabled={orderPending || hasErrors || !isOracleValid || qtyNum <= 0}
+              disabled={orderSigning || hasErrors || !isOracleValid || qtyNum <= 0}
               className="w-full py-2.5 text-[13px] font-semibold rounded transition-colors flex items-center justify-center gap-2"
               style={{
-                background: orderPending || hasErrors || !isOracleValid || qtyNum <= 0
+                background: orderSigning || hasErrors || !isOracleValid || qtyNum <= 0
                   ? "var(--surface-container-high)"
                   : side === "buy"
                   ? "linear-gradient(135deg, var(--buy) 0%, var(--buy-bright) 100%)"
                   : "linear-gradient(135deg, var(--sell) 0%, var(--sell-bright) 100%)",
-                color: orderPending || hasErrors || !isOracleValid || qtyNum <= 0
+                color: orderSigning || hasErrors || !isOracleValid || qtyNum <= 0
                   ? "var(--on-surface-disabled)"
                   : side === "buy" ? "#000" : "var(--on-primary)",
-                cursor: orderPending || hasErrors || !isOracleValid || qtyNum <= 0 ? "not-allowed" : "pointer",
-                boxShadow: orderPending || hasErrors || !isOracleValid || qtyNum <= 0
+                cursor: orderSigning || hasErrors || !isOracleValid || qtyNum <= 0 ? "not-allowed" : "pointer",
+                boxShadow: orderSigning || hasErrors || !isOracleValid || qtyNum <= 0
                   ? "none"
                   : side === "buy"
                   ? "0 0 16px 2px rgba(0,192,118,0.25)"
                   : "0 0 16px 2px rgba(255,77,79,0.25)",
               }}
             >
-              {orderPending ? (
+              {orderSigning ? (
                 <>
                   <Loader2 size={14} className="animate-spin" />
-                  {txStatus.state === "submitted" ? "Confirming…" : "Placing Order…"}
+                  Signing…
                 </>
               ) : !isOracleValid ? (
                 "Oracle Unavailable"
@@ -555,13 +575,39 @@ export default function TradingPanel({
                 `${side === "buy" ? "Buy / Long" : "Sell / Short"} ${symbol}`
               )}
             </button>
+
+            {/* Non-blocking on-chain status — visible while tx is submitted/confirmed */}
+            {(isSubmitted || isConfirmed) && txStatus.hash && (
+              <div
+                className="flex items-center gap-2 px-2 py-1.5 rounded text-[10px] font-mono"
+                style={{
+                  background: isConfirmed ? "rgba(0,192,118,0.08)" : "rgba(99,179,255,0.06)",
+                  border: `1px solid ${isConfirmed ? "rgba(0,192,118,0.2)" : "rgba(99,179,255,0.15)"}`,
+                }}
+              >
+                {isConfirmed ? (
+                  <span style={{ color: "var(--buy)" }}>✓</span>
+                ) : (
+                  <Loader2 size={10} className="animate-spin shrink-0" style={{ color: "#63b3ff" }} />
+                )}
+                <span style={{ color: isConfirmed ? "var(--buy)" : "#63b3ff" }}>
+                  {isConfirmed ? "Confirmed" : "Confirming…"}
+                </span>
+                <span className="truncate" style={{ color: "var(--on-surface-disabled)" }}>
+                  {txStatus.hash.slice(0, 8)}…{txStatus.hash.slice(-6)}
+                </span>
+                <button onClick={resetTxStatus} className="ml-auto opacity-50 hover:opacity-100 shrink-0">
+                  <X size={9} />
+                </button>
+              </div>
+            )}
           </div>
         )}
 
         {/* Order Options */}
         {wallet.connected && (
           <div className="pt-1 space-y-2" style={{ borderTop: "1px solid rgba(66,70,84,0.4)" }}>
-            <SlippageSelector value={slippageBps} onChange={setSlippageBps} disabled={orderPending} />
+            <SlippageSelector value={slippageBps} onChange={setSlippageBps} disabled={orderSigning} />
             <div className="flex items-center gap-3">
               <label className="flex items-center gap-1.5 cursor-pointer">
                 <input type="checkbox" checked={postOnly} onChange={(e) => setPostOnly(e.target.checked)} />
@@ -634,10 +680,11 @@ export default function TradingPanel({
                           sizeDelta: pos.size,
                           collateralDelta: pos.collateral,
                           isLong: pos.isLong,
-                          acceptablePrice: pos.averagePrice,
+                          // Use live oracle price, not entry price, to avoid stale-price revert
+                          acceptablePrice: oraclePriceRaw ?? pos.averagePrice,
                         })
                       }
-                      disabled={orderPending}
+                      disabled={orderSigning}
                       className="w-full py-1.5 text-[11px] font-mono rounded transition-colors"
                       style={{ border: "1px solid rgba(255,77,79,0.3)", color: "var(--sell)", background: "transparent" }}
                       onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = "rgba(255,77,79,0.08)")}
@@ -665,7 +712,7 @@ export default function TradingPanel({
                 </div>
                 <button
                   onClick={() => cancelIncreaseOrder(order.index)}
-                  disabled={orderPending}
+                  disabled={orderSigning}
                   className="p-1 rounded transition-colors"
                   style={{ color: "var(--on-surface-disabled)" }}
                   title="Cancel order"
@@ -686,7 +733,7 @@ export default function TradingPanel({
                 </div>
                 <button
                   onClick={() => cancelDecreaseOrder(order.index)}
-                  disabled={orderPending}
+                  disabled={orderSigning}
                   className="p-1 rounded transition-colors"
                   style={{ color: "var(--on-surface-disabled)" }}
                   title="Cancel order"

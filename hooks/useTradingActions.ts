@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useState, useEffect } from "react";
 import { useWriteContract, useReadContract, useAccount, useWaitForTransactionReceipt } from "wagmi";
 import { parseUnits, formatUnits } from "viem";
 import { contracts, PRICE_PRECISION } from "@/lib/protocol/contracts";
@@ -62,12 +62,24 @@ export function useTradingActions() {
   const [txStatus, setTxStatus] = useState<TxStatus>({ state: "idle" });
   const [pendingHash, setPendingHash] = useState<`0x${string}` | undefined>();
 
-  useWaitForTransactionReceipt({
+  const { data: receipt, isSuccess: receiptSuccess } = useWaitForTransactionReceipt({
     hash: pendingHash,
-    query: {
-      enabled: !!pendingHash,
-    },
+    query: { enabled: !!pendingHash },
   });
+
+  // Transition to confirmed when receipt arrives, then auto-reset after 5 s
+  useEffect(() => {
+    if (!receiptSuccess || !receipt) return;
+    if (txStatus.state !== "submitted") return;
+    console.log("[useTradingActions] tx confirmed", { hash: pendingHash, blockNumber: receipt.blockNumber?.toString() });
+    setTxStatus({ state: "confirmed", hash: pendingHash });
+    const timer = setTimeout(() => {
+      setTxStatus({ state: "idle" });
+      setPendingHash(undefined);
+    }, 5_000);
+    return () => clearTimeout(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [receiptSuccess, receipt]);
 
   const { data: minExecFee } = useReadContract({
     ...contracts.orderBook,
@@ -387,11 +399,16 @@ export function useTradingActions() {
     [address, placeDecreaseOrder]
   );
 
-  const resetTxStatus = useCallback(() => setTxStatus({ state: "idle" }), []);
+  const resetTxStatus = useCallback(() => {
+    setTxStatus({ state: "idle" });
+    setPendingHash(undefined);
+  }, []);
 
   return {
     txStatus,
-    isPending: txStatus.state === "pending" || txStatus.state === "submitted",
+    isPending: txStatus.state === "pending",        // wallet signing — blocks new orders
+    isSubmitted: txStatus.state === "submitted",    // on-chain — allow new orders
+    isConfirmed: txStatus.state === "confirmed",    // receipt arrived
     routerApproved: !!routerApproved,
     approvePlugin,
     approveToken,

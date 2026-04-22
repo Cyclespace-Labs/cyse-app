@@ -6,10 +6,14 @@ import { orderBookAbi } from "@/lib/protocol/abis/orderBook.abi";
 const ORDER_BOOK = addr["OrderBook"] as `0x${string}`;
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ account: string }> }
 ) {
+  const reqId = Math.random().toString(36).slice(2, 8);
+  const t0    = Date.now();
   const { account } = await params;
+
+  console.log(`[orders][${reqId}] GET account=${account}`);
 
   try {
     const [increaseIndexRaw, decreaseIndexRaw] = await Promise.all([
@@ -19,6 +23,7 @@ export async function GET(
 
     const increaseCount = Math.min(Number(increaseIndexRaw), 20);
     const decreaseCount = Math.min(Number(decreaseIndexRaw), 20);
+    console.log(`[orders][${reqId}] indexes: increase=${increaseIndexRaw} decrease=${decreaseIndexRaw} (fetching ${increaseCount}/${decreaseCount})`);
 
     type IncreaseResult = readonly [`0x${string}`, bigint, `0x${string}`, `0x${string}`, bigint, boolean, bigint, boolean, bigint];
     type DecreaseResult = readonly [`0x${string}`, bigint, `0x${string}`, bigint, boolean, bigint, boolean, bigint];
@@ -95,9 +100,14 @@ export async function GET(
       })
       .filter(Boolean);
 
-    return NextResponse.json({ account, increaseOrders, decreaseOrders });
+    console.log(`[orders][${reqId}] OK increase=${increaseOrders.length} decrease=${decreaseOrders.length} latency=${Date.now()-t0}ms`);
+    increaseOrders.forEach((o) => o && console.log(`[orders][${reqId}]   +increase[${o.index}] isLong=${o.isLong} sizeUsd=${o.sizeUsd} triggerPrice=${o.triggerPriceFormatted} above=${o.triggerAboveThreshold}`));
+    decreaseOrders.forEach((o) => o && console.log(`[orders][${reqId}]   -decrease[${o.index}] isLong=${o.isLong} sizeUsd=${o.sizeUsd} triggerPrice=${o.triggerPriceFormatted} above=${o.triggerAboveThreshold}`));
+
+    return NextResponse.json({ account, increaseOrders, decreaseOrders, ts: Date.now() });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Failed to fetch orders";
+    console.error(`[orders][${reqId}] ERR account=${account} latency=${Date.now()-t0}ms`, err);
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

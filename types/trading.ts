@@ -78,3 +78,43 @@ export interface TokenPriceData {
   openInterest: number;
   profitApy: string;
 }
+
+// ── Pyth Network price types ────────────────────────────────────────────────
+
+/** Single Pyth price point (matches Hermes parsed response). */
+export interface PythPrice {
+  price: string;      // int price as string, e.g. "6163260000000"
+  conf: string;       // confidence interval as string
+  expo: number;       // exponent, e.g. -8
+  publish_time: number; // unix timestamp
+}
+
+/** Parsed price update from Hermes SSE stream. */
+export interface PythParsedFeed {
+  id: string;         // 32-byte hex feed ID (no 0x prefix in SSE)
+  price: PythPrice;
+  ema_price: PythPrice;
+}
+
+/** Full SSE event payload from Hermes /v2/updates/price/stream. */
+export interface PythStreamEvent {
+  binary: {
+    encoding: string;
+    data: string[];   // hex-encoded update bytes (for on-chain submission)
+  };
+  parsed: PythParsedFeed[];
+}
+
+/** Resolved real-time price from a Pyth feed. */
+export interface PythResolvedPrice {
+  pair: string;       // e.g. "ETH/USD"
+  feedId: string;     // 0x-prefixed hex
+  price: number;      // USD price (human-readable)
+  confidence: number; // ± USD confidence
+  emaPrice: number;   // exponential moving average price
+  publishTime: number; // unix timestamp
+  // Raw values for on-chain submission
+  priceRaw: string;
+  exponent: number;
+  updateData: string | null; // hex VAA for on-chain updatePriceFeeds()
+}

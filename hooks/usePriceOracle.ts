@@ -1,18 +1,34 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { useReadContract, useChainId } from "wagmi";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useReadContracts } from "wagmi";
 import { contracts } from "@/lib/protocol/contracts";
 import { formatUnits } from "viem";
+import type { Abi } from "viem";
+import { HERMES_BASE_URL, resolvePythFeed, PYTH_FEED_IDS, feedIdToPair } from "@/lib/pyth/config";
+import type { PythParsedFeed, PythStreamEvent, PythResolvedPrice } from "@/types/trading";
 
-const STALE_THRESHOLD_MS = 60_000; // 60 seconds = warning
-const ERROR_THRESHOLD_MS = 300_000; // 5 minutes = error
-const MAX_DEVIATION_PERCENT = 1; // 1% max deviation
+// ── Thresholds ──────────────────────────────────────────────────────────────
+const PYTH_STALE_MS       = 10_000;  // 10 s without Pyth update → warn
+const CHAIN_STALE_MS      = 60_000;  // 60 s without on-chain → warn
+const ERROR_THRESHOLD_MS  = 120_000; // 2 min → error
+const CHAIN_POLL_MS       = 5_000;   // on-chain poll (slower when Pyth SSE is active)
+const CHAIN_POLL_FAST_MS  = 2_000;   // on-chain poll fallback when Pyth is down
 
-// WebSocket configuration
-const WEBSOCKET_RECONNECT_DELAY = 3000; // 3 seconds
-const WEBSOCKET_MAX_RECONNECTS = 5;
+const SSE_MAX_RECONNECTS  = 10;
+const SSE_RECONNECT_BASE  = 1_000;
+const SSE_RECONNECT_MAX   = 30_000;
 
+// ── Pyth price conversion ───────────────────────────────────────────────────
+function parsePythRaw(raw: { price: string; conf: string; expo: number }): {
+  price: number;
+  confidence: number;
+} {
+  const factor = Math.pow(10, raw.expo);
+  return { price: Number(raw.price) * factor, confidence: Number(raw.conf) * factor };
+}
+
+// ── Interfaces (unchanged for consumers) ────────────────────────────────────
 export interface PriceOracleState {
   price: number | null;
   priceRaw: bigint | null;
@@ -20,8 +36,8 @@ export interface PriceOracleState {
   source: "vault" | "pyth" | "websocket" | "stale" | "error";
   isValid: boolean;
   isStale: boolean;
-  confidence: number; // 0-100, higher is better
-  deviation: number; // % deviation from reference
+  confidence: number;
+  deviation: number;
   error?: string;
   networkStatus: "online" | "degraded" | "offline";
   websocketConnected: boolean;
@@ -31,368 +47,289 @@ export interface PriceValidationResult {
   isValid: boolean;
   error?: string;
   warning?: string;
-  bounds: {
-    min: number;
-    max: number;
-  };
-  acceptablePrice: bigint; // For contract calls
+  bounds: { min: number; max: number };
+  acceptablePrice: bigint;
 }
 
+// ═════════════════════════════════════════════════════════════════════════════
+// usePriceOracle — Pyth SSE (1 s) as primary, VaultPriceFeed as on-chain
+// validation / fallback.  Replaces old WebSocket + FastPriceFeed logic.
+// ═════════════════════════════════════════════════════════════════════════════
 export function usePriceOracle(indexToken: `0x${string}`, maximise = true) {
-  const chainId = useChainId();
-  const [lastUpdate, setLastUpdate] = useState<number>(Date.now());
-  const [pythPrice, setPythPrice] = useState<number | null>(null);
-  const [websocketPrice, setWebsocketPrice] = useState<number | null>(null);
-  const [websocketConnected, setWebsocketConnected] = useState(false);
-  const [networkStatus, setNetworkStatus] = useState<"online" | "degraded" | "offline">("online");
-  const wsRef = useRef<WebSocket | null>(null);
-  const reconnectAttemptsRef = useRef(0);
+  // ── Pyth SSE state ────────────────────────────────────────────────────────
+  const [pythPrice, setPythPrice]          = useState<PythResolvedPrice | null>(null);
+  const [pythConnected, setPythConnected]  = useState(false);
+  const [pythLastUpdate, setPythLastUpdate] = useState(0);
+  const esRef         = useRef<EventSource | null>(null);
+  const reconnectRef  = useRef(0);
+  const mountedRef    = useRef(true);
 
-  // WebSocket connection for real-time price updates
-  useEffect(() => {
-    // WebSocket URL for price feeds (configure as needed)
-    const wsUrl = process.env.NEXT_PUBLIC_PRICE_WEBSOCKET_URL;
-    if (!wsUrl) {
-      setNetworkStatus("degraded");
-      return;
-    }
-
-    const connectWebSocket = () => {
-      try {
-        const ws = new WebSocket(wsUrl);
-        wsRef.current = ws;
-
-        ws.onopen = () => {
-          setWebsocketConnected(true);
-          setNetworkStatus("online");
-          reconnectAttemptsRef.current = 0;
-          // Subscribe to price feed for the token
-          ws.send(JSON.stringify({
-            type: "subscribe",
-            token: indexToken,
-          }));
-        };
-
-        ws.onmessage = (event) => {
-          try {
-            const data = JSON.parse(event.data);
-            if (data.type === "price" && data.token === indexToken) {
-              setWebsocketPrice(data.price);
-              setLastUpdate(Date.now());
-            }
-          } catch (e) {
-            console.error("Failed to parse WebSocket message:", e);
-          }
-        };
-
-        ws.onerror = () => {
-          setWebsocketConnected(false);
-          setNetworkStatus("degraded");
-        };
-
-        ws.onclose = () => {
-          setWebsocketConnected(false);
-          // Attempt reconnection with backoff
-          if (reconnectAttemptsRef.current < WEBSOCKET_MAX_RECONNECTS) {
-            reconnectAttemptsRef.current++;
-            setTimeout(connectWebSocket, WEBSOCKET_RECONNECT_DELAY * reconnectAttemptsRef.current);
-          } else {
-            setNetworkStatus("offline");
-          }
-        };
-      } catch (e) {
-        console.error("Failed to create WebSocket connection:", e);
-        setNetworkStatus("offline");
-      }
-    };
-
-    connectWebSocket();
-
-    return () => {
-      if (wsRef.current) {
-        wsRef.current.close();
-      }
-    };
+  // Resolve which Pyth feed ID this indexToken maps to
+  const pythFeedPair = useMemo(() => {
+    // Try address first, then common symbol lookup
+    const pair = resolvePythFeed(indexToken);
+    if (pair) return pair;
+    // Fallback: if indexToken matches weth address → ETH/USD
+    if (indexToken.toLowerCase() === contracts.weth.address.toLowerCase()) return "ETH/USD" as const;
+    if (indexToken.toLowerCase() === contracts.btc.address.toLowerCase()) return "BTC/USD" as const;
+    return null;
   }, [indexToken]);
 
-  // Primary price from VaultPriceFeed
-  const {
-    data: vaultPriceRaw,
-    isLoading: vaultLoading,
-    error: vaultError,
-    refetch: refetchVault,
-  } = useReadContract({
-    ...contracts.vaultPriceFeed,
-    functionName: "getPrice",
-    args: [indexToken, maximise, true, false],
-    query: {
-      refetchInterval: websocketConnected ? 30_000 : 5_000, // Slower when WebSocket is active
-      staleTime: 3_000,
-    },
-  });
+  const pythFeedId = pythFeedPair ? PYTH_FEED_IDS[pythFeedPair] : null;
 
-  // Secondary price from FastPriceFeed if available
-  const {
-    data: fastPriceRaw,
-    isLoading: fastLoading,
-    error: fastError,
-  } = useReadContract({
-    ...contracts.fastPriceFeed,
-    functionName: "getPrice",
-    args: [indexToken, vaultPriceRaw || 0n, maximise], // refPrice from vault
-    query: {
-      refetchInterval: websocketConnected ? 30_000 : 3_000, // Slower when WebSocket is active
-      staleTime: 2_000,
-      enabled: !!contracts.fastPriceFeed.address,
-    },
-  });
-
-  // Direct price from MockPyth for testing (if available)
-  const { data: mockPythPriceData } = useReadContract({
-    ...contracts.mockPyth,
-    functionName: "getPrice",
-    args: ["0xff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace"], // ETH price feed ID
-    query: {
-      refetchInterval: websocketConnected ? 30_000 : 5_000,
-      staleTime: 3_000,
-      enabled: !!contracts.mockPyth.address,
-    },
-  });
-
-  // Convert MockPyth price to standard format
-  const mockPythPrice = useMemo(() => {
-    if (!mockPythPriceData) return null;
-    const { price, expo } = mockPythPriceData;
-    const priceNum = Number(price) / Math.pow(10, -expo);
-    return priceNum;
-  }, [mockPythPriceData]);
-
-  // Get max price for validation (from vault)
-  const { data: maxPriceRaw } = useReadContract({
-    ...contracts.vault,
-    functionName: "getMaxPrice",
-    args: [indexToken],
-    query: { refetchInterval: 10_000 },
-  });
-
-  // Get min price for validation
-  const { data: minPriceRaw } = useReadContract({
-    ...contracts.vault,
-    functionName: "getMinPrice",
-    args: [indexToken],
-    query: { refetchInterval: 10_000 },
-  });
-
-  // Update timestamp when price changes
+  // ── Pyth Hermes SSE connection (1-second real-time updates) ───────────────
   useEffect(() => {
-    if (vaultPriceRaw || websocketPrice) {
-      setLastUpdate(Date.now());
-    }
-  }, [vaultPriceRaw, websocketPrice]);
+    if (!pythFeedId) return;
+    mountedRef.current = true;
 
-  // Calculate staleness
-  const now = Date.now();
-  const timeSinceUpdate = now - lastUpdate;
-  const isStale = timeSinceUpdate > STALE_THRESHOLD_MS;
-  const isError = timeSinceUpdate > ERROR_THRESHOLD_MS || !!vaultError;
+    const connect = () => {
+      if (!mountedRef.current) return;
 
-  // Format prices
-  const vaultPrice = vaultPriceRaw ? parseFloat(formatUnits(vaultPriceRaw as bigint, 30)) : null;
-  const fastPrice = fastPriceRaw ? parseFloat(formatUnits(fastPriceRaw as bigint, 30)) : null;
-  const maxPrice = maxPriceRaw ? parseFloat(formatUnits(maxPriceRaw as bigint, 30)) : null;
-  const minPrice = minPriceRaw ? parseFloat(formatUnits(minPriceRaw as bigint, 30)) : null;
+      const params = new URLSearchParams();
+      params.append("ids[]", pythFeedId);
+      params.set("parsed", "true");
+      params.set("allow_unordered", "true");
+      params.set("benchmarks_only", "false");
 
-  // Use WebSocket price if available and valid, otherwise fall back to vault
-  const displayPrice = websocketPrice || vaultPrice;
+      const url = `${HERMES_BASE_URL}/v2/updates/price/stream?${params.toString()}`;
+      console.log("[usePriceOracle] Pyth SSE connecting:", url);
 
-  // Calculate deviation between sources
-  const deviation = useMemo(() => {
-    if (!vaultPrice || !fastPrice) return 0;
-    return Math.abs((fastPrice - vaultPrice) / vaultPrice) * 100;
-  }, [vaultPrice, fastPrice]);
+      const es = new EventSource(url);
+      esRef.current = es;
 
-  // Determine source and validity
-  const priceRawTyped = (vaultPriceRaw ?? null) as bigint | null;
-  const oracleState: PriceOracleState = useMemo(() => {
-    if (isError) {
-      return {
-        price: displayPrice,
-        priceRaw: priceRawTyped,
-        lastUpdate,
-        source: "error",
-        isValid: false,
-        isStale: true,
-        confidence: 0,
-        deviation,
-        error: vaultError?.message || "Price data unavailable",
-        networkStatus,
-        websocketConnected,
+      es.onopen = () => {
+        if (!mountedRef.current) return;
+        setPythConnected(true);
+        reconnectRef.current = 0;
+        console.log("[usePriceOracle] Pyth SSE connected for", pythFeedPair);
       };
-    }
 
-    if (isStale) {
-      return {
-        price: displayPrice,
-        priceRaw: priceRawTyped,
-        lastUpdate,
-        source: "stale",
-        isValid: true, // Still usable but warn
-        isStale: true,
-        confidence: 50,
-        deviation,
-        networkStatus,
-        websocketConnected,
+      es.onmessage = (event) => {
+        if (!mountedRef.current) return;
+        try {
+          const data: PythStreamEvent = JSON.parse(event.data);
+          if (!data.parsed?.length) return;
+
+          const updateHex = data.binary?.data?.[0] ?? null;
+
+          for (const feed of data.parsed) {
+            const id = feed.id.startsWith("0x") ? feed.id : `0x${feed.id}`;
+            const pair = feedIdToPair(id);
+            if (pair !== pythFeedPair) continue;
+
+            const { price, confidence } = parsePythRaw(feed.price);
+            const { price: emaPrice } = parsePythRaw(feed.ema_price);
+
+            setPythPrice({
+              pair: pair ?? id,
+              feedId: id,
+              price,
+              confidence,
+              emaPrice,
+              publishTime: feed.price.publish_time,
+              priceRaw: feed.price.price,
+              exponent: feed.price.expo,
+              updateData: updateHex,
+            });
+            setPythLastUpdate(Date.now());
+          }
+        } catch { /* ignore malformed SSE */ }
       };
-    }
 
-    if (deviation > MAX_DEVIATION_PERCENT) {
-      return {
-        price: displayPrice,
-        priceRaw: priceRawTyped,
-        lastUpdate,
-        source: "vault",
-        isValid: false, // Reject due to high deviation
-        isStale: false,
-        confidence: 30,
-        deviation,
-        error: `Price deviation too high: ${deviation.toFixed(2)}%`,
-        networkStatus,
-        websocketConnected,
+      es.onerror = () => {
+        if (!mountedRef.current) return;
+        setPythConnected(false);
+        es.close();
+
+        if (reconnectRef.current < SSE_MAX_RECONNECTS) {
+          reconnectRef.current++;
+          const delay = Math.min(SSE_RECONNECT_BASE * Math.pow(2, reconnectRef.current - 1), SSE_RECONNECT_MAX);
+          console.log(`[usePriceOracle] Pyth SSE reconnecting in ${delay}ms (attempt ${reconnectRef.current})`);
+          setTimeout(connect, delay);
+        } else {
+          console.error("[usePriceOracle] Pyth SSE max reconnects reached — falling back to on-chain");
+        }
       };
-    }
-
-    return {
-      price: displayPrice,
-      priceRaw: priceRawTyped,
-      lastUpdate,
-      source: websocketConnected ? "websocket" : (mockPythPrice ? "pyth" : (fastPrice ? "pyth" : "vault")),
-      isValid: true,
-      isStale: false,
-      confidence: websocketConnected ? 98 : (mockPythPrice ? 95 : (fastPrice ? 90 : 80)),
-      deviation,
-      networkStatus,
-      websocketConnected,
     };
-  }, [displayPrice, priceRawTyped, fastPrice, lastUpdate, isStale, isError, deviation, vaultError, networkStatus, websocketConnected]);
 
-  // Validate a proposed price
+    connect();
+    return () => {
+      mountedRef.current = false;
+      esRef.current?.close();
+      esRef.current = null;
+    };
+  }, [pythFeedId, pythFeedPair]);
+
+  // ── On-chain price: VaultPriceFeed (max + min in one batch) ───────────────
+  // Slower polling when Pyth SSE is active (5 s); faster fallback (2 s).
+  const {
+    data: priceResults,
+    error: priceError,
+    isLoading: chainLoading,
+    refetch,
+  } = useReadContracts({
+    contracts: [
+      {
+        address:      contracts.vaultPriceFeed.address,
+        abi:          contracts.vaultPriceFeed.abi as Abi,
+        functionName: "getPrice" as const,
+        args:         [indexToken, true,  true, false] as const,
+      },
+      {
+        address:      contracts.vaultPriceFeed.address,
+        abi:          contracts.vaultPriceFeed.abi as Abi,
+        functionName: "getPrice" as const,
+        args:         [indexToken, false, true, false] as const,
+      },
+    ],
+    query: {
+      refetchInterval: pythConnected ? CHAIN_POLL_MS : CHAIN_POLL_FAST_MS,
+      staleTime:       CHAIN_POLL_FAST_MS - 500,
+    },
+  });
+
+  const maxPriceRaw = priceResults?.[0]?.status === "success" ? (priceResults[0].result as bigint) : undefined;
+  const minPriceRaw = priceResults?.[1]?.status === "success" ? (priceResults[1].result as bigint) : undefined;
+
+  const maxPrice = maxPriceRaw ? parseFloat(formatUnits(maxPriceRaw, 30)) : null;
+  const minPrice = minPriceRaw ? parseFloat(formatUnits(minPriceRaw, 30)) : null;
+
+  const vaultMidPrice = (maxPrice !== null && minPrice !== null)
+    ? (maxPrice + minPrice) / 2
+    : (maxPrice ?? minPrice ?? null);
+
+  const spread = (maxPrice !== null && minPrice !== null) ? Math.abs(maxPrice - minPrice) : 0;
+
+  // priceRaw follows the maximise param for acceptable-price math in useTradingActions
+  const vaultPriceRaw = maximise ? maxPriceRaw : minPriceRaw;
+
+  // ── Timestamp tracking ────────────────────────────────────────────────────
+  const [chainLastUpdate, setChainLastUpdate] = useState(Date.now());
+  useEffect(() => {
+    if (vaultPriceRaw) setChainLastUpdate(Date.now());
+  }, [vaultPriceRaw]);
+
+  const lastUpdate = Math.max(pythLastUpdate, chainLastUpdate);
+
+  // ── Staleness & errors ────────────────────────────────────────────────────
+  const now = Date.now();
+  const pythStale   = pythConnected && (now - pythLastUpdate > PYTH_STALE_MS);
+  const chainStale  = now - chainLastUpdate > CHAIN_STALE_MS;
+  const hasRpcError = !!priceError ||
+    (priceResults?.[0]?.status === "failure" && priceResults?.[1]?.status === "failure");
+  const isError     = (hasRpcError && !pythPrice) || (now - lastUpdate > ERROR_THRESHOLD_MS);
+  const isStale     = !isError && (pythStale || chainStale);
+
+  // ── Price resolution: Pyth SSE → VaultPriceFeed fallback ──────────────────
+  const displayPrice  = pythPrice?.price ?? vaultMidPrice;
+  const priceRawTyped = (vaultPriceRaw ?? null) as bigint | null;
+
+  // Deviation between Pyth and on-chain (informational only — does NOT block trading)
+  const deviation = useMemo(() => {
+    if (!pythPrice?.price || !vaultMidPrice) return 0;
+    return Math.abs((pythPrice.price - vaultMidPrice) / vaultMidPrice) * 100;
+  }, [pythPrice?.price, vaultMidPrice]);
+
+  // isValid: we have ANY non-zero price — Pyth OR on-chain
+  const isValid = !isError && displayPrice !== null && displayPrice > 0;
+
+  const source: PriceOracleState["source"] = isError
+    ? "error"
+    : isStale
+    ? "stale"
+    : pythConnected && pythPrice
+    ? "pyth"
+    : "vault";
+
+  const networkStatus: PriceOracleState["networkStatus"] =
+    isError ? "offline"
+    : (hasRpcError && !pythConnected) ? "offline"
+    : isStale ? "degraded"
+    : "online";
+
+  // Confidence: Pyth live > on-chain > stale > error
+  const confidence = isError ? 0 : isStale ? 50 : pythConnected ? 98 : 85;
+
+  // ── validatePrice ─────────────────────────────────────────────────────────
   const validatePrice = useCallback(
-    (proposedPrice: number, slippageBps: number = 30): PriceValidationResult => {
-      if (!oracleState.isValid || !vaultPrice) {
+    (proposedPrice: number, slippageBps = 30): PriceValidationResult => {
+      if (!isValid || displayPrice === null) {
         return {
           isValid: false,
-          error: oracleState.error || "Oracle price unavailable",
-          bounds: { min: 0, max: 0 },
+          error:   priceError?.message ?? "Oracle price unavailable",
+          bounds:  { min: 0, max: 0 },
           acceptablePrice: 0n,
         };
       }
 
-      const slippageDecimal = slippageBps / 10000;
-      const minPriceBound = vaultPrice * (1 - slippageDecimal);
-      const maxPriceBound = vaultPrice * (1 + slippageDecimal);
+      const slippageDec = slippageBps / 10_000;
+      const minBound    = displayPrice * (1 - slippageDec);
+      const maxBound    = displayPrice * (1 + slippageDec);
 
-      // Check if proposed price is within acceptable bounds
-      if (proposedPrice < minPriceBound || proposedPrice > maxPriceBound) {
+      if (proposedPrice < minBound || proposedPrice > maxBound) {
         return {
-          isValid: false,
-          error: `Price ${proposedPrice.toFixed(4)} outside acceptable range (${minPriceBound.toFixed(4)} - ${maxPriceBound.toFixed(4)})`,
-          warning: `Current oracle price: ${vaultPrice.toFixed(4)}`,
-          bounds: { min: minPriceBound, max: maxPriceBound },
+          isValid:  false,
+          error:    `Price ${proposedPrice.toFixed(4)} outside range (${minBound.toFixed(4)} – ${maxBound.toFixed(4)})`,
+          warning:  `Oracle: ${displayPrice.toFixed(4)}`,
+          bounds:   { min: minBound, max: maxBound },
           acceptablePrice: 0n,
         };
       }
-
-      // Check against contract min/max prices
-      if (minPrice && proposedPrice < minPrice * 0.99) {
-        return {
-          isValid: false,
-          error: `Price below contract minimum: ${minPrice.toFixed(4)}`,
-          bounds: { min: minPriceBound, max: maxPriceBound },
-          acceptablePrice: 0n,
-        };
-      }
-
-      if (maxPrice && proposedPrice > maxPrice * 1.01) {
-        return {
-          isValid: false,
-          error: `Price above contract maximum: ${maxPrice.toFixed(4)}`,
-          bounds: { min: minPriceBound, max: maxPriceBound },
-          acceptablePrice: 0n,
-        };
-      }
-
-      // Calculate acceptable price for contract (with slippage)
-      // For longs: acceptablePrice = currentPrice * (1 + slippage)
-      // For shorts: acceptablePrice = currentPrice * (1 - slippage)
-      // Note: This is handled by the caller based on isLong
-      const acceptablePrice = (vaultPriceRaw as bigint | undefined) ?? 0n;
 
       return {
-        isValid: true,
-        bounds: { min: minPriceBound, max: maxPriceBound },
-        acceptablePrice,
+        isValid:         true,
+        bounds:          { min: minBound, max: maxBound },
+        acceptablePrice: priceRawTyped ?? 0n,
       };
     },
-    [oracleState, vaultPrice, vaultPriceRaw, minPrice, maxPrice]
+    [isValid, displayPrice, priceError, priceRawTyped]
   );
 
-  // Calculate price impact for a given order size
+  // ── calculatePriceImpact ──────────────────────────────────────────────────
   const calculatePriceImpact = useCallback(
     (sizeUsd: number): { impact: number; warning?: string } => {
-      if (!vaultPrice || sizeUsd <= 0) return { impact: 0 };
-
-      // Get pool depth (simplified - would use actual pool amounts)
-      const typicalPoolDepth = 1_000_000; // $1M assumption
+      if (!displayPrice || sizeUsd <= 0) return { impact: 0 };
+      const typicalPoolDepth = 1_000_000;
       const impact = (sizeUsd / typicalPoolDepth) * 100;
-
-      let warning: string | undefined;
-      if (impact > 1) warning = `High price impact: ${impact.toFixed(2)}%`;
-      if (impact > 5) warning = `Very high price impact: ${impact.toFixed(2)}% - consider smaller size`;
-
+      const warning = impact > 5
+        ? `Very high price impact: ${impact.toFixed(2)}% – consider smaller size`
+        : impact > 1
+        ? `High price impact: ${impact.toFixed(2)}%`
+        : undefined;
       return { impact, warning };
     },
-    [vaultPrice]
-  );
-
-  // Function to update MockPyth price for testing
-  const updateMockPythPrice = useCallback(
-    async (priceId: `0x${string}`, price: number, expo: number = 8): Promise<void> => {
-      try {
-        // Convert price to int64 (price * 10^expo)
-        const priceInt = BigInt(Math.floor(price * Math.pow(10, expo)));
-        const currentTime = Math.floor(Date.now() / 1000);
-        
-        // This would need to use a write contract, for now just log
-        console.log(`MockPyth price update: ID=${priceId}, Price=${price}, Expo=${expo}, Time=${currentTime}`);
-        // TODO: Implement actual contract call when write functionality is added
-      } catch (error) {
-        console.error("Failed to update MockPyth price:", error);
-        throw error;
-      }
-    },
-    []
+    [displayPrice]
   );
 
   return {
-    price: oracleState.price,
-    priceRaw: oracleState.priceRaw as bigint | null,
-    lastUpdate: oracleState.lastUpdate,
-    source: oracleState.source,
-    isValid: oracleState.isValid,
-    isStale: oracleState.isStale,
-    confidence: oracleState.confidence,
-    deviation: oracleState.deviation,
-    error: oracleState.error,
+    // Core prices
+    price:               displayPrice,
+    priceRaw:            priceRawTyped,
     maxPrice,
     minPrice,
-    isLoading: vaultLoading || fastLoading,
+    spread,
+    lastUpdate,
+    // Oracle metadata
+    source,
+    isValid,
+    isStale,
+    confidence,
+    deviation,
+    error:               isError ? (priceError?.message ?? "Price data unavailable") : undefined,
+    networkStatus,
+    websocketConnected:  pythConnected,  // Pyth SSE acts as the "websocket" layer
+    isLoading:           chainLoading && !displayPrice,
+    // Functions
     validatePrice,
     calculatePriceImpact,
-    refetch: refetchVault,
-    networkStatus: oracleState.networkStatus,
-    websocketConnected: oracleState.websocketConnected,
-    updateMockPythPrice,
-    mockPythPrice,
+    refetch,
+    // Pyth-specific (new)
+    pythPrice,
+    pythConnected,
+    pythFeedPair,
+    // Legacy compat
+    mockPythPrice:          null,
+    updateMockPythPrice:    async () => {},
   };
 }
 
