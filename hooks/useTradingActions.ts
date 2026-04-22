@@ -197,7 +197,14 @@ export function useTradingActions() {
       if (!address) return null;
       setTxStatus({ state: "pending" });
       try {
-        const slippedPrice = applySlippage(acceptablePrice, !isLong);
+        // For closing positions, the acceptable price direction is opposite to opening:
+        // Long (selling): contract checks mark >= limit, so limit should be LOWER (minimum acceptable)
+        // Short (buying): contract checks mark <= limit, so limit should be HIGHER (maximum acceptable)
+        // We apply 10% slippage in the direction that gives more room for execution
+        const CLOSE_SLIPPAGE_BPS = 1000n; // 10% for closing to handle price discrepancies
+        const slippedPrice = isLong
+          ? (acceptablePrice * (BASIS_POINTS - CLOSE_SLIPPAGE_BPS)) / BASIS_POINTS // Lower for selling long
+          : (acceptablePrice * (BASIS_POINTS + CLOSE_SLIPPAGE_BPS)) / BASIS_POINTS; // Higher for buying short
         const isEth = collateralToken.toLowerCase() === contracts.weth.address.toLowerCase();
 
         // For ETH collateral: use decreasePositionETH so proceeds are unwrapped to native ETH.
@@ -205,6 +212,7 @@ export function useTradingActions() {
           ...contracts.router,
           functionName: isEth ? "decreasePositionETH" : "decreasePosition",
           args: [collateralToken, indexToken, collateralDelta, sizeDelta, isLong, address, slippedPrice],
+          gas: 8_000_000n, // Manual gas limit to avoid cap error (16,777,216 cap)
         });
         setPendingHash(hash);
         setTxStatus({ state: "submitted", hash });

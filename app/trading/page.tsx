@@ -132,6 +132,7 @@ export default function TradingPage() {
             orders={orders}
             onCancelOrder={() => {}}
             onClosePosition={() => {}}
+            currentPrice={currentPrice}
           />
         </div>
 
