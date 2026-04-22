@@ -29,7 +29,7 @@ export default function TokenPickerDialog({
   const [search, setSearch] = useState("");
   const [activeTab, setActiveTab] = useState("Futures");
   const [sortBy, setSortBy] = useState<"volume" | "price" | "marketCap">("volume");
-  const [whitelistOnly, setWhitelistOnly] = useState(false);
+  const [whitelistOnly, setWhitelistOnly] = useState(true);
   const backdropRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 

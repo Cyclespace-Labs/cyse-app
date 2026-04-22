@@ -54,6 +54,7 @@ export function useCandleData(
     setLoading(true);
     setError(null);
     readyRef.current = false;
+    setCandles([]); // Clear old data when fetching new
     try {
       const res = await fetch(
         `/api/trading/candles?symbol=${encodeURIComponent(symbol)}&interval=${encodeURIComponent(interval)}&limit=300`
@@ -139,7 +140,7 @@ export function useCandleData(
       next[next.length - 1] = updated;
       return next;
     });
-  }, [livePrice]);
+  }, [livePrice, interval]);
 
   return { candles, loading, error };
 }

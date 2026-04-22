@@ -46,6 +46,8 @@ export interface OnChainIncreaseOrder {
   triggerPrice: bigint;
   triggerAboveThreshold: boolean;
   executionFee: bigint;
+  tp?: bigint;
+  sl?: bigint;
 }
 
 export interface OnChainDecreaseOrder {
@@ -59,6 +61,8 @@ export interface OnChainDecreaseOrder {
   triggerPrice: bigint;
   triggerAboveThreshold: boolean;
   executionFee: bigint;
+  tp?: bigint;
+  sl?: bigint;
 }
 
 export type OnChainOrder = OnChainIncreaseOrder | OnChainDecreaseOrder;

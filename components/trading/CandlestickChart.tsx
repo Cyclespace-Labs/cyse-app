@@ -96,6 +96,8 @@ export default function CandlestickChart({
         secondsVisible: false,
         rightOffset: 5,
         barSpacing: 8,
+        minBarSpacing: 2,
+        maxBarSpacing: 50,
       },
       width: el.clientWidth,
       height: el.clientHeight,

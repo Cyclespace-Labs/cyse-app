@@ -42,6 +42,8 @@ function onChainOrdersToUI(
     filled: 0,
     status: "open",
     createdAt: Date.now(),
+    tp: o.tp ? parseFloat(formatUnits(o.tp, 30)) : undefined,
+    sl: o.sl ? parseFloat(formatUnits(o.sl, 30)) : undefined,
   }));
   const dec: Order[] = decreases.map((o) => ({
     id: `dec-${o.index}`,
@@ -53,6 +55,8 @@ function onChainOrdersToUI(
     filled: 0,
     status: "open",
     createdAt: Date.now(),
+    tp: o.tp ? parseFloat(formatUnits(o.tp, 30)) : undefined,
+    sl: o.sl ? parseFloat(formatUnits(o.sl, 30)) : undefined,
   }));
   return [...inc, ...dec];
 }
@@ -110,6 +114,7 @@ export default function TradingPage() {
           <div className="flex flex-1 min-h-0">
             <div className="flex-1 min-h-0">
               <ChartSection
+                key={symbol}
                 symbol={symbol}
                 orders={orders}
                 positions={positions}
