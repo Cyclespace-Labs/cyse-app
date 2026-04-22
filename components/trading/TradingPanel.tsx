@@ -2,7 +2,6 @@
 
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { ChevronDown, Loader2, X, AlertTriangle, Shield } from "lucide-react";
-import { useReadContract } from "wagmi";
 import { TokenPriceData } from "@/types/trading";
 import { getTickSize } from "@/lib/tradingData";
 import { useWallet } from "@/contexts/WalletContext";
@@ -62,14 +61,6 @@ export default function TradingPanel({
     validatePrice,
     calculatePriceImpact,
   } = usePriceOracle(indexToken);
-
-  // Fetch on-chain price from VaultPriceFeed for closing positions (same source contract uses)
-  const { data: vaultPriceRaw } = useReadContract({
-    ...contracts.vaultPriceFeed,
-    functionName: "getPrice",
-    args: [indexToken, true, true, false],
-    query: { refetchInterval: 5_000 },
-  });
 
   const currentPrice = oraclePrice ?? tokenPriceData?.price ?? 0;
   const priceNum = parseFloat(price) || 0;
@@ -642,11 +633,7 @@ export default function TradingPanel({
               .filter(Boolean)
               .map((pos) => {
                 if (!pos) return null;
-                // Calculate live PnL using current oracle price
-                const priceDiff = pos.isLong ? currentPrice - pos.avgPriceFormatted : pos.avgPriceFormatted - currentPrice;
-                const livePnl = priceDiff * pos.sizeUsd;
-                const livePnlPct = pos.collateralUsd > 0 ? (livePnl / pos.collateralUsd) * 100 : 0;
-                const pnlColor = livePnl >= 0 ? "var(--buy)" : "var(--sell)";
+                const pnlColor = pos.unrealizedPnlUsd >= 0 ? "var(--buy)" : "var(--sell)";
                 return (
                   <div key={pos.isLong ? "long" : "short"} className="rounded p-2.5 mb-2" style={{ background: "var(--surface-container-low)" }}>
                     <div className="flex items-center justify-between mb-1.5">
@@ -668,7 +655,7 @@ export default function TradingPanel({
                     <div className="flex items-center justify-between text-[10px] mb-2">
                       <span style={{ color: "var(--on-surface-disabled)" }}>Unrealized PnL</span>
                       <span className="font-mono" style={{ color: pnlColor }}>
-                        {livePnl >= 0 ? "+" : ""}${livePnl.toFixed(2)} ({livePnlPct.toFixed(2)}%)
+                        {pos.unrealizedPnlUsd >= 0 ? "+" : ""}${pos.unrealizedPnlUsd.toFixed(2)} ({pos.unrealizedPnlPct.toFixed(2)}%)
                       </span>
                     </div>
 
@@ -693,8 +680,8 @@ export default function TradingPanel({
                           sizeDelta: pos.size,
                           collateralDelta: pos.collateral,
                           isLong: pos.isLong,
-                          // Use VaultPriceFeed on-chain price for closing (same source contract uses)
-                          acceptablePrice: vaultPriceRaw || oraclePriceRaw || parseUnits(currentPrice.toFixed(8), 30),
+                          // Use live oracle price, not entry price, to avoid stale-price revert
+                          acceptablePrice: oraclePriceRaw ?? pos.averagePrice,
                         })
                       }
                       disabled={orderSigning}

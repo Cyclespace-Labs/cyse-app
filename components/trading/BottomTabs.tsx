@@ -22,7 +22,6 @@ interface BottomTabsProps {
   orders?: Order[];
   onCancelOrder?: (orderId: string) => void;
   onClosePosition?: (positionId: string) => void;
-  currentPrice?: number;
 }
 
 export default function BottomTabs({
@@ -31,7 +30,6 @@ export default function BottomTabs({
   orders = [],
   onCancelOrder,
   onClosePosition,
-  currentPrice = 0,
 }: BottomTabsProps) {
   const [activeTab, setActiveTab] = useState("Balances");
 
@@ -63,42 +61,36 @@ export default function BottomTabs({
               </tr>
             </thead>
             <tbody>
-              {positions.map((pos) => {
-                // Calculate live PnL using current price
-                const priceDiff = pos.side === "long" ? currentPrice - pos.entryPrice : pos.entryPrice - currentPrice;
-                const livePnl = priceDiff * pos.quantity;
-                const pnlColor = livePnl >= 0 ? "var(--buy)" : "var(--sell)";
-                return (
-                  <tr
-                    key={pos.id}
-                    style={{ borderBottom: "1px solid rgba(66,70,84,0.2)" }}
-                    onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = "var(--surface-container-low)")}
-                    onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = "transparent")}
-                  >
-                    <td className="px-3 py-1.5" style={{ color: "var(--on-surface)" }}>{pos.symbol}</td>
-                    <td className="px-3 py-1.5" style={{ color: pos.side === "long" ? "var(--buy)" : "var(--sell)" }}>
-                      {pos.side.toUpperCase()} {pos.leverage}x
-                    </td>
-                    <td className="px-3 py-1.5 text-right" style={{ color: "var(--on-surface)" }}>{pos.quantity}</td>
-                    <td className="px-3 py-1.5 text-right" style={{ color: "var(--on-surface)" }}>{pos.entryPrice}</td>
-                    <td className="px-3 py-1.5 text-right" style={{ color: "var(--liquidation)" }}>{pos.liquidationPrice}</td>
-                    <td className="px-3 py-1.5 text-right" style={{ color: pnlColor }}>
-                      {livePnl >= 0 ? "+" : ""}${livePnl.toFixed(2)}
-                    </td>
-                    <td className="px-3 py-1.5 text-right">
-                      <button
-                        onClick={() => onClosePosition?.(pos.id)}
-                        className="text-[10px] px-2 py-0.5 rounded transition-colors"
-                        style={{ border: "1px solid rgba(255,77,79,0.3)", color: "var(--sell)", background: "transparent" }}
-                        onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = "rgba(255,77,79,0.08)")}
-                        onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = "transparent")}
-                      >
-                        Close
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
+              {positions.map((pos) => (
+                <tr
+                  key={pos.id}
+                  style={{ borderBottom: "1px solid rgba(66,70,84,0.2)" }}
+                  onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = "var(--surface-container-low)")}
+                  onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = "transparent")}
+                >
+                  <td className="px-3 py-1.5" style={{ color: "var(--on-surface)" }}>{pos.symbol}</td>
+                  <td className="px-3 py-1.5" style={{ color: pos.side === "long" ? "var(--buy)" : "var(--sell)" }}>
+                    {pos.side.toUpperCase()} {pos.leverage}x
+                  </td>
+                  <td className="px-3 py-1.5 text-right" style={{ color: "var(--on-surface)" }}>{pos.quantity}</td>
+                  <td className="px-3 py-1.5 text-right" style={{ color: "var(--on-surface)" }}>{pos.entryPrice}</td>
+                  <td className="px-3 py-1.5 text-right" style={{ color: "var(--liquidation)" }}>{pos.liquidationPrice}</td>
+                  <td className="px-3 py-1.5 text-right" style={{ color: pos.unrealizedPnl >= 0 ? "var(--buy)" : "var(--sell)" }}>
+                    {pos.unrealizedPnl >= 0 ? "+" : ""}${pos.unrealizedPnl.toFixed(2)}
+                  </td>
+                  <td className="px-3 py-1.5 text-right">
+                    <button
+                      onClick={() => onClosePosition?.(pos.id)}
+                      className="text-[10px] px-2 py-0.5 rounded transition-colors"
+                      style={{ border: "1px solid rgba(255,77,79,0.3)", color: "var(--sell)", background: "transparent" }}
+                      onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = "rgba(255,77,79,0.08)")}
+                      onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = "transparent")}
+                    >
+                      Close
+                    </button>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>

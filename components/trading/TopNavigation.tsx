@@ -45,14 +45,9 @@ export default function TopNavigation() {
   const [notifOpen, setNotifOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
-  const [isMounted, setIsMounted] = useState(false);
 
   const searchRef = useRef<HTMLInputElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
   const settingsRef = useRef<HTMLDivElement>(null);
 
   const unreadCount = mockNotifications.filter((n) => n.unread).length;
@@ -324,7 +319,7 @@ export default function TopNavigation() {
                 <span>Wrong Network</span>
               </button>
             )}
-            {isMounted && wallet.isHardwareWallet && (
+            {wallet.isHardwareWallet && (
               <div
                 className="flex items-center gap-1 px-2 py-1 rounded text-[10px]"
                 style={{ background: "rgba(0,192,118,0.1)", color: "var(--buy)" }}
@@ -334,7 +329,7 @@ export default function TopNavigation() {
                 <span>{wallet.walletType === "ledger" ? "Ledger" : "Trezor"}</span>
               </div>
             )}
-            {isMounted && wallet.isCorrectNetwork && (
+            {wallet.isCorrectNetwork && (
               <div
                 className="flex items-center gap-1 px-2 py-1 rounded text-[10px]"
                 style={{ background: "rgba(14,118,253,0.1)", color: "var(--primary)" }}
