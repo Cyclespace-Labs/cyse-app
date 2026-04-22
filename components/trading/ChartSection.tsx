@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useMemo } from "react";
 import CandlestickChart from "./CandlestickChart";
 import {
   Crosshair,
@@ -12,29 +12,10 @@ import {
 } from "lucide-react";
 import { Order, Position, TokenPriceData } from "@/types/trading";
 import { formatPrice } from "@/lib/formatters";
-import { TV_PYTH_SYMBOLS } from "@/lib/pyth/config";
+import { useCandleData } from "@/hooks/useCandleData";
 
 const chartTabs = ["Chart", "Depth", "Margin", "Funding", "Market Info"];
 const timeframes = ["1m", "3m", "5m", "15m", "1h", "4h", "1d"];
-
-// TradingView script loader (singleton)
-let tvScriptPromise: Promise<void> | null = null;
-function loadTradingViewScript(): Promise<void> {
-  if (tvScriptPromise) return tvScriptPromise;
-  tvScriptPromise = new Promise((resolve) => {
-    if (typeof window !== "undefined" && "TradingView" in window) {
-      resolve();
-      return;
-    }
-    const script = document.createElement("script");
-    script.id = "tradingview-widget-loading-script";
-    script.src = "https://s3.tradingview.com/tv.js";
-    script.type = "text/javascript";
-    script.onload = () => resolve();
-    document.head.appendChild(script);
-  });
-  return tvScriptPromise;
-}
 
 interface ChartSectionProps {
   symbol?: string;
@@ -44,65 +25,52 @@ interface ChartSectionProps {
   currentPrice?: number;
 }
 
+function fmtVol(v: number): string {
+  if (v >= 1e9) return `$${(v / 1e9).toFixed(2)}B`;
+  if (v >= 1e6) return `$${(v / 1e6).toFixed(1)}M`;
+  if (v >= 1e3) return `$${(v / 1e3).toFixed(0)}K`;
+  return `$${v.toFixed(0)}`;
+}
+
 export default function ChartSection({ symbol = "SOL", orders = [], positions = [], tokenPriceData, currentPrice }: ChartSectionProps) {
   const [activeTab, setActiveTab] = useState("Chart");
-  const [activeTimeframe, setActiveTimeframe] = useState("1m");
+  const [activeTimeframe, setActiveTimeframe] = useState("15m");
   const [utcClock, setUtcClock] = useState("");
-  const [tvReady, setTvReady] = useState(false);
-  const tvContainerRef = useRef<HTMLDivElement>(null);
-  const tvWidgetRef = useRef<unknown>(null);
+
+  // ── Real candle data from Binance via API ─────────────────────────────────
+  const { candles, loading } = useCandleData(symbol, activeTimeframe, currentPrice);
+
+  // ── Derive OHLCV from the latest candle for the info bar ──────────────────
+  const lastCandle = candles.length > 0 ? candles[candles.length - 1] : null;
+  const firstCandle = candles.length > 0 ? candles[0] : null;
+
+  const ohlcInfo = useMemo(() => {
+    if (!lastCandle || !firstCandle) return null;
+    const change = lastCandle.close - firstCandle.open;
+    const changePct = firstCandle.open !== 0 ? (change / firstCandle.open) * 100 : 0;
+    let high = 0, low = Infinity, vol = 0;
+    for (const c of candles) {
+      if (c.high > high) high = c.high;
+      if (c.low < low) low = c.low;
+      vol += c.volume;
+    }
+    return {
+      open: firstCandle.open,
+      high,
+      low,
+      close: lastCandle.close,
+      change,
+      changePct,
+      volume: vol,
+    };
+  }, [candles, lastCandle, firstCandle]);
 
   useEffect(() => {
-    const tick = () => {
-      const now = new Date();
-      setUtcClock(now.toISOString().slice(11, 19) + " [UTC]");
-    };
+    const tick = () => setUtcClock(new Date().toISOString().slice(11, 19) + " [UTC]");
     tick();
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
   }, []);
-
-  // Load TradingView widget with PYTH data feed
-  const tvSymbol = TV_PYTH_SYMBOLS[symbol] ?? `PYTH:${symbol}USD`;
-
-  useEffect(() => {
-    if (activeTab !== "Chart") return;
-
-    loadTradingViewScript().then(() => {
-      setTvReady(true);
-      if (!tvContainerRef.current) return;
-      // Clear previous widget
-      tvContainerRef.current.innerHTML = "";
-      tvWidgetRef.current = null;
-
-      try {
-        const TradingView = (window as unknown as Record<string, unknown>).TradingView as {
-          widget: new (config: Record<string, unknown>) => unknown;
-        };
-        if (!TradingView?.widget) return;
-
-        tvWidgetRef.current = new TradingView.widget({
-          autosize: true,
-          symbol: tvSymbol,
-          interval: activeTimeframe === "1d" ? "D" : activeTimeframe.replace("m", "").replace("h", "60"),
-          timezone: "Etc/UTC",
-          theme: "dark",
-          style: "1",
-          locale: "en",
-          toolbar_bg: "#0e0e11",
-          enable_publishing: false,
-          allow_symbol_change: false,
-          hide_side_toolbar: false,
-          container_id: "tradingview-chart-container",
-          backgroundColor: "#0e0e11",
-          gridColor: "rgba(66,70,84,0.15)",
-        });
-      } catch (e) {
-        console.error("[ChartSection] TradingView widget error:", e);
-      }
-    });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tvSymbol, activeTimeframe, activeTab]);
 
   return (
     <div className="flex flex-col h-full" style={{ background: "var(--surface-container-lowest)", borderRight: "1px solid rgba(66,70,84,0.4)" }}>
@@ -189,44 +157,56 @@ export default function ChartSection({ symbol = "SOL", orders = [], positions = 
         </div>
       </div>
 
-      {/* Pair info bar */}
+      {/* Pair info bar — OHLCV from real candle data */}
       <div className="flex items-center gap-2 px-3 py-1 text-[11px]" style={{ color: "var(--on-surface-disabled)", borderBottom: "1px solid rgba(66,70,84,0.4)" }}>
-        <span style={{ color: "var(--on-surface)" }}>{symbol}-PERP · 1 · Cyclespace</span>
+        <span style={{ color: "var(--on-surface)" }}>{symbol}-PERP · {activeTimeframe} · Cyclespace</span>
         <span style={{ color: "var(--on-surface-muted)" }}>·</span>
-        {tokenPriceData && (
+        {ohlcInfo ? (
+          <>
+            <span>
+              O <span style={{ color: "var(--on-surface)" }}>{formatPrice(ohlcInfo.open)}</span>{" "}
+              H <span style={{ color: "var(--on-surface)" }}>{formatPrice(ohlcInfo.high)}</span>{" "}
+              L <span style={{ color: "var(--on-surface)" }}>{formatPrice(ohlcInfo.low)}</span>{" "}
+              C <span style={{ color: ohlcInfo.change >= 0 ? "var(--buy)" : "var(--sell)" }}>
+                {currentPrice && currentPrice > 0 ? formatPrice(currentPrice) : formatPrice(ohlcInfo.close)}
+              </span>
+            </span>
+            <span style={{ color: ohlcInfo.change >= 0 ? "var(--buy)" : "var(--sell)" }}>
+              {ohlcInfo.change >= 0 ? "+" : ""}{formatPrice(ohlcInfo.change)} ({ohlcInfo.changePct.toFixed(2)}%)
+            </span>
+            <span style={{ color: "var(--on-surface-disabled)" }}>
+              Vol <span style={{ color: "var(--on-surface-muted)" }}>{fmtVol(ohlcInfo.volume)}</span>
+            </span>
+          </>
+        ) : tokenPriceData ? (
           <>
             <span>
               O <span style={{ color: "var(--on-surface)" }}>{formatPrice(tokenPriceData.openPrice ?? tokenPriceData.price)}</span>{" "}
               H <span style={{ color: "var(--on-surface)" }}>{formatPrice(tokenPriceData.high24h)}</span>{" "}
               L <span style={{ color: "var(--on-surface)" }}>{formatPrice(tokenPriceData.low24h)}</span>{" "}
               C <span style={{ color: tokenPriceData.change24h >= 0 ? "var(--buy)" : "var(--sell)" }}>
-                {formatPrice(tokenPriceData.price)}
+                {currentPrice && currentPrice > 0 ? formatPrice(currentPrice) : formatPrice(tokenPriceData.price)}
               </span>
             </span>
-            <span style={{ color: tokenPriceData.change24h >= 0 ? "var(--buy)" : "var(--sell)" }}>
-              {tokenPriceData.change24h >= 0 ? "+" : ""}{formatPrice(tokenPriceData.change24h)} ({tokenPriceData.changePct24h.toFixed(2)}%)
-            </span>
-            <span style={{ color: "var(--on-surface-disabled)" }}>
-              Vol <span style={{ color: "var(--on-surface-muted)" }}>{tokenPriceData.volume24h >= 1e9
-                ? `$${(tokenPriceData.volume24h / 1e9).toFixed(2)}B`
-                : tokenPriceData.volume24h >= 1e6
-                  ? `$${(tokenPriceData.volume24h / 1e6).toFixed(1)}M`
-                  : `$${(tokenPriceData.volume24h / 1e3).toFixed(0)}K`}</span>
-            </span>
           </>
-        )}
+        ) : null}
       </div>
 
-      {/* Chart — TradingView widget (PYTH data) with lightweight-charts fallback */}
+      {/* Chart — native lightweight-charts with real Binance candles + Pyth live price */}
       <div className="flex-1 relative min-h-0">
-        {activeTab === "Chart" && tvReady ? (
-          <div
-            ref={tvContainerRef}
-            id="tradingview-chart-container"
-            className="absolute inset-0"
+        {activeTab === "Chart" ? (
+          <CandlestickChart
+            key={`${symbol}-${activeTimeframe}`}
+            candles={candles}
+            orders={orders}
+            positions={positions}
+            currentPrice={currentPrice}
+            loading={loading}
           />
         ) : (
-          <CandlestickChart symbol={symbol} orders={orders} positions={positions} currentPrice={currentPrice} />
+          <div className="flex items-center justify-center h-full text-[13px]" style={{ color: "var(--on-surface-disabled)" }}>
+            {activeTab} — Coming soon
+          </div>
         )}
       </div>
 

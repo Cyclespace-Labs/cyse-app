@@ -8,6 +8,13 @@ import { useVaultWhitelist } from "@/hooks/useVaultWhitelist";
 
 const tabs = ["Spot", "Futures", "Lend"];
 
+// Tokens that have real chart data (Binance klines)
+const CHART_SYMBOLS = new Set([
+  "ETH", "BTC", "BNB", "SOL", "DOGE", "ARB", "OP", "PENGU",
+  "XRP", "LINK", "AVAX", "SUI", "APT", "SEI", "WIF", "BONK",
+  "HYPE", "JUP", "USDT",
+]);
+
 interface TokenPickerDialogProps {
   isOpen: boolean;
   onClose: () => void;
@@ -22,7 +29,7 @@ export default function TokenPickerDialog({
   const [search, setSearch] = useState("");
   const [activeTab, setActiveTab] = useState("Futures");
   const [sortBy, setSortBy] = useState<"volume" | "price" | "marketCap">("volume");
-  const [whitelistOnly, setWhitelistOnly] = useState(true);
+  const [whitelistOnly, setWhitelistOnly] = useState(false);
   const backdropRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
@@ -221,12 +228,20 @@ export default function TokenPickerDialog({
                     <span className="text-[13px] font-medium truncate" style={{ color: "var(--on-surface)" }}>
                       {token.pair}
                     </span>
-                    {isTokenWhitelisted(token) && (
+                    {(token.isLive || isTokenWhitelisted(token)) && (
                       <span
                         className="px-1 py-0.5 text-[9px] font-semibold rounded shrink-0"
                         style={{ color: "var(--buy)", background: "rgba(0,192,118,0.12)", border: "1px solid rgba(0,192,118,0.25)" }}
                       >
                         Live
+                      </span>
+                    )}
+                    {CHART_SYMBOLS.has(token.symbol) && (
+                      <span
+                        className="px-1 py-0.5 text-[9px] font-semibold rounded shrink-0"
+                        style={{ color: "var(--primary)", background: "rgba(14,118,253,0.1)", border: "1px solid rgba(14,118,253,0.2)" }}
+                      >
+                        Chart
                       </span>
                     )}
                   {token.leverage && (
