@@ -22,16 +22,24 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     const stored = localStorage.getItem("theme") as Theme | null;
     if (stored) {
       setTheme(stored);
-      document.documentElement.setAttribute("data-theme", stored);
+      if (stored === "dark") {
+        document.documentElement.classList.remove("light");
+      } else {
+        document.documentElement.classList.add("light");
+      }
     } else {
-      document.documentElement.setAttribute("data-theme", "dark");
+      document.documentElement.classList.remove("light");
     }
     setMounted(true);
   }, []);
 
   useEffect(() => {
     if (mounted) {
-      document.documentElement.setAttribute("data-theme", theme);
+      if (theme === "dark") {
+        document.documentElement.classList.remove("light");
+      } else {
+        document.documentElement.classList.add("light");
+      }
     }
   }, [theme, mounted]);
 

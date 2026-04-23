@@ -1,11 +1,33 @@
 @import "tailwindcss";
 
 /* ============================================================
-   KINETIC INSTITUTIONALIST — Design System
+   KINETIC INSTITUTIONALIST — Design System with shadcn variables
    ============================================================ */
 
 :root {
-  /* --- Surface Hierarchy ----------------------------------- */
+  /* --- shadcn Base Variables (Dark Theme Default) ---------- */
+  --background:              #10131a;
+  --foreground:              #ffffff;
+  --card:                    #1d2026;
+  --card-foreground:         #ffffff;
+  --popover:                 #272a31;
+  --popover-foreground:      #ffffff;
+  --primary:                 #0E76FD;
+  --primary-foreground:      #ffffff;
+  --secondary:               #7b8cde;
+  --secondary-foreground:    #ffffff;
+  --muted:                   #272a31;
+  --muted-foreground:        #8a8da0;
+  --accent:                  #548dff;
+  --accent-foreground:       #ffffff;
+  --destructive:             #ff4d4f;
+  --destructive-foreground:  #ffffff;
+  --border:                  #424654;
+  --input:                   #424654;
+  --ring:                    #548dff;
+  --radius:                  0.75rem;
+
+  /* --- Custom Surface Hierarchy (preserved) ---------------- */
   --surface:                  #10131a;
   --surface-container-lowest: #0c0f14;
   --surface-container-low:    #191c22;
@@ -15,28 +37,26 @@
   --surface-bright:           #363940;
   --surface-variant:          #32353c;
 
-  /* --- Primary --------------------------------------------- */
-  --primary:                  #0E76FD;
+  /* --- Custom Primary (preserved) --------------------------- */
   --primary-container:        #548dff;
   --primary-muted:            #b0c6ff;
   --on-primary:               #ffffff;
   --on-primary-container:     #b0c6ff;
 
-  /* --- Secondary / Tertiary -------------------------------- */
-  --secondary:                #7b8cde;
+  /* --- Custom Secondary / Tertiary (preserved) ------------ */
   --secondary-container:      #2a3060;
   --on-secondary-container:   #c5cbf9;
   --tertiary:                 #ffb68f;
   --error:                    #ffb4ab;
   --error-bright:             #ff4d4f;
 
-  /* --- Text / On-surface ----------------------------------- */
+  /* --- Custom Text / On-surface (preserved) ----------------- */
   --on-surface:               #e1e2eb;
   --on-surface-variant:       #c2c6d7;
   --on-surface-muted:         #8a8da0;
   --on-surface-disabled:      #5a5d70;
 
-  /* --- Outline --------------------------------------------- */
+  /* --- Custom Outline (preserved) --------------------------- */
   --outline:                  #62667a;
   --outline-variant:          #424654;
 
@@ -49,10 +69,6 @@
   --sell-bright:              #ff6b6d;
   --warning:                  #ffb68f;
   --liquidation:              #ff6b35;
-
-  /* --- Background / Foreground (Tailwind compat) ----------- */
-  --background:               var(--surface);
-  --foreground:               var(--on-surface);
 
   /* --- Typography Scale ------------------------------------ */
   --font-display:             var(--font-alexandria, "Alexandria", system-ui, sans-serif);
@@ -80,11 +96,32 @@
 }
 
 /* ============================================================
-   LIGHT THEME
+   LIGHT THEME (Tailwind dark: class-based)
    ============================================================ */
 
-[data-theme="light"] {
-  /* --- Surface Hierarchy ----------------------------------- */
+.light {
+  /* --- shadcn Base Variables (Light Theme) ---------------- */
+  --background:              #f8f9fc;
+  --foreground:              #000000;
+  --card:                    #e8ebf2;
+  --card-foreground:         #000000;
+  --popover:                 #dfe2ea;
+  --popover-foreground:      #000000;
+  --primary:                 #0E76FD;
+  --primary-foreground:      #ffffff;
+  --secondary:               #5b6bc0;
+  --secondary-foreground:    #ffffff;
+  --muted:                   #dfe2ea;
+  --muted-foreground:        #5a5d70;
+  --accent:                  #d4e4ff;
+  --accent-foreground:       #0a4a9e;
+  --destructive:             #e53935;
+  --destructive-foreground:  #ffffff;
+  --border:                  #d0d4e0;
+  --input:                   #d0d4e0;
+  --ring:                    #0E76FD;
+
+  /* --- Custom Surface Hierarchy ----------------------------- */
   --surface:                  #f8f9fc;
   --surface-container-lowest: #ffffff;
   --surface-container-low:    #f1f3f8;
@@ -94,28 +131,26 @@
   --surface-bright:           #ffffff;
   --surface-variant:          #e2e5ed;
 
-  /* --- Primary --------------------------------------------- */
-  --primary:                  #0E76FD;
+  /* --- Custom Primary --------------------------------------- */
   --primary-container:        #d4e4ff;
   --primary-muted:            #6ba3ff;
   --on-primary:               #ffffff;
   --on-primary-container:     #0a4a9e;
 
-  /* --- Secondary / Tertiary -------------------------------- */
-  --secondary:                #5b6bc0;
+  /* --- Custom Secondary / Tertiary ------------------------- */
   --secondary-container:      #dde1ff;
   --on-secondary-container:   #1a237e;
   --tertiary:                 #e67e22;
   --error:                    #d32f2f;
   --error-bright:             #f44336;
 
-  /* --- Text / On-surface ----------------------------------- */
+  /* --- Custom Text / On-surface --------------------------- */
   --on-surface:               #1a1c24;
   --on-surface-variant:       #3a3d4a;
   --on-surface-muted:         #5a5d70;
   --on-surface-disabled:      #9a9daa;
 
-  /* --- Outline --------------------------------------------- */
+  /* --- Custom Outline --------------------------------------- */
   --outline:                  #b0b4c0;
   --outline-variant:          #d0d4e0;
 
@@ -128,16 +163,31 @@
   --sell-bright:              #ff5252;
   --warning:                  #f57c00;
   --liquidation:              #ff6b35;
-
-  /* --- Background / Foreground (Tailwind compat) ----------- */
-  --background:               var(--surface);
-  --foreground:               var(--on-surface);
 }
 
-/* Tailwind v4 theme bridge */
+/* Tailwind v4 theme bridge with shadcn variables */
 @theme inline {
   --color-background:               var(--background);
   --color-foreground:               var(--foreground);
+  --color-card:                     var(--card);
+  --color-card-foreground:          var(--card-foreground);
+  --color-popover:                  var(--popover);
+  --color-popover-foreground:       var(--popover-foreground);
+  --color-primary:                  var(--primary);
+  --color-primary-foreground:       var(--primary-foreground);
+  --color-secondary:                var(--secondary);
+  --color-secondary-foreground:     var(--secondary-foreground);
+  --color-muted:                    var(--muted);
+  --color-muted-foreground:        var(--muted-foreground);
+  --color-accent:                   var(--accent);
+  --color-accent-foreground:        var(--accent-foreground);
+  --color-destructive:              var(--destructive);
+  --color-destructive-foreground:   var(--destructive-foreground);
+  --color-border:                   var(--border);
+  --color-input:                    var(--input);
+  --color-ring:                     var(--ring);
+  
+  /* Custom variables preserved */
   --color-surface:                  var(--surface);
   --color-surface-low:              var(--surface-container-low);
   --color-surface-container:        var(--surface-container);
@@ -145,7 +195,6 @@
   --color-surface-highest:          var(--surface-container-highest);
   --color-surface-bright:           var(--surface-bright);
   --color-surface-variant:          var(--surface-variant);
-  --color-primary:                  var(--primary);
   --color-primary-container:        var(--primary-container);
   --color-on-primary:               var(--on-primary);
   --color-on-surface:               var(--on-surface);
