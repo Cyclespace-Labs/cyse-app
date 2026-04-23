@@ -12,12 +12,24 @@ import { usePriceOracle } from "@/hooks/usePriceOracle";
 import { usePositionHealth } from "@/hooks/usePositionHealth";
 import { validateOrder, validateTPSL, formatValidationErrors, validatePositionHealth } from "@/lib/validation/trading";
 import { parseUnits, formatUnits } from "viem";
-import { contracts } from "@/lib/protocol/contracts";
+import { contracts, erc20Abi } from "@/lib/protocol/contracts";
+import { useBalance, useReadContract } from "wagmi";
 import SlippageSelector from "./SlippageSelector";
 import LiquidationGauge from "./LiquidationGauge";
 
 const orderTypes = ["Limit", "Market", "Conditional"];
 const pctButtons = [25, 50, 75, 100];
+
+// Token configuration for multi-token support
+const TOKEN_CONFIG = {
+  WETH: { address: contracts.weth.address, decimals: 18, symbol: "WETH", name: "Wrapped Ether" },
+  USDC: { address: contracts.usdc.address, decimals: 6, symbol: "USDC", name: "USD Coin" },
+  USDT: { address: contracts.usdt.address, decimals: 6, symbol: "USDT", name: "Tether" },
+  BTC: { address: contracts.btc.address, decimals: 8, symbol: "BTC", name: "Bitcoin" },
+};
+
+const COLLATERAL_TOKENS = ["WETH", "USDC", "USDT"];
+const INDEX_TOKENS = ["WETH", "BTC"];
 
 interface TradingPanelProps {
   symbol: string;
@@ -34,6 +46,10 @@ export default function TradingPanel({
 }: TradingPanelProps) {
   const { wallet, CustomConnectButton } = useWallet();
 
+  // Token selection state
+  const [selectedCollateralTokenKey, setSelectedCollateralTokenKey] = useState<"WETH" | "USDC" | "USDT">("WETH");
+  const [selectedIndexTokenKey, setSelectedIndexTokenKey] = useState<"WETH" | "BTC">("WETH");
+
   const [activeType, setActiveType] = useState("Limit");
   const [side, setSide] = useState<"buy" | "sell">("buy");
   const [price, setPrice] = useState("");
@@ -46,6 +62,32 @@ export default function TradingPanel({
   const [tpPrice, setTpPrice] = useState("");
   const [slPrice, setSlPrice] = useState("");
   const [slippageBps, setSlippageBps] = useState(30); // 0.3% default
+  const [closePercentage, setClosePercentage] = useState(100); // Default to full close
+
+  // Get selected token configs
+  const selectedCollateralConfig = TOKEN_CONFIG[selectedCollateralTokenKey];
+  const selectedIndexConfig = TOKEN_CONFIG[selectedIndexTokenKey];
+
+  // Use selected token addresses and decimals
+  const activeCollateralToken = selectedCollateralConfig.address;
+  const activeIndexToken = selectedIndexConfig.address;
+  const collateralDecimals = selectedCollateralConfig.decimals;
+
+  // Fetch balance for selected collateral token
+  // For native ETH (WETH as native), use useBalance; for ERC20 tokens, use useReadContract
+  const isNativeCollateral = selectedCollateralTokenKey === "WETH";
+  const { data: nativeBalance } = useBalance({
+    address: wallet.address,
+    query: { enabled: !!wallet.address && isNativeCollateral, refetchInterval: 5_000 },
+  });
+  const { data: erc20Balance } = useReadContract({
+    address: selectedCollateralConfig.address,
+    abi: erc20Abi,
+    functionName: "balanceOf",
+    args: wallet.address ? [wallet.address] : undefined,
+    query: { enabled: !!wallet.address && !isNativeCollateral, refetchInterval: 5_000 },
+  });
+  const collateralTokenBalance = isNativeCollateral ? nativeBalance : { value: erc20Balance as bigint | undefined, decimals: collateralDecimals };
 
   // Price oracle with validation
   const {
@@ -60,12 +102,27 @@ export default function TradingPanel({
     websocketConnected,
     validatePrice,
     calculatePriceImpact,
-  } = usePriceOracle(indexToken);
+  } = usePriceOracle(activeIndexToken);
 
   const currentPrice = oraclePrice ?? tokenPriceData?.price ?? 0;
   const priceNum = parseFloat(price) || 0;
   const qtyNum = parseFloat(quantity) || 0;
   const isLong = side === "buy";
+
+  // Calculate dynamic slippage based on oracle spread (minimum 30bps)
+  const dynamicSlippageBps = useMemo(() => {
+    if (oracleSpread && oracleSpread > 0 && currentPrice > 0) {
+      const spreadBps = (oracleSpread / currentPrice) * 10000;
+      return Math.max(30, Math.round(spreadBps * 2)); // At least 30bps, or 2x spread
+    }
+    return 30;
+  }, [oracleSpread, currentPrice]);
+
+  // Calculate collateral token balance in USD for display
+  const collateralTokenBalanceNum = collateralTokenBalance?.value !== undefined
+    ? parseFloat(formatUnits(collateralTokenBalance.value, collateralDecimals))
+    : 0;
+  const collateralTokenBalanceUsd = collateralTokenBalanceNum * currentPrice;
 
   const {
     txStatus,
@@ -81,10 +138,10 @@ export default function TradingPanel({
     resetTxStatus,
   } = useTradingActions();
 
-  const { increaseOrders, decreaseOrders } = useOpenOrders(indexToken);
+  const { increaseOrders, decreaseOrders } = useOpenOrders(activeIndexToken);
 
-  const { position: longPosition } = useVaultPosition({ collateralToken, indexToken, isLong: true });
-  const { position: shortPosition } = useVaultPosition({ collateralToken, indexToken, isLong: false });
+  const { position: longPosition } = useVaultPosition({ collateralToken: activeCollateralToken, indexToken: activeIndexToken, isLong: true });
+  const { position: shortPosition } = useVaultPosition({ collateralToken: activeCollateralToken, indexToken: activeIndexToken, isLong: false });
 
   // Position health tracking
   const activePosition = isLong ? longPosition : shortPosition;
@@ -103,11 +160,11 @@ export default function TradingPanel({
       leverage,
       side,
       orderType: activeType.toLowerCase() as "market" | "limit" | "conditional",
-      availableBalance: wallet.balance,
+      availableBalance: collateralTokenBalanceUsd, // Use token balance in USD
       oraclePrice: currentPrice,
       slippageBps,
     });
-  }, [wallet.connected, wallet.balance, priceNum, qtyNum, leverage, side, activeType, currentPrice, slippageBps]);
+  }, [wallet.connected, collateralTokenBalanceUsd, priceNum, qtyNum, leverage, side, activeType, currentPrice, slippageBps]);
 
   const { errors: validationErrorMessages, warnings: validationWarnings } = formatValidationErrors(validationErrors);
   const hasErrors = validationErrorMessages.length > 0;
@@ -152,7 +209,7 @@ export default function TradingPanel({
       : parseFloat((p + liqDist).toFixed(decimals));
   }, [side, activeType, currentPrice, priceNum, qtyNum, leverage]);
 
-  const insufficientBalance = wallet.connected && marginRequired > wallet.balance;
+  const insufficientBalance = wallet.connected && marginRequired > collateralTokenBalanceUsd;
 
   const notification = useMemo(() => {
     if (isConfirmed)
@@ -168,10 +225,10 @@ export default function TradingPanel({
   const orderSigning = isPending;
 
   const handlePctQuantity = (pct: number) => {
-    if (!wallet.connected || wallet.balance <= 0) return;
+    if (!wallet.connected || collateralTokenBalanceNum <= 0) return;
     const p = activeType === "Market" ? currentPrice : priceNum || currentPrice;
     if (p <= 0) return;
-    setQuantity(String(parseFloat(((wallet.balance * leverage * pct) / 100 / p).toFixed(4))));
+    setQuantity(String(parseFloat(((collateralTokenBalanceNum * leverage * pct) / 100 / p).toFixed(4))));
   };
 
   const handlePlaceOrder = useCallback(async () => {
@@ -187,11 +244,13 @@ export default function TradingPanel({
       return;
     }
 
-    const collateralAmount = parseUnits(qtyNum.toFixed(8), 18); // ETH collateral (18 dec)
+    // Use token-specific decimals for collateral amount
+    const collateralAmount = parseUnits(qtyNum.toFixed(8), collateralDecimals);
 
-    // Use worst-case oracle price for entry (min for longs, max for shorts)
-    // This matches Vault.sol behavior: getMinPrice for longs, getMaxPrice for shorts
-    const worstCaseEntryPrice = isLong ? oracleMaxPrice : oracleMinPrice;
+    // Use worst-case oracle price for entry
+    // For longs: Vault uses getMinPrice (you want to buy at lowest possible price)
+    // For shorts: Vault uses getMaxPrice (you want to sell at highest possible price)
+    const worstCaseEntryPrice = isLong ? oracleMinPrice : oracleMaxPrice;
     const collateralUsd = qtyNum * currentPrice; // Collateral value in USD
     const sizeUsd = collateralUsd * leverage;   // Position size in USD
 
@@ -232,7 +291,7 @@ export default function TradingPanel({
       // sizeDelta = collateral USD * leverage = (qty * oracle_price * leverage)
       const sizeDelta = parseUnits((currentPrice * qtyNum * leverage).toFixed(8), 30);
       console.log("[handlePlaceOrder] Market", { currentPrice, qtyNum, leverage, sizeDelta: sizeDelta.toString(), acceptablePrice: acceptablePrice.toString(), worstCaseEntryPrice });
-      await placeMarketOrder({ collateralToken, indexToken, collateralAmount, sizeDelta, isLong, acceptablePrice });
+      await placeMarketOrder({ collateralToken: activeCollateralToken, indexToken: activeIndexToken, collateralAmount, sizeDelta, isLong, acceptablePrice });
     } else {
       // Limit / Conditional: triggerPrice = user's entered limit price (NOT oracle price)
       if (priceNum <= 0) {
@@ -246,7 +305,7 @@ export default function TradingPanel({
       //   Short limit: execute when oracle price ≥ triggerPrice (price rose to your sell level) → true
       const triggerAboveThreshold = !isLong;
       console.log("[handlePlaceOrder]", activeType, { priceNum, qtyNum, leverage, sizeDelta: sizeDelta.toString(), triggerPrice: triggerPriceRaw.toString(), triggerAboveThreshold });
-      await placeLimitOrder({ collateralToken, indexToken, collateralAmount, sizeDelta, isLong, triggerPrice: triggerPriceRaw, triggerAboveThreshold });
+      await placeLimitOrder({ collateralToken: activeCollateralToken, indexToken: activeIndexToken, collateralAmount, sizeDelta, isLong, triggerPrice: triggerPriceRaw, triggerAboveThreshold });
     }
 
     // TP/SL orders attached to the position
@@ -256,9 +315,9 @@ export default function TradingPanel({
       );
       const tpPriceRaw = tpPrice ? parseUnits(parseFloat(tpPrice).toFixed(8), 30) : null;
       const slPriceRaw = slPrice ? parseUnits(parseFloat(slPrice).toFixed(8), 30) : null;
-      await placeTPSLOrders({ collateralToken, indexToken, collateralDelta: collateralAmount, sizeDelta: sizeDeltaForTPSL, isLong, tpPrice: tpPriceRaw, slPrice: slPriceRaw });
+      await placeTPSLOrders({ collateralToken: activeCollateralToken, indexToken: activeIndexToken, collateralDelta: collateralAmount, sizeDelta: sizeDeltaForTPSL, isLong, tpPrice: tpPriceRaw, slPrice: slPriceRaw });
     }
-  }, [activeType, currentPrice, priceNum, qtyNum, leverage, wallet.address, collateralToken, indexToken, isLong, placeMarketOrder, placeLimitOrder, placeTPSLOrders, isOracleValid, oraclePriceRaw, slippageBps, tpsl, tpPrice, slPrice, oracleMinPrice, oracleMaxPrice]);
+  }, [activeType, currentPrice, priceNum, qtyNum, leverage, wallet.address, activeCollateralToken, activeIndexToken, isLong, placeMarketOrder, placeLimitOrder, placeTPSLOrders, isOracleValid, oraclePriceRaw, slippageBps, tpsl, tpPrice, slPrice, oracleMinPrice, oracleMaxPrice, collateralDecimals]);
 
   return (
     <div className="flex flex-col h-full" style={{ background: "var(--surface-container-lowest)", color: "var(--on-surface)" }}>
@@ -359,11 +418,68 @@ export default function TradingPanel({
       </div>
 
       <div className="flex-1 overflow-y-auto px-3 py-3 space-y-3 scrollbar-hide">
+        {/* Token Selection */}
+        <div className="grid grid-cols-2 gap-2">
+          {/* Collateral Token */}
+          <div>
+            <label className="text-[11px] mb-1 block" style={{ color: "var(--on-surface-disabled)" }}>Collateral</label>
+            <div className="relative">
+              <select
+                value={selectedCollateralTokenKey}
+                onChange={(e) => setSelectedCollateralTokenKey(e.target.value as "WETH" | "USDC" | "USDT")}
+                className="w-full px-2 py-1.5 text-[11px] rounded outline-none font-mono"
+                style={{
+                  background: "var(--surface-container-low)",
+                  color: "var(--on-surface)",
+                  border: "1px solid var(--outline-variant)",
+                  appearance: "none",
+                  paddingRight: "24px",
+                }}
+              >
+                {COLLATERAL_TOKENS.map((token) => (
+                  <option key={token} value={token}>
+                    {TOKEN_CONFIG[token as keyof typeof TOKEN_CONFIG].symbol}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: "var(--on-surface-disabled)" }} />
+            </div>
+          </div>
+          {/* Index Token */}
+          <div>
+            <label className="text-[11px] mb-1 block" style={{ color: "var(--on-surface-disabled)" }}>Index Token</label>
+            <div className="relative">
+              <select
+                value={selectedIndexTokenKey}
+                onChange={(e) => setSelectedIndexTokenKey(e.target.value as "WETH" | "BTC")}
+                className="w-full px-2 py-1.5 text-[11px] rounded outline-none font-mono"
+                style={{
+                  background: "var(--surface-container-low)",
+                  color: "var(--on-surface)",
+                  border: "1px solid var(--outline-variant)",
+                  appearance: "none",
+                  paddingRight: "24px",
+                }}
+              >
+                {INDEX_TOKENS.map((token) => (
+                  <option key={token} value={token}>
+                    {TOKEN_CONFIG[token as keyof typeof TOKEN_CONFIG].symbol}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: "var(--on-surface-disabled)" }} />
+            </div>
+          </div>
+        </div>
+
         {/* Available Equity */}
         <div className="flex items-center justify-between text-[11px]">
           <span style={{ color: "var(--on-surface-disabled)" }}>Available Equity</span>
           <span style={{ color: "var(--on-surface)" }}>
-            {wallet.connected ? `${wallet.balance.toLocaleString("en-US", { minimumFractionDigits: 4 })} ${wallet.nativeCurrencySymbol}` : "—"}
+            {wallet.connected
+              ? `${collateralTokenBalanceNum.toLocaleString("en-US", { minimumFractionDigits: 4 })} ${selectedCollateralConfig.symbol} ($${collateralTokenBalanceUsd.toLocaleString("en-US", { minimumFractionDigits: 2 })})`
+              : "—"
+            }
           </span>
         </div>
 
@@ -630,7 +746,7 @@ export default function TradingPanel({
                 <span className="truncate" style={{ color: "var(--on-surface-disabled)" }}>
                   {txStatus.hash.slice(0, 8)}…{txStatus.hash.slice(-6)}
                 </span>
-                <button onClick={resetTxStatus} className="ml-auto opacity-50 hover:opacity-100 shrink-0">
+                <button  onClick={resetTxStatus} className="ml-auto opacity-50 hover:opacity-100 shrink-0">
                   <X size={9} />
                 </button>
               </div>
@@ -689,7 +805,23 @@ export default function TradingPanel({
                     <div className="flex items-center justify-between text-[10px] mb-2">
                       <span style={{ color: "var(--on-surface-disabled)" }}>Unrealized PnL</span>
                       <span className="font-mono" style={{ color: pnlColor }}>
-                        {pos.unrealizedPnlUsd >= 0 ? "+" : ""}${pos.unrealizedPnlUsd.toFixed(2)} ({pos.unrealizedPnlPct.toFixed(2)}%)
+                        {(() => {
+                          // Calculate real-time PnL using current oracle price
+                          const entryPrice = pos.avgPriceFormatted;
+                          const sizeUsd = pos.sizeUsd;
+                          const collateralUsd = pos.collateralUsd;
+                          
+                          if (entryPrice === 0 || sizeUsd === 0) return "$0.00 (0.00%)";
+                          
+                          // For longs: PnL = (currentPrice - entryPrice) * size / entryPrice
+                          // For shorts: PnL = (entryPrice - currentPrice) * size / entryPrice
+                          const priceDiff = pos.isLong ? (currentPrice - entryPrice) : (entryPrice - currentPrice);
+                          const pnlUsd = (priceDiff / entryPrice) * sizeUsd;
+                          const pnlPct = collateralUsd > 0 ? (pnlUsd / collateralUsd) * 100 : 0;
+                          
+                          const pnlColor = pnlUsd >= 0 ? "var(--buy)" : "var(--sell)";
+                          return `${pnlUsd >= 0 ? "+" : ""}$${pnlUsd.toFixed(2)} (${pnlPct.toFixed(2)}%)`;
+                        })()}
                       </span>
                     </div>
 
@@ -707,25 +839,57 @@ export default function TradingPanel({
                     )}
 
                     <button
-                      onClick={() =>
+                      onClick={() => {
+                        const closePct = closePercentage / 100;
+                        const sizeDelta = (pos.size * BigInt(Math.floor(closePct * 10000))) / 10000n;
+                        const collateralDelta = (pos.collateral * BigInt(Math.floor(closePct * 10000))) / 10000n;
                         closeMarketPosition({
-                          collateralToken,
-                          indexToken,
-                          sizeDelta: pos.size,
-                          collateralDelta: pos.collateral,
+                          collateralToken: activeCollateralToken,
+                          indexToken: activeIndexToken,
+                          sizeDelta,
+                          collateralDelta,
                           isLong: pos.isLong,
                           // Use live oracle price, not entry price, to avoid stale-price revert
                           acceptablePrice: oraclePriceRaw ?? pos.averagePrice,
-                        })
-                      }
+                        });
+                      }}
                       disabled={orderSigning}
                       className="w-full py-1.5 text-[11px] font-mono rounded transition-colors"
                       style={{ border: "1px solid rgba(255,77,79,0.3)", color: "var(--sell)", background: "transparent" }}
                       onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = "rgba(255,77,79,0.08)")}
                       onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = "transparent")}
                     >
-                      Close Position
+                      Close Position ({closePercentage}%)
                     </button>
+
+                    {/* Partial Close Slider */}
+                    <div className="mt-2">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-[10px]" style={{ color: "var(--on-surface-disabled)" }}>Close Amount</span>
+                        <span className="text-[10px] font-mono" style={{ color: "var(--on-surface)" }}>{closePercentage}%</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="25"
+                        max="100"
+                        step="25"
+                        value={closePercentage}
+                        onChange={(e) => setClosePercentage(Number(e.target.value))}
+                        className="w-full h-1 rounded-full appearance-none cursor-pointer"
+                      />
+                      <div className="flex justify-between mt-1">
+                        {[25, 50, 75, 100].map((pct) => (
+                          <button
+                            key={pct}
+                            onClick={() => setClosePercentage(pct)}
+                            className="text-[10px] font-mono transition-colors"
+                            style={{ color: closePercentage === pct ? "var(--on-surface)" : "var(--on-surface-disabled)" }}
+                          >
+                            {pct}%
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                   </div>
                 );
               })}

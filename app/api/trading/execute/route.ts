@@ -28,9 +28,24 @@ const PRICE_FEED  = addr["VaultPriceFeed"] as `0x${string}`;
 const VAULT       = addr["Vault"]          as `0x${string}`;
 const ORDER_BOOK  = addr["OrderBook"]      as `0x${string}`;
 const WETH        = addr["WETH"]           as `0x${string}`;
+const USDC        = addr["USDC"]           as `0x${string}`;
+const USDT        = addr["USDT"]           as `0x${string}`;
+const BTC         = addr["BTC"]            as `0x${string}`;
 
 const BASIS_POINTS = 10_000n;
 const PRICE_DECIMALS = 30;
+
+// Token decimals mapping
+const TOKEN_DECIMALS: Record<string, number> = {
+  [WETH.toLowerCase()]: 18,
+  [USDC.toLowerCase()]: 6,
+  [USDT.toLowerCase()]: 6,
+  [BTC.toLowerCase()]: 8,
+};
+
+function getTokenDecimals(tokenAddress: string): number {
+  return TOKEN_DECIMALS[tokenAddress.toLowerCase()] ?? 18; // Default to 18 decimals
+}
 
 function applySlippage(priceRaw: bigint, isLong: boolean, slippageBps: bigint): bigint {
   return isLong
@@ -55,12 +70,13 @@ export async function POST(req: NextRequest) {
     collateralToken,
     indexToken,
     isLong,
-    quantityEth,      // collateral amount as string (ETH units, e.g. "0.1")
+    quantityEth,      // collateral amount as string (token units, e.g. "0.1")
     leverageX,        // number, e.g. 10
     limitPrice,       // string, USD for limit/decrease orders
     slippageBps: slippageBpsRaw = 30,
     tpPrice,          // optional string
     slPriceVal,       // optional string
+    collateralDecimals: collateralDecimalsParam, // optional number, defaults to 18
   } = body as {
     orderType: string;
     account: string;
@@ -73,6 +89,7 @@ export async function POST(req: NextRequest) {
     slippageBps?: number;
     tpPrice?: string;
     slPriceVal?: string;
+    collateralDecimals?: number;
   };
 
   console.log(`[execute][${reqId}] POST orderType=${orderType} account=${account} indexToken=${indexToken} isLong=${isLong} qty=${quantityEth} leverage=${leverageX}x slippage=${slippageBpsRaw}bps`);
@@ -89,6 +106,12 @@ export async function POST(req: NextRequest) {
     validationErrors.push("indexToken must be a valid address");
   if (typeof isLong !== "boolean")
     validationErrors.push("isLong must be boolean");
+
+  // Validate collateral token is in our supported list
+  const decimals = collateralDecimalsParam ?? getTokenDecimals(collateralToken);
+  if (!TOKEN_DECIMALS[collateralToken.toLowerCase()]) {
+    validationErrors.push(`unsupported collateral token: ${collateralToken}`);
+  }
 
   const qtyNum = parseFloat(quantityEth ?? "0");
   if (!quantityEth || isNaN(qtyNum) || qtyNum <= 0)
@@ -161,7 +184,7 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Compute trade parameters ───────────────────────────────────────────────
-    const collateralAmountRaw = parseUnits(qtyNum.toFixed(8), 18); // WETH = 18 decimals
+    const collateralAmountRaw = parseUnits(qtyNum.toFixed(8), decimals); // Use token-specific decimals
 
     // sizeDelta = collateral * leverage, expressed in 1e30 USD
     const priceForSize = orderType === "market" ? oraclePrice : parseFloat(limitPrice ?? "0") || oraclePrice;

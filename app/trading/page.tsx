@@ -88,7 +88,7 @@ export default function TradingPage() {
 
   return (
     <div className="flex flex-col h-screen bg-black text-white overflow-hidden">
-      <TopNavigation />
+      <TopNavigation currentPrice={currentPrice} />
 
       <PriceHeader
         onTokenPickerOpen={() => setIsTokenPickerOpen(true)}
@@ -128,6 +128,7 @@ export default function TradingPage() {
             orders={orders}
             onCancelOrder={() => {}}
             onClosePosition={() => {}}
+            currentPrice={currentPrice}
           />
         </div>
 

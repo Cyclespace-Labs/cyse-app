@@ -35,7 +35,11 @@ const notifIconColor: Record<string, string> = {
   info: "var(--primary)",
 };
 
-export default function TopNavigation() {
+interface TopNavigationProps {
+  currentPrice?: number;
+}
+
+export default function TopNavigation({ currentPrice }: TopNavigationProps) {
   const pathname = usePathname();
   const { theme, toggleTheme, mounted: themeMounted } = useTheme();
   const { wallet, CustomConnectButton, disconnect } = useWallet();
@@ -364,6 +368,12 @@ export default function TopNavigation() {
                 }}
               />
               <span style={{ color: "var(--on-surface)" }}>{wallet.balance.toLocaleString("en-US", { minimumFractionDigits: 4 })} {wallet.nativeCurrencySymbol}</span>
+              {currentPrice && currentPrice > 0 && (
+                <>
+                  <span className="opacity-50">|</span>
+                  <span style={{ color: "var(--on-surface)" }}>${(wallet.balance * currentPrice).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                </>
+              )}
               <span className="opacity-50">|</span>
               <span>{wallet.shortAddress}</span>
             </div>
