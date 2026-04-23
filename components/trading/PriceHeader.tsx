@@ -4,6 +4,18 @@ import { formatPrice, formatVolume } from "@/lib/formatters";
 import { ChevronDown } from "lucide-react";
 import { TokenPriceData } from "@/types/trading";
 
+// Token icon mapping: symbol -> filename in /tokens/
+const TOKEN_ICONS: Record<string, string> = {
+  BTC: "/tokens/Bitcoin.svg",
+  ETH: "/tokens/Ethereum ETH.svg",
+  BNB: "/tokens/BNB.svg",
+  SOL: "/tokens/Solana SOL.svg",
+  USDT: "/tokens/Tether.svg",
+  AVAX: "/tokens/Avalanche.svg",
+  XRP: "/tokens/XRP.svg",
+  ARB: "/tokens/arbitrum-arb-logo.svg",
+};
+
 interface PriceHeaderProps {
   onTokenPickerOpen?: () => void;
   selectedSymbol?: string;
@@ -19,6 +31,7 @@ interface PriceHeaderProps {
 export default function PriceHeader({ onTokenPickerOpen, selectedSymbol, tokenPriceData, livePrice, pythConnected, oracleSource }: PriceHeaderProps) {
   const d = tokenPriceData ?? null;
   const displaySymbol = selectedSymbol || d?.symbol || "—";
+  const baseSymbol = displaySymbol.replace(/-PERP$/, "");
   const na = "—";
 
   // Use livePrice (from Pyth/oracle) if available, otherwise fall back to tokenPriceData
@@ -43,10 +56,18 @@ export default function PriceHeader({ onTokenPickerOpen, selectedSymbol, tokenPr
         onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = "transparent")}
       >
         <div className="flex items-center gap-1.5">
-          <div
-            className="w-5 h-5 rounded-full shrink-0"
-            style={{ background: "linear-gradient(135deg, var(--primary) 0%, var(--primary-container) 100%)" }}
-          />
+          {TOKEN_ICONS[baseSymbol] ? (
+            <img
+              src={TOKEN_ICONS[baseSymbol]}
+              alt={baseSymbol}
+              className="w-5 h-5 rounded-full shrink-0 object-contain"
+            />
+          ) : (
+            <div
+              className="w-5 h-5 rounded-full shrink-0"
+              style={{ background: "linear-gradient(135deg, var(--primary) 0%, var(--primary-container) 100%)" }}
+            />
+          )}
           <span className="text-sm font-semibold" style={{ color: "var(--on-surface)" }}>{displaySymbol}</span>
           <span
             className="px-1.5 py-0.5 text-[10px] font-semibold rounded tracking-wide"

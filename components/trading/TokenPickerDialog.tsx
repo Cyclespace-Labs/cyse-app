@@ -8,6 +8,18 @@ import { useVaultWhitelist } from "@/hooks/useVaultWhitelist";
 
 const tabs = ["Spot", "Futures", "Lend"];
 
+// Token icon mapping: symbol -> filename in /tokens/
+const TOKEN_ICONS: Record<string, string> = {
+  BTC: "/tokens/Bitcoin.svg",
+  ETH: "/tokens/Ethereum ETH.svg",
+  BNB: "/tokens/BNB.svg",
+  SOL: "/tokens/Solana SOL.svg",
+  USDT: "/tokens/Tether.svg",
+  AVAX: "/tokens/Avalanche.svg",
+  XRP: "/tokens/XRP.svg",
+  ARB: "/tokens/arbitrum-arb-logo.svg",
+};
+
 // Tokens that have real chart data (Binance klines)
 const CHART_SYMBOLS = new Set([
   "ETH", "BTC", "BNB", "SOL", "DOGE", "ARB", "OP", "PENGU",
@@ -217,12 +229,20 @@ export default function TokenPickerDialog({
               {/* Token info */}
               <div className="flex items-center gap-2.5 min-w-0">
                 {/* Icon */}
-                <div
-                  className="w-7 h-7 rounded-full shrink-0 flex items-center justify-center text-white text-[10px] font-bold"
-                  style={{ background: `linear-gradient(135deg, ${token.iconColor}, ${token.iconSecondary})` }}
-                >
-                  {token.symbol.charAt(0)}
-                </div>
+                {TOKEN_ICONS[token.symbol] ? (
+                  <img
+                    src={TOKEN_ICONS[token.symbol]}
+                    alt={token.symbol}
+                    className="w-7 h-7 rounded-full shrink-0 object-contain"
+                  />
+                ) : (
+                  <div
+                    className="w-7 h-7 rounded-full shrink-0 flex items-center justify-center text-white text-[10px] font-bold"
+                    style={{ background: `linear-gradient(135deg, ${token.iconColor}, ${token.iconSecondary})` }}
+                  >
+                    {token.symbol.charAt(0)}
+                  </div>
+                )}
                 <div className="flex flex-col min-w-0">
                   <div className="flex items-center gap-1.5">
                     <span className="text-[13px] font-medium truncate" style={{ color: "var(--on-surface)" }}>

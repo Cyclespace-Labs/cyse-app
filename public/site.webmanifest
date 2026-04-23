@@ -1,0 +1,21 @@
+{
+  "name": "Cyclespace Exchange",
+  "short_name": "Cyclespace Exchange",
+  "description": "High-velocity decentralized finance with institutional-grade tooling.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0e76fd",
+  "theme_color": "#0e76fd",
+  "icons": [
+    {
+      "src": "/android-chrome-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/android-chrome-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

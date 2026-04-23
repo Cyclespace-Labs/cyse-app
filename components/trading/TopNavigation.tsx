@@ -37,7 +37,7 @@ const notifIconColor: Record<string, string> = {
 
 export default function TopNavigation() {
   const pathname = usePathname();
-  const { theme, toggleTheme, mounted } = useTheme();
+  const { theme, toggleTheme, mounted: themeMounted } = useTheme();
   const { wallet, CustomConnectButton, disconnect } = useWallet();
   const [primaryColor, setPrimaryColor] = useState("#0E76FD");
   const [searchOpen, setSearchOpen] = useState(false);
@@ -45,6 +45,11 @@ export default function TopNavigation() {
   const [notifOpen, setNotifOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const searchRef = useRef<HTMLInputElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
@@ -166,7 +171,7 @@ export default function TopNavigation() {
         {iconBtn(() => {}, "Language", <Globe size={15} />)}
 
         {/* Theme Toggle */}
-        {mounted && iconBtn(toggleTheme, theme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode", theme === "dark" ? <Sun size={15} /> : <Moon size={15} />)}
+        {themeMounted && iconBtn(toggleTheme, theme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode", theme === "dark" ? <Sun size={15} /> : <Moon size={15} />)}
 
         {/* Notifications */}
         <div className="relative" ref={notifRef}>
@@ -305,7 +310,11 @@ export default function TopNavigation() {
         <div className="w-px h-5 mx-1.5" style={{ background: "rgba(66,70,84,0.5)" }} />
 
         {/* Wallet */}
-        {wallet.connected ? (
+        {!mounted ? (
+          <div className="flex items-center">
+            <CustomConnectButton variant="small" />
+          </div>
+        ) : wallet.connected ? (
           <div className="flex items-center gap-2">
             {/* Security/Network Warnings */}
             {!wallet.isCorrectNetwork && (
