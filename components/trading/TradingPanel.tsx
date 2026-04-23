@@ -10,7 +10,7 @@ import { useOpenOrders } from "@/hooks/useOpenOrders";
 import { useVaultPosition } from "@/hooks/useVaultPosition";
 import { usePriceOracle } from "@/hooks/usePriceOracle";
 import { usePositionHealth } from "@/hooks/usePositionHealth";
-import { validateOrder, validateTPSL, formatValidationErrors } from "@/lib/validation/trading";
+import { validateOrder, validateTPSL, formatValidationErrors, validatePositionHealth } from "@/lib/validation/trading";
 import { parseUnits, formatUnits } from "viem";
 import { contracts } from "@/lib/protocol/contracts";
 import SlippageSelector from "./SlippageSelector";
@@ -181,10 +181,44 @@ export default function TradingPanel({
       return;
     }
 
+    // Validate we have min/max oracle prices for position health check
+    if (!oracleMinPrice || !oracleMaxPrice) {
+      console.error("[handlePlaceOrder] oracle min/max prices unavailable");
+      return;
+    }
+
     const collateralAmount = parseUnits(qtyNum.toFixed(8), 18); // ETH collateral (18 dec)
 
-    // Oracle price for market orders — must come from VaultPriceFeed
-    const oraclePriceForOrder = oraclePriceRaw ?? parseUnits(currentPrice.toFixed(8), 30);
+    // Use worst-case oracle price for entry (min for longs, max for shorts)
+    // This matches Vault.sol behavior: getMinPrice for longs, getMaxPrice for shorts
+    const worstCaseEntryPrice = isLong ? oracleMaxPrice : oracleMinPrice;
+    const collateralUsd = qtyNum * currentPrice; // Collateral value in USD
+    const sizeUsd = collateralUsd * leverage;   // Position size in USD
+
+    // Validate position health before submitting
+    const health = validatePositionHealth({
+      collateralUsd,
+      sizeUsd,
+      entryPrice: worstCaseEntryPrice,
+      isLong,
+      maxPrice: oracleMaxPrice,
+      minPrice: oracleMinPrice,
+    });
+
+    if (!health.isHealthy) {
+      console.error("[handlePlaceOrder] Position health check failed:", health.error);
+      // Show error notification (could add state for this)
+      alert(health.error);
+      return;
+    }
+
+    if (health.warning) {
+      console.warn("[handlePlaceOrder] Position health warning:", health.warning);
+    }
+
+    // Oracle price for acceptablePrice calculation
+    // Use the same worst-case price that Vault will use
+    const oraclePriceForOrder = parseUnits(worstCaseEntryPrice.toFixed(8), 30);
 
     const BASIS_POINTS      = 10000n;
     const slippageBpsBigInt = BigInt(slippageBps);
@@ -197,7 +231,7 @@ export default function TradingPanel({
     if (activeType === "Market") {
       // sizeDelta = collateral USD * leverage = (qty * oracle_price * leverage)
       const sizeDelta = parseUnits((currentPrice * qtyNum * leverage).toFixed(8), 30);
-      console.log("[handlePlaceOrder] Market", { currentPrice, qtyNum, leverage, sizeDelta: sizeDelta.toString(), acceptablePrice: acceptablePrice.toString() });
+      console.log("[handlePlaceOrder] Market", { currentPrice, qtyNum, leverage, sizeDelta: sizeDelta.toString(), acceptablePrice: acceptablePrice.toString(), worstCaseEntryPrice });
       await placeMarketOrder({ collateralToken, indexToken, collateralAmount, sizeDelta, isLong, acceptablePrice });
     } else {
       // Limit / Conditional: triggerPrice = user's entered limit price (NOT oracle price)
@@ -224,7 +258,7 @@ export default function TradingPanel({
       const slPriceRaw = slPrice ? parseUnits(parseFloat(slPrice).toFixed(8), 30) : null;
       await placeTPSLOrders({ collateralToken, indexToken, collateralDelta: collateralAmount, sizeDelta: sizeDeltaForTPSL, isLong, tpPrice: tpPriceRaw, slPrice: slPriceRaw });
     }
-  }, [activeType, currentPrice, priceNum, qtyNum, leverage, wallet.address, collateralToken, indexToken, isLong, placeMarketOrder, placeLimitOrder, placeTPSLOrders, isOracleValid, oraclePriceRaw, slippageBps, tpsl, tpPrice, slPrice]);
+  }, [activeType, currentPrice, priceNum, qtyNum, leverage, wallet.address, collateralToken, indexToken, isLong, placeMarketOrder, placeLimitOrder, placeTPSLOrders, isOracleValid, oraclePriceRaw, slippageBps, tpsl, tpPrice, slPrice, oracleMinPrice, oracleMaxPrice]);
 
   return (
     <div className="flex flex-col h-full" style={{ background: "var(--surface-container-lowest)", color: "var(--on-surface)" }}>

@@ -103,6 +103,7 @@ export function useTradingActions() {
         ...contracts.router,
         functionName: "approvePlugin",
         args: [contracts.positionManager.address],
+        gas: 100_000n,
       });
       setPendingHash(hash);
       setTxStatus({ state: "submitted", hash });
@@ -121,6 +122,7 @@ export function useTradingActions() {
           address: tokenAddress,
           functionName: "approve",
           args: [spender, amount],
+          gas: 100_000n,
         });
         setPendingHash(hash);
         setTxStatus({ state: "submitted", hash });
@@ -159,11 +161,13 @@ export function useTradingActions() {
               functionName: "increasePositionETH",
               args: [path, indexToken, 0n, sizeDelta, isLong, slippedPrice],
               value: collateralAmount,
+              gas: 1_000_000n, // Prevent gas over-estimation
             })
           : await writeContractAsync({
               ...contracts.router,
               functionName: "increasePosition",
               args: [path, indexToken, collateralAmount, 0n, sizeDelta, isLong, slippedPrice],
+              gas: 800_000n,
             });
 
         setPendingHash(hash);
@@ -205,6 +209,7 @@ export function useTradingActions() {
           ...contracts.router,
           functionName: isEth ? "decreasePositionETH" : "decreasePosition",
           args: [collateralToken, indexToken, collateralDelta, sizeDelta, isLong, address, slippedPrice],
+          gas: isEth ? 800_000n : 600_000n,
         });
         setPendingHash(hash);
         setTxStatus({ state: "submitted", hash });
@@ -249,6 +254,7 @@ export function useTradingActions() {
             false,
           ],
           value: executionFee,
+          gas: 600_000n,
         });
         setPendingHash(hash);
         setTxStatus({ state: "submitted", hash });
@@ -270,6 +276,7 @@ export function useTradingActions() {
           ...contracts.orderBook,
           functionName: "cancelIncreaseOrder",
           args: [BigInt(orderIndex)],
+          gas: 200_000n,
         });
         setPendingHash(hash);
         setTxStatus({ state: "submitted", hash });
@@ -291,6 +298,7 @@ export function useTradingActions() {
           ...contracts.orderBook,
           functionName: "cancelDecreaseOrder",
           args: [BigInt(orderIndex)],
+          gas: 200_000n,
         });
         setPendingHash(hash);
         setTxStatus({ state: "submitted", hash });
@@ -330,6 +338,7 @@ export function useTradingActions() {
             triggerAboveThreshold,
           ],
           value: executionFee,
+          gas: 500_000n,
         });
         setPendingHash(hash);
         setTxStatus({ state: "submitted", hash });

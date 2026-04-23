@@ -253,6 +253,111 @@ export function calculatePositionHealth(
 }
 
 /**
+ * Validates if a new position would be immediately liquidatable
+ * This prevents the "Vault: losses exceed collateral" error
+ */
+export interface PositionHealthInput {
+  collateralUsd: number;      // Collateral amount in USD
+  sizeUsd: number;            // Position size in USD (collateral * leverage)
+  entryPrice: number;         // Entry price (worst-case: min for longs, max for shorts)
+  isLong: boolean;
+  maxPrice: number;           // Oracle max price (for longs)
+  minPrice: number;           // Oracle min price (for shorts)
+  liquidationFee?: number;     // Fee deducted at liquidation (default 5 USD)
+  maintenanceMargin?: number; // Maintenance margin requirement (default 0.5%)
+}
+
+export interface PositionHealthResult {
+  isHealthy: boolean;
+  error?: string;
+  warning?: string;
+  liquidationPrice: number;
+  distanceToLiquidation: number; // Percentage
+  effectiveCollateral: number;
+  initialLoss: number; // Loss due to oracle spread
+}
+
+export function validatePositionHealth(
+  input: PositionHealthInput
+): PositionHealthResult {
+  const {
+    collateralUsd,
+    sizeUsd,
+    entryPrice,
+    isLong,
+    maxPrice,
+    minPrice,
+    liquidationFee = 5,
+    maintenanceMargin = 0.005,
+  } = input;
+
+  const leverage = sizeUsd / collateralUsd;
+
+  // Calculate initial loss due to oracle spread
+  // For longs: you buy at maxPrice, but collateral is valued at minPrice
+  // For shorts: you sell at minPrice, but collateral is valued at maxPrice
+  const priceForCollateral = isLong ? minPrice : maxPrice;
+  const priceForPosition = isLong ? maxPrice : minPrice;
+
+  // Initial loss from the spread
+  const priceDiff = Math.abs(priceForPosition - priceForCollateral);
+  const sizeInTokens = sizeUsd / entryPrice;
+  const initialLoss = priceDiff * sizeInTokens;
+
+  // Effective collateral after accounting for the spread loss
+  const effectiveCollateral = collateralUsd - initialLoss;
+
+  // Calculate liquidation price using the formula from Vault.sol
+  // Liq price = entry price * (1 - effectiveCollateral/sizeUsd) / (1 - maintenanceMargin)
+  // Simplified: Liq price = entry price - (effectiveCollateral * entryPrice / sizeUsd) * (1 - maintenanceMargin)
+
+  let liquidationPrice: number;
+  if (isLong) {
+    // For longs: liq price = entry - (effectiveCollateral / size) * entry * (1 - maintenance)
+    const liqBuffer = (effectiveCollateral / leverage) * (1 - maintenanceMargin);
+    liquidationPrice = entryPrice - liqBuffer;
+  } else {
+    // For shorts: liq price = entry + (effectiveCollateral / size) * entry * (1 - maintenance)
+    const liqBuffer = (effectiveCollateral / leverage) * (1 - maintenanceMargin);
+    liquidationPrice = entryPrice + liqBuffer;
+  }
+
+  // Check if position would be immediately liquidatable
+  // Position is liquidatable if effectiveCollateral <= 0 or liq price is crossed
+  const currentPriceForLiq = isLong ? minPrice : maxPrice;
+  const isLiquidatable = effectiveCollateral <= 0 ||
+    (isLong && currentPriceForLiq <= liquidationPrice) ||
+    (!isLong && currentPriceForLiq >= liquidationPrice);
+
+  const distanceToLiquidation = Math.abs(currentPriceForLiq - liquidationPrice) / entryPrice * 100;
+
+  if (isLiquidatable) {
+    return {
+      isHealthy: false,
+      error: `Position would be immediately liquidatable. Reduce leverage or wait for lower spread. Spread loss: $${initialLoss.toFixed(2)}`,
+      liquidationPrice,
+      distanceToLiquidation: 0,
+      effectiveCollateral,
+      initialLoss,
+    };
+  }
+
+  // Warning if very close to liquidation
+  const warning = distanceToLiquidation < 2
+    ? `Position is very close to liquidation (${distanceToLiquidation.toFixed(2)}% away). Consider reducing leverage.`
+    : undefined;
+
+  return {
+    isHealthy: true,
+    warning,
+    liquidationPrice,
+    distanceToLiquidation,
+    effectiveCollateral,
+    initialLoss,
+  };
+}
+
+/**
  * Validates TP/SL prices
  */
 export function validateTPSL(
