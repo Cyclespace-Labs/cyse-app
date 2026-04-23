@@ -11,9 +11,7 @@ import { Loader2, Droplets, ShieldCheck, TrendingUp, Wallet, ArrowUpRight, Arrow
 import { formatUnits } from "viem";
 
 const fmt$ = (v: number) => {
-  if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(2)}M`;
-  if (v >= 1_000) return `$${(v / 1_000).toFixed(2)}K`;
-  return `$${v.toFixed(2)}`;
+  return `$${Math.floor(v).toLocaleString("en-US")}`;
 };
 
 const fmtNum = (v: number, d = 4) => v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: d });
