@@ -130,13 +130,8 @@ export async function POST(req: NextRequest) {
 
   try {
     // ── Fetch oracle price + minExecutionFee in parallel ──────────────────────
-    const [priceRaw, minPriceRaw, maxPriceRaw, minExecFeeRaw] = await Promise.all([
-      publicClient.readContract({
-        address: PRICE_FEED,
-        abi: vaultPriceFeedAbi,
-        functionName: "getPrice",
-        args: [indexToken as `0x${string}`, isLong, true, false], // maximise=isLong for acceptable price
-      }),
+    // Contract pattern: use getMaxPrice for longs, getMinPrice for shorts (Vault.sol line 582)
+    const [minPriceRaw, maxPriceRaw, minExecFeeRaw] = await Promise.all([
       publicClient.readContract({
         address: VAULT,
         abi: vaultAbi,
@@ -156,10 +151,13 @@ export async function POST(req: NextRequest) {
       }),
     ]);
 
-    const oraclePrice  = parseFloat(formatUnits(priceRaw as bigint, PRICE_DECIMALS));
     const minPriceFmt  = parseFloat(formatUnits(minPriceRaw as bigint, PRICE_DECIMALS));
     const maxPriceFmt  = parseFloat(formatUnits(maxPriceRaw as bigint, PRICE_DECIMALS));
     const executionFee = minExecFeeRaw as bigint;
+
+    // Use contract-accurate price: getMaxPrice for longs, getMinPrice for shorts
+    const oraclePriceRaw = isLong ? (maxPriceRaw as bigint) : (minPriceRaw as bigint);
+    const oraclePrice = isLong ? maxPriceFmt : minPriceFmt;
 
     console.log(`[execute][${reqId}] oracle price=${oraclePrice} min=${minPriceFmt} max=${maxPriceFmt} execFee=${formatUnits(executionFee, 18)} ETH`);
 
@@ -186,15 +184,20 @@ export async function POST(req: NextRequest) {
     // ── Compute trade parameters ───────────────────────────────────────────────
     const collateralAmountRaw = parseUnits(qtyNum.toFixed(8), decimals); // Use token-specific decimals
 
-    // sizeDelta = collateral * leverage, expressed in 1e30 USD
-    const priceForSize = orderType === "market" ? oraclePrice : parseFloat(limitPrice ?? "0") || oraclePrice;
-    const sizeUsd      = qtyNum * priceForSize * levNum;
-    const sizeDelta    = parseUnits(sizeUsd.toFixed(8), PRICE_DECIMALS);
+    const isEthCollateral = collateralToken.toLowerCase() === WETH.toLowerCase();
+
+    // Calculate collateral value in USD and position size
+    // For WETH collateral, use oracle price (ETH price varies)
+    // For USDC/USDT collateral, use $1 (stablecoins)
+    const collateralTokenPrice = isEthCollateral ? oraclePrice : 1;
+    const collateralUsd = qtyNum * collateralTokenPrice; // Collateral value in USD
+    const sizeUsd = collateralUsd * levNum; // Position size in USD
+    const sizeDelta = parseUnits(sizeUsd.toFixed(8), PRICE_DECIMALS);
 
     // acceptablePrice: for market orders apply slippage to oracle price
     const acceptablePrice = orderType === "market"
-      ? applySlippage(priceRaw as bigint, isLong, slippageBps)
-      : (limitPriceRaw ?? applySlippage(priceRaw as bigint, isLong, slippageBps));
+      ? applySlippage(oraclePriceRaw, isLong, slippageBps)
+      : (limitPriceRaw ?? applySlippage(oraclePriceRaw, isLong, slippageBps));
 
     const acceptablePriceFmt = parseFloat(formatUnits(acceptablePrice, PRICE_DECIMALS));
 
@@ -211,8 +214,6 @@ export async function POST(req: NextRequest) {
     //   SL short: triggerAboveThreshold = true  (close when price ≥ SL, i.e. price rose)
     const triggerAboveThreshold = orderType === "limit" ? !isLong : isLong;
 
-    const isEthCollateral = collateralToken.toLowerCase() === WETH.toLowerCase();
-
     // ── Build response with contract call parameters ──────────────────────────
     const result: Record<string, unknown> = {
       orderType,
@@ -223,7 +224,7 @@ export async function POST(req: NextRequest) {
         price: oraclePrice,
         minPrice: minPriceFmt,
         maxPrice: maxPriceFmt,
-        priceRaw: (priceRaw as bigint).toString(),
+        priceRaw: oraclePriceRaw.toString(),
       },
       computed: {
         collateralAmountRaw: collateralAmountRaw.toString(),

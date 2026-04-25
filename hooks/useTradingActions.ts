@@ -7,13 +7,12 @@ import { contracts, PRICE_PRECISION } from "@/lib/protocol/contracts";
 import { TxStatus } from "@/types/protocol";
 
 const EXECUTION_FEE = parseUnits("0.01", 18);
-const SLIPPAGE_BPS = 30n;
 const BASIS_POINTS = 10000n;
 
-function applySlippage(price: bigint, isLong: boolean): bigint {
+function applySlippage(price: bigint, isLong: boolean, slippageBps: bigint): bigint {
   return isLong
-    ? (price * (BASIS_POINTS + SLIPPAGE_BPS)) / BASIS_POINTS
-    : (price * (BASIS_POINTS - SLIPPAGE_BPS)) / BASIS_POINTS;
+    ? (price * (BASIS_POINTS + slippageBps)) / BASIS_POINTS
+    : (price * (BASIS_POINTS - slippageBps)) / BASIS_POINTS;
 }
 
 export interface PlaceMarketOrderParams {
@@ -23,6 +22,7 @@ export interface PlaceMarketOrderParams {
   sizeDelta: bigint;
   isLong: boolean;
   acceptablePrice: bigint;
+  slippageBps?: bigint;
 }
 
 export interface PlaceLimitOrderParams {
@@ -96,6 +96,13 @@ export function useTradingActions() {
     query: { enabled: !!address },
   });
 
+  const { data: vaultRouterApproved } = useReadContract({
+    ...contracts.vault,
+    functionName: "approvedRouters",
+    args: address ? [address, contracts.router.address] : undefined,
+    query: { enabled: !!address },
+  });
+
   const approvePlugin = useCallback(async () => {
     setTxStatus({ state: "pending" });
     try {
@@ -112,6 +119,26 @@ export function useTradingActions() {
       setTxStatus({ state: "failed", error: message });
     }
   }, [writeContractAsync]);
+
+  const approveVaultRouter = useCallback(async () => {
+    if (!address) return null;
+    setTxStatus({ state: "pending" });
+    try {
+      const hash = await writeContractAsync({
+        ...contracts.vault,
+        functionName: "addRouter",
+        args: [contracts.router.address],
+        gas: 100_000n,
+      });
+      setPendingHash(hash);
+      setTxStatus({ state: "submitted", hash });
+      return hash;
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Vault router approval failed";
+      setTxStatus({ state: "failed", error: message });
+      return null;
+    }
+  }, [address, writeContractAsync]);
 
   const approveToken = useCallback(
     async (tokenAddress: `0x${string}`, spender: `0x${string}`, amount: bigint) => {
@@ -144,11 +171,12 @@ export function useTradingActions() {
       sizeDelta,
       isLong,
       acceptablePrice,
+      slippageBps = 30n,
     }: PlaceMarketOrderParams) => {
       if (!address) return null;
       setTxStatus({ state: "pending" });
       try {
-        const slippedPrice = applySlippage(acceptablePrice, isLong);
+        const slippedPrice = applySlippage(acceptablePrice, isLong, slippageBps);
         const path: [`0x${string}`] = [collateralToken];
         const isEth = collateralToken.toLowerCase() === contracts.weth.address.toLowerCase();
 
@@ -175,6 +203,7 @@ export function useTradingActions() {
         return hash;
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : "Order failed";
+        console.error("[placeMarketOrder] Error:", message, err);
         setTxStatus({ state: "failed", error: message });
         return null;
       }
@@ -190,6 +219,7 @@ export function useTradingActions() {
       collateralDelta,
       isLong,
       acceptablePrice,
+      slippageBps = 30n,
     }: {
       collateralToken: `0x${string}`;
       indexToken: `0x${string}`;
@@ -197,11 +227,12 @@ export function useTradingActions() {
       collateralDelta: bigint;
       isLong: boolean;
       acceptablePrice: bigint;
+      slippageBps?: bigint;
     }) => {
       if (!address) return null;
       setTxStatus({ state: "pending" });
       try {
-        const slippedPrice = applySlippage(acceptablePrice, !isLong);
+        const slippedPrice = applySlippage(acceptablePrice, !isLong, slippageBps);
         const isEth = collateralToken.toLowerCase() === contracts.weth.address.toLowerCase();
 
         // For ETH collateral: use decreasePositionETH so proceeds are unwrapped to native ETH.
@@ -419,7 +450,9 @@ export function useTradingActions() {
     isSubmitted: txStatus.state === "submitted",    // on-chain — allow new orders
     isConfirmed: txStatus.state === "confirmed",    // receipt arrived
     routerApproved: !!routerApproved,
+    vaultRouterApproved: !!vaultRouterApproved,
     approvePlugin,
+    approveVaultRouter,
     approveToken,
     placeMarketOrder,
     closeMarketPosition,

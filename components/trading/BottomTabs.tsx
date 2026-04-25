@@ -22,7 +22,6 @@ interface BottomTabsProps {
   orders?: Order[];
   onCancelOrder?: (orderId: string) => void;
   onClosePosition?: (positionId: string) => void;
-  currentPrice?: number;
 }
 
 export default function BottomTabs({
@@ -31,7 +30,6 @@ export default function BottomTabs({
   orders = [],
   onCancelOrder,
   onClosePosition,
-  currentPrice = 0,
 }: BottomTabsProps) {
   const [activeTab, setActiveTab] = useState("Balances");
 
@@ -77,28 +75,8 @@ export default function BottomTabs({
                   <td className="px-3 py-1.5 text-right" style={{ color: "var(--on-surface)" }}>{pos.quantity}</td>
                   <td className="px-3 py-1.5 text-right" style={{ color: "var(--on-surface)" }}>{pos.entryPrice}</td>
                   <td className="px-3 py-1.5 text-right" style={{ color: "var(--liquidation)" }}>{pos.liquidationPrice}</td>
-                  <td className="px-3 py-1.5 text-right">
-                    {(() => {
-                      // Calculate real-time PnL using current oracle price
-                      const entryPrice = Number(pos.entryPrice);
-                      const sizeUsd = Number(pos.quantity);
-                      
-                      if (entryPrice === 0 || sizeUsd === 0 || currentPrice === 0) return (
-                        <span style={{ color: "var(--on-surface)" }}>$0.00</span>
-                      );
-                      
-                      // For longs: PnL = (currentPrice - entryPrice) * size
-                      // For shorts: PnL = (entryPrice - currentPrice) * size
-                      const priceDiff = pos.side === "long" ? (currentPrice - entryPrice) : (entryPrice - currentPrice);
-                      const pnlUsd = (priceDiff / entryPrice) * sizeUsd;
-                      
-                      const pnlColor = pnlUsd >= 0 ? "var(--buy)" : "var(--sell)";
-                      return (
-                        <span style={{ color: pnlColor }}>
-                          {pnlUsd >= 0 ? "+" : ""}${pnlUsd.toFixed(2)}
-                        </span>
-                      );
-                    })()}
+                  <td className="px-3 py-1.5 text-right" style={{ color: pos.unrealizedPnl >= 0 ? "var(--buy)" : "var(--sell)" }}>
+                    {pos.unrealizedPnl >= 0 ? "+" : ""}${pos.unrealizedPnl.toFixed(2)}
                   </td>
                   <td className="px-3 py-1.5 text-right">
                     <button

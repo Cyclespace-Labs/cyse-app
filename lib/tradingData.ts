@@ -226,6 +226,10 @@ export function getTickSize(price: number): number {
   return 0.000001;
 }
 
+/**
+ * @deprecated Use oracle spread from usePriceOracle instead
+ * This function is kept for chart data generation only
+ */
 export function getBestBidAsk(symbol: string): { bid: number; ask: number; mid: number } {
   const data = generateCandlestickDataForToken(symbol);
   const last = data[data.length - 1];

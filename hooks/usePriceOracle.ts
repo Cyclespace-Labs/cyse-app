@@ -307,6 +307,8 @@ export function usePriceOracle(indexToken: `0x${string}`, maximise = true) {
     priceRaw:            priceRawTyped,
     maxPrice,
     minPrice,
+    maxPriceRaw,
+    minPriceRaw,
     spread,
     lastUpdate,
     // Oracle metadata

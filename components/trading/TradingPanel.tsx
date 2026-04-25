@@ -95,6 +95,8 @@ export default function TradingPanel({
     priceRaw: oraclePriceRaw,
     maxPrice: oracleMaxPrice,
     minPrice: oracleMinPrice,
+    maxPriceRaw: oracleMaxPriceRaw,
+    minPriceRaw: oracleMinPriceRaw,
     spread: oracleSpread,
     isValid: isOracleValid,
     isStale: isOracleStale,
@@ -113,7 +115,7 @@ export default function TradingPanel({
   const dynamicSlippageBps = useMemo(() => {
     if (oracleSpread && oracleSpread > 0 && currentPrice > 0) {
       const spreadBps = (oracleSpread / currentPrice) * 10000;
-      return Math.max(30, Math.round(spreadBps * 2)); // At least 30bps, or 2x spread
+      return Math.max(30, Math.round(spreadBps)); // At least 30bps, or actual spread
     }
     return 30;
   }, [oracleSpread, currentPrice]);
@@ -122,7 +124,9 @@ export default function TradingPanel({
   const collateralTokenBalanceNum = collateralTokenBalance?.value !== undefined
     ? parseFloat(formatUnits(collateralTokenBalance.value, collateralDecimals))
     : 0;
-  const collateralTokenBalanceUsd = collateralTokenBalanceNum * currentPrice;
+  // For WETH collateral, use ETH price; for stablecoins, use $1
+  const collateralTokenPrice = selectedCollateralTokenKey === "WETH" ? currentPrice : 1;
+  const collateralTokenBalanceUsd = collateralTokenBalanceNum * collateralTokenPrice;
 
   const {
     txStatus,
@@ -136,6 +140,8 @@ export default function TradingPanel({
     cancelDecreaseOrder,
     closeMarketPosition,
     resetTxStatus,
+    vaultRouterApproved,
+    approveVaultRouter,
   } = useTradingActions();
 
   const { increaseOrders, decreaseOrders } = useOpenOrders(activeIndexToken);
@@ -226,9 +232,14 @@ export default function TradingPanel({
 
   const handlePctQuantity = (pct: number) => {
     if (!wallet.connected || collateralTokenBalanceNum <= 0) return;
-    const p = activeType === "Market" ? currentPrice : priceNum || currentPrice;
-    if (p <= 0) return;
-    setQuantity(String(parseFloat(((collateralTokenBalanceNum * leverage * pct) / 100 / p).toFixed(4))));
+    // Use collateral token price for quantity calculation
+    const collateralTokenPrice = selectedCollateralTokenKey === "WETH" ? currentPrice : 1;
+    if (collateralTokenPrice <= 0) return;
+    // Calculate quantity based on percentage of collateral balance
+    // For index token quantity: (collateral * pct/100) / indexPrice
+    const indexPrice = activeType === "Market" ? currentPrice : priceNum || currentPrice;
+    if (indexPrice <= 0) return;
+    setQuantity(String(parseFloat(((collateralTokenBalanceNum * pct / 100 * collateralTokenPrice) / indexPrice).toFixed(4))));
   };
 
   const handlePlaceOrder = useCallback(async () => {
@@ -236,6 +247,18 @@ export default function TradingPanel({
     if (!isOracleValid) {
       console.error("[handlePlaceOrder] oracle not valid — aborting");
       return;
+    }
+
+    // Auto-approve Router in Vault if not already approved
+    if (!vaultRouterApproved) {
+      console.log("[handlePlaceOrder] Router not approved in Vault, approving...");
+      const approvalHash = await approveVaultRouter();
+      if (!approvalHash) {
+        console.error("[handlePlaceOrder] Failed to approve Router in Vault");
+        alert("Failed to approve Router. Please try again.");
+        return;
+      }
+      console.log("[handlePlaceOrder] Router approved in Vault");
     }
 
     // Validate we have min/max oracle prices for position health check
@@ -247,18 +270,18 @@ export default function TradingPanel({
     // Use token-specific decimals for collateral amount
     const collateralAmount = parseUnits(qtyNum.toFixed(8), collateralDecimals);
 
-    // Use worst-case oracle price for entry
-    // For longs: Vault uses getMinPrice (you want to buy at lowest possible price)
-    // For shorts: Vault uses getMaxPrice (you want to sell at highest possible price)
-    const worstCaseEntryPrice = isLong ? oracleMinPrice : oracleMaxPrice;
-    const collateralUsd = qtyNum * currentPrice; // Collateral value in USD
+    // Calculate collateral value in USD and position size
+    // collateralUsd = quantity of collateral token * price of collateral token in USD
+    // For WETH/USDC/USDT as collateral, we need to use the collateral token's price, not the index token's price
+    const collateralTokenPrice = selectedCollateralTokenKey === "WETH" ? currentPrice : 1; // WETH price varies, stablecoins = $1
+    const collateralUsd = qtyNum * collateralTokenPrice; // Collateral value in USD
     const sizeUsd = collateralUsd * leverage;   // Position size in USD
 
     // Validate position health before submitting
     const health = validatePositionHealth({
       collateralUsd,
       sizeUsd,
-      entryPrice: worstCaseEntryPrice,
+      entryPrice: currentPrice,
       isLong,
       maxPrice: oracleMaxPrice,
       minPrice: oracleMinPrice,
@@ -276,22 +299,16 @@ export default function TradingPanel({
     }
 
     // Oracle price for acceptablePrice calculation
-    // Use the same worst-case price that Vault will use
-    const oraclePriceForOrder = parseUnits(worstCaseEntryPrice.toFixed(8), 30);
-
-    const BASIS_POINTS      = 10000n;
-    const slippageBpsBigInt = BigInt(slippageBps);
-
-    // acceptablePrice: worst price the user will accept (market slippage bounds)
-    const acceptablePrice = isLong
-      ? (oraclePriceForOrder * (BASIS_POINTS + slippageBpsBigInt)) / BASIS_POINTS
-      : (oraclePriceForOrder * (BASIS_POINTS - slippageBpsBigInt)) / BASIS_POINTS;
+    // For longs: use getMaxPrice (you want to ensure you don't pay more than max)
+    // For shorts: use getMinPrice (you want to ensure you don't sell for less than min)
+    const oraclePriceForOrder = parseUnits((isLong ? oracleMaxPrice : oracleMinPrice).toFixed(8), 30);
 
     if (activeType === "Market") {
-      // sizeDelta = collateral USD * leverage = (qty * oracle_price * leverage)
-      const sizeDelta = parseUnits((currentPrice * qtyNum * leverage).toFixed(8), 30);
-      console.log("[handlePlaceOrder] Market", { currentPrice, qtyNum, leverage, sizeDelta: sizeDelta.toString(), acceptablePrice: acceptablePrice.toString(), worstCaseEntryPrice });
-      await placeMarketOrder({ collateralToken: activeCollateralToken, indexToken: activeIndexToken, collateralAmount, sizeDelta, isLong, acceptablePrice });
+      // sizeDelta = collateral USD * leverage (in USD, 30 decimals)
+      const sizeDelta = parseUnits((collateralUsd * leverage).toFixed(8), 30);
+      console.log("[handlePlaceOrder] Market", { collateralUsd, leverage, sizeDelta: sizeDelta.toString(), oraclePriceForOrder: (isLong ? oracleMaxPrice : oracleMinPrice) });
+      // pass raw oraclePriceForOrder; useTradingActions.placeMarketOrder will apply slippage
+      await placeMarketOrder({ collateralToken: activeCollateralToken, indexToken: activeIndexToken, collateralAmount, sizeDelta, isLong, acceptablePrice: oraclePriceForOrder, slippageBps: BigInt(slippageBps) });
     } else {
       // Limit / Conditional: triggerPrice = user's entered limit price (NOT oracle price)
       if (priceNum <= 0) {
@@ -299,25 +316,24 @@ export default function TradingPanel({
         return;
       }
       const triggerPriceRaw = parseUnits(priceNum.toFixed(8), 30);
-      const sizeDelta        = parseUnits((priceNum * qtyNum * leverage).toFixed(8), 30);
+      // sizeDelta = collateral USD * leverage (in USD, 30 decimals)
+      const sizeDelta = parseUnits((collateralUsd * leverage).toFixed(8), 30);
       // triggerAboveThreshold:
       //   Long  limit: execute when oracle price ≤ triggerPrice (price dropped to your buy level) → false
       //   Short limit: execute when oracle price ≥ triggerPrice (price rose to your sell level) → true
       const triggerAboveThreshold = !isLong;
-      console.log("[handlePlaceOrder]", activeType, { priceNum, qtyNum, leverage, sizeDelta: sizeDelta.toString(), triggerPrice: triggerPriceRaw.toString(), triggerAboveThreshold });
+      console.log("[handlePlaceOrder]", activeType, { collateralUsd, leverage, sizeDelta: sizeDelta.toString(), triggerPrice: triggerPriceRaw.toString(), triggerAboveThreshold });
       await placeLimitOrder({ collateralToken: activeCollateralToken, indexToken: activeIndexToken, collateralAmount, sizeDelta, isLong, triggerPrice: triggerPriceRaw, triggerAboveThreshold });
     }
 
     // TP/SL orders attached to the position
     if (tpsl && (tpPrice || slPrice)) {
-      const sizeDeltaForTPSL = parseUnits(
-        ((activeType === "Market" ? currentPrice : priceNum) * qtyNum * leverage).toFixed(8), 30
-      );
+      const sizeDeltaForTPSL = parseUnits((collateralUsd * leverage).toFixed(8), 30);
       const tpPriceRaw = tpPrice ? parseUnits(parseFloat(tpPrice).toFixed(8), 30) : null;
       const slPriceRaw = slPrice ? parseUnits(parseFloat(slPrice).toFixed(8), 30) : null;
       await placeTPSLOrders({ collateralToken: activeCollateralToken, indexToken: activeIndexToken, collateralDelta: collateralAmount, sizeDelta: sizeDeltaForTPSL, isLong, tpPrice: tpPriceRaw, slPrice: slPriceRaw });
     }
-  }, [activeType, currentPrice, priceNum, qtyNum, leverage, wallet.address, activeCollateralToken, activeIndexToken, isLong, placeMarketOrder, placeLimitOrder, placeTPSLOrders, isOracleValid, oraclePriceRaw, slippageBps, tpsl, tpPrice, slPrice, oracleMinPrice, oracleMaxPrice, collateralDecimals]);
+  }, [activeType, currentPrice, priceNum, qtyNum, leverage, wallet.address, activeCollateralToken, activeIndexToken, isLong, placeMarketOrder, placeLimitOrder, placeTPSLOrders, isOracleValid, oraclePriceRaw, slippageBps, tpsl, tpPrice, slPrice, oracleMinPrice, oracleMaxPrice, collateralDecimals, vaultRouterApproved, approveVaultRouter]);
 
   return (
     <div className="flex flex-col h-full" style={{ background: "var(--surface-container-lowest)", color: "var(--on-surface)" }}>
@@ -556,13 +572,13 @@ export default function TradingPanel({
             id="leverage-slider"
             type="range"
             min={1}
-            max={50}
+            max={100}
             value={leverage}
             onChange={(e) => setLeverage(Number(e.target.value))}
             className="w-full h-1 rounded-full appearance-none cursor-pointer"
           />
           <div className="flex justify-between mt-1">
-            {[1, 5, 10, 20, 50].map((l) => (
+            {[1, 5, 10, 20, 50, 100].map((l) => (
               <button
                 key={l}
                 onClick={() => setLeverage(l)}
@@ -805,23 +821,7 @@ export default function TradingPanel({
                     <div className="flex items-center justify-between text-[10px] mb-2">
                       <span style={{ color: "var(--on-surface-disabled)" }}>Unrealized PnL</span>
                       <span className="font-mono" style={{ color: pnlColor }}>
-                        {(() => {
-                          // Calculate real-time PnL using current oracle price
-                          const entryPrice = pos.avgPriceFormatted;
-                          const sizeUsd = pos.sizeUsd;
-                          const collateralUsd = pos.collateralUsd;
-                          
-                          if (entryPrice === 0 || sizeUsd === 0) return "$0.00 (0.00%)";
-                          
-                          // For longs: PnL = (currentPrice - entryPrice) * size / entryPrice
-                          // For shorts: PnL = (entryPrice - currentPrice) * size / entryPrice
-                          const priceDiff = pos.isLong ? (currentPrice - entryPrice) : (entryPrice - currentPrice);
-                          const pnlUsd = (priceDiff / entryPrice) * sizeUsd;
-                          const pnlPct = collateralUsd > 0 ? (pnlUsd / collateralUsd) * 100 : 0;
-                          
-                          const pnlColor = pnlUsd >= 0 ? "var(--buy)" : "var(--sell)";
-                          return `${pnlUsd >= 0 ? "+" : ""}$${pnlUsd.toFixed(2)} (${pnlPct.toFixed(2)}%)`;
-                        })()}
+                        {pos.unrealizedPnlUsd >= 0 ? "+" : ""}${pos.unrealizedPnlUsd.toFixed(2)} ({pos.unrealizedPnlPct.toFixed(2)}%)
                       </span>
                     </div>
 
@@ -842,15 +842,25 @@ export default function TradingPanel({
                       onClick={() => {
                         const closePct = closePercentage / 100;
                         const sizeDelta = (pos.size * BigInt(Math.floor(closePct * 10000))) / 10000n;
-                        const collateralDelta = (pos.collateral * BigInt(Math.floor(closePct * 10000))) / 10000n;
+                        // collateralDelta=0 avoids underflow in Vault._reduceCollateral
+                        // when losses have reduced position.collateral below the withdrawn amount.
+                        // The contract returns all remaining collateral automatically on full close.
+                        const collateralDelta = 0n;
+                        // For closing positions, acceptablePrice must satisfy Router's _decreasePosition checks:
+                        //   Long decrease: getMinPrice(indexToken) >= _price  => _price <= minPrice
+                        //   Short decrease: getMaxPrice(indexToken) <= _price  => _price >= maxPrice
+                        const closeOraclePrice = pos.isLong ? oracleMinPrice : oracleMaxPrice;
+                        const closeOraclePriceRaw = closeOraclePrice
+                          ? parseUnits(closeOraclePrice.toFixed(8), 30)
+                          : (pos.isLong ? (oracleMinPriceRaw ?? oraclePriceRaw ?? pos.averagePrice) : (oracleMaxPriceRaw ?? oraclePriceRaw ?? pos.averagePrice));
                         closeMarketPosition({
                           collateralToken: activeCollateralToken,
                           indexToken: activeIndexToken,
                           sizeDelta,
                           collateralDelta,
                           isLong: pos.isLong,
-                          // Use live oracle price, not entry price, to avoid stale-price revert
-                          acceptablePrice: oraclePriceRaw ?? pos.averagePrice,
+                          acceptablePrice: closeOraclePriceRaw,
+                          slippageBps: BigInt(slippageBps),
                         });
                       }}
                       disabled={orderSigning}
