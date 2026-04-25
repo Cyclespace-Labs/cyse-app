@@ -6,7 +6,7 @@ import { parseUnits, formatUnits } from "viem";
 import { contracts, PRICE_PRECISION } from "@/lib/protocol/contracts";
 import { TxStatus } from "@/types/protocol";
 
-const EXECUTION_FEE = parseUnits("0.01", 18);
+const EXECUTION_FEE = parseUnits("0.05", 18);
 const BASIS_POINTS = 10000n;
 
 function applySlippage(price: bigint, isLong: boolean, slippageBps: bigint): bigint {
@@ -87,7 +87,18 @@ export function useTradingActions() {
     query: { staleTime: 60_000 },
   });
 
-  const executionFee = (minExecFee as bigint | undefined) ?? EXECUTION_FEE;
+  // Add 20% buffer to the on-chain minExecutionFee to ensure the tx never
+  // reverts with "insufficient execution fee" due to keeper fee changes.
+  const executionFee =
+    (minExecFee && minExecFee > 0n ? (minExecFee * 120n) / 100n : undefined) || EXECUTION_FEE;
+
+  useEffect(() => {
+    console.log("[useTradingActions] executionFee config", {
+      minExecFee: minExecFee?.toString(),
+      executionFee: executionFee.toString(),
+      executionFeeEth: formatUnits(executionFee, 18),
+    });
+  }, [minExecFee, executionFee]);
 
   const { data: routerApproved } = useReadContract({
     ...contracts.router,
@@ -114,9 +125,11 @@ export function useTradingActions() {
       });
       setPendingHash(hash);
       setTxStatus({ state: "submitted", hash });
+      return hash;
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Plugin approval failed";
       setTxStatus({ state: "failed", error: message });
+      return null;
     }
   }, [writeContractAsync]);
 
@@ -163,6 +176,25 @@ export function useTradingActions() {
     [writeContractAsync]
   );
 
+  // Short positions require stable collateral (USDC). When user selects WETH for a
+  // short, the Router must swap wrapped ETH to USDC via a multi-hop path.
+  function getShortPathAndCollateral(
+    collateralToken: `0x${string}`,
+    isLong: boolean
+  ): { path: `0x${string}`[]; collateralToken: `0x${string}` } {
+    if (isLong) {
+      return { path: [collateralToken], collateralToken };
+    }
+    // Shorts require stable collateral
+    if (collateralToken.toLowerCase() === contracts.weth.address.toLowerCase()) {
+      return {
+        path: [contracts.weth.address, contracts.usdc.address],
+        collateralToken: contracts.usdc.address,
+      };
+    }
+    return { path: [collateralToken], collateralToken };
+  }
+
   const placeMarketOrder = useCallback(
     async ({
       collateralToken,
@@ -177,19 +209,19 @@ export function useTradingActions() {
       setTxStatus({ state: "pending" });
       try {
         const slippedPrice = applySlippage(acceptablePrice, isLong, slippageBps);
-        const path: [`0x${string}`] = [collateralToken];
         const isEth = collateralToken.toLowerCase() === contracts.weth.address.toLowerCase();
+        const { path } = getShortPathAndCollateral(collateralToken, isLong);
 
-        // For ETH collateral: use increasePositionETH so the Router wraps native ETH
-        // internally — avoids ERC20 transferFrom which would revert if user has no WETH.
-        // For any other ERC20 collateral: use increasePosition (requires prior approval).
+        // ETH collateral (longs OR shorts where WETH is swapped to USDC).
+        // For shorts with WETH we still use increasePositionETH because the
+        // Router wraps native ETH → WETH → swaps to USDC via the path.
         const hash = isEth
           ? await writeContractAsync({
               ...contracts.router,
               functionName: "increasePositionETH",
               args: [path, indexToken, 0n, sizeDelta, isLong, slippedPrice],
               value: collateralAmount,
-              gas: 1_000_000n, // Prevent gas over-estimation
+              gas: 1_000_000n,
             })
           : await writeContractAsync({
               ...contracts.router,
@@ -232,14 +264,18 @@ export function useTradingActions() {
       if (!address) return null;
       setTxStatus({ state: "pending" });
       try {
+        const { collateralToken: effectiveCollateral } = getShortPathAndCollateral(
+          collateralToken,
+          isLong
+        );
         const slippedPrice = applySlippage(acceptablePrice, !isLong, slippageBps);
-        const isEth = collateralToken.toLowerCase() === contracts.weth.address.toLowerCase();
+        const isEth = effectiveCollateral.toLowerCase() === contracts.weth.address.toLowerCase();
 
         // For ETH collateral: use decreasePositionETH so proceeds are unwrapped to native ETH.
         const hash = await writeContractAsync({
           ...contracts.router,
           functionName: isEth ? "decreasePositionETH" : "decreasePosition",
-          args: [collateralToken, indexToken, collateralDelta, sizeDelta, isLong, address, slippedPrice],
+          args: [effectiveCollateral, indexToken, collateralDelta, sizeDelta, isLong, address, slippedPrice],
           gas: isEth ? 800_000n : 600_000n,
         });
         setPendingHash(hash);
@@ -267,7 +303,10 @@ export function useTradingActions() {
       if (!address) return null;
       setTxStatus({ state: "pending" });
       try {
-        const path: [`0x${string}`] = [collateralToken];
+        const { path, collateralToken: effectiveCollateral } = getShortPathAndCollateral(
+          collateralToken,
+          isLong
+        );
         const hash = await writeContractAsync({
           ...contracts.orderBook,
           functionName: "createIncreaseOrder",
@@ -277,7 +316,7 @@ export function useTradingActions() {
             indexToken,
             0n,
             sizeDelta,
-            collateralToken,
+            effectiveCollateral,
             isLong,
             triggerPrice,
             triggerAboveThreshold,
@@ -356,13 +395,28 @@ export function useTradingActions() {
       if (!address) return null;
       setTxStatus({ state: "pending" });
       try {
+        const { collateralToken: effectiveCollateral } = getShortPathAndCollateral(
+          collateralToken,
+          isLong
+        );
+        console.log("[placeDecreaseOrder] submitting", {
+          address,
+          indexToken,
+          sizeDelta: sizeDelta.toString(),
+          effectiveCollateral,
+          collateralDelta: collateralDelta.toString(),
+          isLong,
+          triggerPrice: triggerPrice.toString(),
+          triggerAboveThreshold,
+          executionFee: executionFee.toString(),
+        });
         const hash = await writeContractAsync({
           ...contracts.orderBook,
           functionName: "createDecreaseOrder",
           args: [
             indexToken,
             sizeDelta,
-            collateralToken,
+            effectiveCollateral,
             collateralDelta,
             isLong,
             triggerPrice,
@@ -376,6 +430,7 @@ export function useTradingActions() {
         return hash;
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : "Decrease order failed";
+        console.error("[placeDecreaseOrder] FAILED:", message, err);
         setTxStatus({ state: "failed", error: message });
         return null;
       }
@@ -387,44 +442,54 @@ export function useTradingActions() {
     async ({ collateralToken, indexToken, collateralDelta, sizeDelta, isLong, tpPrice, slPrice }: PlaceTPSLOrdersParams) => {
       if (!address) return null;
       setTxStatus({ state: "pending" });
-      try {
-        const orders: Promise<`0x${string}` | null>[] = [];
+      const results: (`0x${string}` | null)[] = [];
+      const errors: string[] = [];
 
+      try {
         // Take Profit: trigger above threshold for longs, below for shorts
         if (tpPrice) {
-          orders.push(
-            placeDecreaseOrder({
-              collateralToken,
-              indexToken,
-              collateralDelta,
-              sizeDelta,
-              isLong,
-              triggerPrice: tpPrice,
-              triggerAboveThreshold: isLong,
-            })
-          );
+          console.log("[placeTPSLOrders] placing TP", { isLong, sizeDelta: sizeDelta.toString(), triggerPrice: tpPrice.toString(), triggerAboveThreshold: isLong });
+          const tpHash = await placeDecreaseOrder({
+            collateralToken,
+            indexToken,
+            collateralDelta,
+            sizeDelta,
+            isLong,
+            triggerPrice: tpPrice,
+            triggerAboveThreshold: isLong,
+          });
+          results.push(tpHash);
+          if (!tpHash) {
+            errors.push("Take Profit order failed");
+            console.error("[placeTPSLOrders] TP failed");
+          } else {
+            console.log("[placeTPSLOrders] TP placed", tpHash);
+          }
         }
 
         // Stop Loss: trigger below threshold for longs, above for shorts
         if (slPrice) {
-          orders.push(
-            placeDecreaseOrder({
-              collateralToken,
-              indexToken,
-              collateralDelta,
-              sizeDelta,
-              isLong,
-              triggerPrice: slPrice,
-              triggerAboveThreshold: !isLong,
-            })
-          );
+          console.log("[placeTPSLOrders] placing SL", { isLong, sizeDelta: sizeDelta.toString(), triggerPrice: slPrice.toString(), triggerAboveThreshold: !isLong });
+          const slHash = await placeDecreaseOrder({
+            collateralToken,
+            indexToken,
+            collateralDelta,
+            sizeDelta,
+            isLong,
+            triggerPrice: slPrice,
+            triggerAboveThreshold: !isLong,
+          });
+          results.push(slHash);
+          if (!slHash) {
+            errors.push("Stop Loss order failed");
+            console.error("[placeTPSLOrders] SL failed");
+          } else {
+            console.log("[placeTPSLOrders] SL placed", slHash);
+          }
         }
 
-        const results = await Promise.all(orders);
-        const failed = results.some((r) => r === null);
-
-        if (failed) {
-          setTxStatus({ state: "failed", error: "Some TP/SL orders failed" });
+        if (errors.length > 0) {
+          setTxStatus({ state: "failed", error: errors.join("; ") });
         } else {
           setTxStatus({ state: "idle" });
         }
@@ -432,6 +497,7 @@ export function useTradingActions() {
         return results;
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : "TP/SL orders failed";
+        console.error("[placeTPSLOrders] unexpected error:", message, err);
         setTxStatus({ state: "failed", error: message });
         return null;
       }

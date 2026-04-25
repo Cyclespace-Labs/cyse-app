@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Order, Position } from "@/types/trading";
 import { X } from "lucide-react";
+import { computeLivePnl, computeLivePnlPct } from "@/lib/formatters";
 
 const tabs = [
   "Balances",
@@ -20,6 +21,7 @@ interface BottomTabsProps {
   isAuthenticated?: boolean;
   positions?: Position[];
   orders?: Order[];
+  currentPrice?: number;
   onCancelOrder?: (orderId: string) => void;
   onClosePosition?: (positionId: string) => void;
 }
@@ -28,6 +30,7 @@ export default function BottomTabs({
   isAuthenticated = false,
   positions = [],
   orders = [],
+  currentPrice = 0,
   onCancelOrder,
   onClosePosition,
 }: BottomTabsProps) {
@@ -74,10 +77,15 @@ export default function BottomTabs({
                   </td>
                   <td className="px-3 py-1.5 text-right" style={{ color: "var(--on-surface)" }}>{pos.quantity}</td>
                   <td className="px-3 py-1.5 text-right" style={{ color: "var(--on-surface)" }}>{pos.entryPrice}</td>
-                  <td className="px-3 py-1.5 text-right" style={{ color: "var(--liquidation)" }}>{pos.liquidationPrice}</td>
-                  <td className="px-3 py-1.5 text-right" style={{ color: pos.unrealizedPnl >= 0 ? "var(--buy)" : "var(--sell)" }}>
-                    {pos.unrealizedPnl >= 0 ? "+" : ""}${pos.unrealizedPnl.toFixed(2)}
-                  </td>
+                  <td className="px-3 py-1.5 text-right" style={{ color: "var(--liquidation)" }}>{pos.liquidationPrice.toFixed(4)}</td>
+                  {(() => {
+                    const livePnl = computeLivePnl(pos.quantity, pos.entryPrice, pos.side === "long", currentPrice, pos.unrealizedPnl);
+                    return (
+                      <td className="px-3 py-1.5 text-right" style={{ color: livePnl >= 0 ? "var(--buy)" : "var(--sell)" }}>
+                        {livePnl >= 0 ? "+" : ""}${livePnl.toFixed(2)}
+                      </td>
+                    );
+                  })()}
                   <td className="px-3 py-1.5 text-right">
                     <button
                       onClick={() => onClosePosition?.(pos.id)}

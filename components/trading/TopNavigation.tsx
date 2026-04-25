@@ -7,6 +7,10 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useWallet } from "@/contexts/WalletContext";
+import { useBalance, useReadContract } from "wagmi";
+import { formatUnits } from "viem";
+import { contracts } from "@/lib/protocol/contracts";
+import { useAllPositions } from "@/hooks/useAllPositions";
 
 const tourney = Tourney({
   subsets: ["latin"],
@@ -46,6 +50,26 @@ export default function TopNavigation() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [mounted, setMounted] = useState(false);
+
+  // Global account equity: wallet balance (native ETH → USD) + all position unrealized PnL
+  const { data: nativeBalance } = useBalance({
+    address: wallet.address,
+    query: { enabled: wallet.connected, refetchInterval: 10_000 },
+  });
+  const { data: ethPriceRaw } = useReadContract({
+    ...contracts.vaultPriceFeed,
+    functionName: "getPrice",
+    args: [contracts.weth.address, true, true, false],
+    query: { enabled: wallet.connected, refetchInterval: 10_000 },
+  });
+  const { positions } = useAllPositions();
+
+  const ethPrice = ethPriceRaw ? parseFloat(formatUnits(ethPriceRaw as bigint, 30)) : 0;
+  const walletUsd = nativeBalance?.value
+    ? parseFloat(formatUnits(nativeBalance.value, 18)) * ethPrice
+    : 0;
+  const totalPnl = positions.reduce((sum, p) => sum + p.unrealizedPnl, 0);
+  const equity = walletUsd + totalPnl;
 
   useEffect(() => {
     setMounted(true);
@@ -363,6 +387,18 @@ export default function TopNavigation() {
                     : "#FFA500",
                 }}
               />
+              <span
+                style={{ color: totalPnl >= 0 ? "var(--buy)" : totalPnl < 0 ? "var(--sell)" : "var(--on-surface)" }}
+                title={`Wallet $${walletUsd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} + PnL $${totalPnl.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+              >
+                ${equity.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                {totalPnl !== 0 && (
+                  <span className="text-[10px] ml-0.5">
+                    ({totalPnl >= 0 ? "+" : ""}{totalPnl.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
+                  </span>
+                )}
+              </span>
+              <span className="opacity-50">|</span>
               <span style={{ color: "var(--on-surface)" }}>{wallet.balance.toLocaleString("en-US", { minimumFractionDigits: 4 })} {wallet.nativeCurrencySymbol}</span>
               <span className="opacity-50">|</span>
               <span>{wallet.shortAddress}</span>

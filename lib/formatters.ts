@@ -24,3 +24,34 @@ export function formatPercent(value: number): string {
 export function cn(...classes: (string | false | undefined | null)[]): string {
   return classes.filter(Boolean).join(" ");
 }
+
+/**
+ * Compute live unrealized PnL for a position using current market price.
+ * Falls back to on-chain PnL if currentPrice is not available.
+ */
+export function computeLivePnl(
+  sizeUsd: number,
+  entryPrice: number,
+  isLong: boolean,
+  currentPrice: number,
+  onChainPnl: number
+): number {
+  if (!currentPrice || currentPrice <= 0 || !entryPrice || entryPrice <= 0) {
+    return onChainPnl;
+  }
+  const priceChange = isLong
+    ? (currentPrice - entryPrice) / entryPrice
+    : (entryPrice - currentPrice) / entryPrice;
+  return sizeUsd * priceChange;
+}
+
+/**
+ * Compute live unrealized PnL percentage.
+ */
+export function computeLivePnlPct(
+  livePnl: number,
+  collateralUsd: number
+): number {
+  if (!collateralUsd || collateralUsd <= 0) return 0;
+  return (livePnl / collateralUsd) * 100;
+}

@@ -43,17 +43,26 @@ function onChainOrdersToUI(
     status: "open",
     createdAt: Date.now(),
   }));
-  const dec: Order[] = decreases.map((o) => ({
-    id: `dec-${o.index}`,
-    symbol: `${ADDRESS_TO_SYMBOL[o.indexToken.toLowerCase()] ?? "?"}-PERP`,
-    side: o.isLong ? "sell" : "buy",
-    type: "conditional",
-    price: parseFloat(formatUnits(o.triggerPrice, 30)),
-    quantity: parseFloat(formatUnits(o.sizeDelta, 30)),
-    filled: 0,
-    status: "open",
-    createdAt: Date.now(),
-  }));
+
+  // Decrease orders are TP/SL triggers. Distinguish TP vs SL from isLong + triggerAboveThreshold.
+  const dec: Order[] = decreases.map((o) => {
+    const triggerPrice = parseFloat(formatUnits(o.triggerPrice, 30));
+    // TP: long + above, or short + below
+    const isTp = (o.isLong && o.triggerAboveThreshold) || (!o.isLong && !o.triggerAboveThreshold);
+    return {
+      id: `dec-${o.index}`,
+      symbol: `${ADDRESS_TO_SYMBOL[o.indexToken.toLowerCase()] ?? "?"}-PERP`,
+      side: o.isLong ? "sell" : "buy",
+      type: "conditional",
+      price: 0, // do not draw a regular order line
+      quantity: parseFloat(formatUnits(o.sizeDelta, 30)),
+      filled: 0,
+      status: "open",
+      createdAt: Date.now(),
+      tp: isTp ? triggerPrice : undefined,
+      sl: isTp ? undefined : triggerPrice,
+    };
+  });
   return [...inc, ...dec];
 }
 
@@ -126,6 +135,7 @@ export default function TradingPage() {
             isAuthenticated={wallet.connected}
             positions={positions}
             orders={orders}
+            currentPrice={currentPrice}
             onCancelOrder={() => {}}
             onClosePosition={() => {}}
           />
