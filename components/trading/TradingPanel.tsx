@@ -998,7 +998,7 @@ export default function TradingPanel({
                     )}
 
                     <button
-                      onClick={() => {
+                      onClick={async () => {
                         const closePct = closePercentage / 100;
                         const sizeDelta = (pos.size * BigInt(Math.floor(closePct * 10000))) / 10000n;
                         // collateralDelta=0 avoids underflow in Vault._reduceCollateral
@@ -1012,7 +1012,7 @@ export default function TradingPanel({
                         const closeOraclePriceRaw = closeOraclePrice
                           ? parseUnits(closeOraclePrice.toFixed(8), 30)
                           : (pos.isLong ? (oracleMinPriceRaw ?? oraclePriceRaw ?? pos.averagePrice) : (oracleMaxPriceRaw ?? oraclePriceRaw ?? pos.averagePrice));
-                        closeMarketPosition({
+                        const hash = await closeMarketPosition({
                           collateralToken: activeCollateralToken,
                           indexToken: activeIndexToken,
                           sizeDelta,
@@ -1021,6 +1021,15 @@ export default function TradingPanel({
                           acceptablePrice: closeOraclePriceRaw,
                           slippageBps: BigInt(slippageBps),
                         });
+                        // On a full close, also cancel any attached TP/SL decrease orders
+                        // so they don't remain orphaned on the OrderBook.
+                        if (hash && closePercentage >= 100) {
+                          const attached = decreaseOrders.filter((o) => o.isLong === pos.isLong);
+                          for (const o of attached) {
+                            console.log("[Close] cancelling attached decrease order", o.index);
+                            await cancelDecreaseOrder(o.index);
+                          }
+                        }
                       }}
                       disabled={orderSigning}
                       className="w-full py-1.5 text-[11px] font-mono rounded transition-colors"

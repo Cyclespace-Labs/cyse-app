@@ -134,7 +134,8 @@ export default function TopNavigation() {
             <path d="M125.807 21.3854C108.841 22.5059 89 33.4938 89 33.4938C89 33.4938 110.862 35.6524 122.776 41.1486C135.785 47.1503 144.604 53.1327 152.654 64.6696C159.034 73.8123 160.737 90 160.737 90H228C228 90 225.957 79.1846 219.484 68.2883C212.123 53.3962 197.111 40.3233 183.254 32.5196C164.979 22.2275 147.371 19.9612 125.807 21.3854Z" fill={primaryColor} stroke={primaryColor} />
             <path d="M125.807 235.615C108.841 234.494 89 223.506 89 223.506C89 223.506 110.862 221.348 122.776 215.851C135.785 209.85 144.604 203.867 152.654 192.33C159.034 183.188 160.737 167 160.737 167H228C228 167 225.957 177.815 219.484 188.712C212.123 203.604 197.111 216.677 183.254 224.48C164.979 234.773 147.371 237.039 125.807 235.615Z" fill={primaryColor} stroke={primaryColor} />
           </svg>
-          <span className={`${tourney.className} text-md font-semibold text-black dark:text-white`}>CYCLESPACE</span>
+          <span className={`${tourney.className} text-md font-semibold bg-linear-to-r from-black to-slate-800 dark:from-white dark:to-slate-200
+             bg-clip-text text-transparent`}>CYCLESPACE</span>
         </Link>
 
         {navItems.map((item) => {
