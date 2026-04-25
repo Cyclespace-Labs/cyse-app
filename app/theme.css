@@ -50,8 +50,8 @@
 
 :root {
   --background: oklch(0.9822 0.0041 271.37);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
+  --foreground: oklch(0 0 0);
+  --card: oklch(0.9398 0.01 267.36);
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
@@ -128,3 +128,234 @@
     @apply font-sans;
   }
 }
+
+
+/* ============================================================
+   BASE STYLES
+   ============================================================ */
+
+body {
+  background: var(--surface);
+  color: var(--on-surface);
+  font-family: var(--font-display);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ============================================================
+   PRIMARY GRADIENT UTILITIES
+   ============================================================ */
+
+.btn-primary-gradient {
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-container) 100%);
+  color: var(--on-primary);
+  position: relative;
+  overflow: hidden;
+  transition: box-shadow 0.2s ease, opacity 0.2s ease;
+}
+
+.btn-primary-gradient:hover {
+  box-shadow: 0 0 20px 4px rgba(14, 118, 253, 0.35);
+  opacity: 0.95;
+}
+
+.btn-primary-gradient:disabled {
+  background: var(--surface-container-high);
+  color: var(--on-surface-disabled);
+  box-shadow: none;
+}
+
+.text-gradient-primary {
+  background: linear-gradient(135deg, var(--on-primary-container) 0%, var(--primary-container) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ============================================================
+   GLASSMORPHISM UTILITIES
+   ============================================================ */
+
+.glass {
+  background: rgba(50, 53, 60, 0.5);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+}
+
+.glass-subtle {
+  background: rgba(29, 32, 38, 0.7);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+/* ============================================================
+   SURFACE ELEVATION UTILITIES
+   ============================================================ */
+
+.surface-float {
+  box-shadow: var(--shadow-float);
+}
+
+.surface-card {
+  box-shadow: var(--shadow-card);
+}
+
+/* ============================================================
+   INPUT STYLES
+   ============================================================ */
+
+.input-base {
+  background: var(--surface-container-low);
+  border-bottom: 2px solid var(--outline-variant);
+  color: var(--on-surface);
+  transition: border-color 0.15s ease;
+  outline: none;
+}
+
+.input-base:focus {
+  border-bottom-color: var(--primary);
+}
+
+.input-base::placeholder {
+  color: var(--on-surface-variant);
+  opacity: 0.5;
+}
+
+/* ============================================================
+   SCROLLBAR HIDE
+   ============================================================ */
+
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* ============================================================
+   TICKER ANIMATION
+   ============================================================ */
+
+@keyframes ticker-scroll {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.animate-ticker {
+  animation: ticker-scroll 30s linear infinite;
+}
+
+/* ============================================================
+   DIALOG ANIMATION
+   ============================================================ */
+
+@keyframes dialog-in {
+  0%   { opacity: 0; transform: scale(0.95) translateY(10px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.animate-dialog-in {
+  animation: dialog-in 0.2s ease-out;
+}
+
+/* ============================================================
+   CUSTOM RANGE INPUT (Leverage Slider)
+   ============================================================ */
+
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  background: var(--surface-container-high);
+  border-radius: 2px;
+  outline: none;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--primary);
+  cursor: pointer;
+  border: 2px solid var(--surface-container-lowest);
+  box-shadow: 0 0 8px rgba(14, 118, 253, 0.4);
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--primary);
+  cursor: pointer;
+  border: 2px solid var(--surface-container-lowest);
+}
+
+/* ============================================================
+   CUSTOM CHECKBOX
+   ============================================================ */
+
+input[type="checkbox"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border: 1px solid var(--outline-variant);
+  border-radius: 3px;
+  background: var(--surface-container-low);
+  cursor: pointer;
+  position: relative;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+input[type="checkbox"]:checked {
+  background: var(--primary);
+  border-color: var(--primary);
+}
+
+input[type="checkbox"]:checked::after {
+  content: "✓";
+  position: absolute;
+  color: var(--on-primary);
+  font-size: 10px;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+/* ============================================================
+   TERMINAL / BLINK
+   ============================================================ */
+
+@keyframes blink {
+  0%, 50%  { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+.terminal-cursor {
+  animation: blink 1s step-end infinite;
+}
+
+/* ============================================================
+   GHOST BORDER FALLBACK (accessibility dividers)
+   Uses outline-variant at ~15% opacity — "felt, not seen"
+   ============================================================ */
+
+.divider-ghost {
+  border-color: rgba(66, 70, 84, 0.15);
+}
+
+/* ============================================================
+   DEPTH BAR UTILITIES (Order Book)
+   ============================================================ */
+
+.depth-bar-sell {
+  background: rgba(255, 77, 79, 0.1);
+}
+
+.depth-bar-buy {
+  background: rgba(0, 192, 118, 0.1);
+}
+

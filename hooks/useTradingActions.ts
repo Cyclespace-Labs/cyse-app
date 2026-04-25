@@ -307,6 +307,8 @@ export function useTradingActions() {
           collateralToken,
           isLong
         );
+        // For native ETH collateral the OrderBook needs to wrap the incoming ETH value to WETH.
+        const shouldWrap = effectiveCollateral.toLowerCase() === contracts.weth.address.toLowerCase();
         const hash = await writeContractAsync({
           ...contracts.orderBook,
           functionName: "createIncreaseOrder",
@@ -321,9 +323,9 @@ export function useTradingActions() {
             triggerPrice,
             triggerAboveThreshold,
             executionFee,
-            false,
+            shouldWrap,
           ],
-          value: executionFee,
+          value: shouldWrap ? executionFee + collateralAmount : executionFee,
           gas: 600_000n,
         });
         setPendingHash(hash);

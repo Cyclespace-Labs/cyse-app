@@ -16,14 +16,14 @@ export function useOpenOrders(indexToken?: `0x${string}`) {
     ...contracts.orderBook,
     functionName: "increaseOrdersIndex",
     args: address ? [address] : undefined,
-    query: { enabled: !!address },
+    query: { enabled: !!address, refetchInterval: 3_000, staleTime: 2_000 },
   });
 
   const { data: decreaseIndexRaw, refetch: refetchDecrease } = useReadContract({
     ...contracts.orderBook,
     functionName: "decreaseOrdersIndex",
     args: address ? [address] : undefined,
-    query: { enabled: !!address },
+    query: { enabled: !!address, refetchInterval: 3_000, staleTime: 2_000 },
   });
 
   const increaseCount = Math.min(Number(increaseIndexRaw ?? 0n), MAX_ORDERS);
@@ -57,12 +57,12 @@ export function useOpenOrders(indexToken?: `0x${string}`) {
 
   const { data: increaseData, refetch: refetchIncreaseData } = useReadContracts({
     contracts: increaseContracts,
-    query: { enabled: increaseContracts.length > 0 },
+    query: { enabled: increaseContracts.length > 0, refetchInterval: 3_000, staleTime: 2_000 },
   });
 
   const { data: decreaseData, refetch: refetchDecreaseData } = useReadContracts({
     contracts: decreaseContracts,
-    query: { enabled: decreaseContracts.length > 0 },
+    query: { enabled: decreaseContracts.length > 0, refetchInterval: 3_000, staleTime: 2_000 },
   });
 
   const increaseOrders = useMemo((): OnChainIncreaseOrder[] => {

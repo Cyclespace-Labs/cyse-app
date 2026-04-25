@@ -16,8 +16,9 @@ import { useWallet } from "@/contexts/WalletContext";
 import { useAllPositions } from "@/hooks/useAllPositions";
 import { useOpenOrders } from "@/hooks/useOpenOrders";
 import { usePriceOracle } from "@/hooks/usePriceOracle";
+import { useTradingActions } from "@/hooks/useTradingActions";
 import { contracts } from "@/lib/protocol/contracts";
-import { formatUnits } from "viem";
+import { formatUnits, parseUnits } from "viem";
 import { OnChainIncreaseOrder, OnChainDecreaseOrder } from "@/types/protocol";
 import { Order } from "@/types/trading";
 
@@ -74,6 +75,7 @@ export default function TradingPage() {
   const { wallet } = useWallet();
   const { positions } = useAllPositions();
   const { increaseOrders, decreaseOrders } = useOpenOrders();
+  const { closeMarketPosition, cancelDecreaseOrder } = useTradingActions();
 
   const symbol = selectedToken.symbol;
   const indexToken: `0x${string}` = (selectedToken.indexAddress ?? contracts.weth.address) as `0x${string}`;
@@ -90,6 +92,39 @@ export default function TradingPage() {
   const currentPrice = livePrice ?? tokenPriceData?.price ?? 0;
 
   const orders = onChainOrdersToUI(increaseOrders, decreaseOrders);
+
+  const handleClosePosition = async (positionId: string) => {
+    const pos = positions.find((p) => p.id === positionId);
+    if (!pos) return;
+    const isLong = pos.side === "long";
+    const posIndexToken = pos.symbol.startsWith("BTC")
+      ? contracts.btc.address
+      : contracts.weth.address;
+    const posCollateralToken = isLong
+      ? posIndexToken
+      : contracts.usdc.address;
+
+    // Cancel attached TP/SL decrease orders first
+    const attached = decreaseOrders.filter(
+      (o) =>
+        o.isLong === isLong &&
+        o.indexToken.toLowerCase() === posIndexToken.toLowerCase()
+    );
+    for (const o of attached) {
+      console.log("[page] cancelling attached decrease order", o.index);
+      await cancelDecreaseOrder(o.index);
+    }
+
+    await closeMarketPosition({
+      collateralToken: posCollateralToken,
+      indexToken: posIndexToken,
+      sizeDelta: 0n, // full close with size=0 triggers contract full close
+      collateralDelta: 0n,
+      isLong,
+      acceptablePrice: parseUnits(currentPrice.toFixed(8), 30),
+      slippageBps: 30n,
+    });
+  };
 
   useEffect(() => {
     setTokenPriceData(getTokenPriceData(symbol));
@@ -137,7 +172,7 @@ export default function TradingPage() {
             orders={orders}
             currentPrice={currentPrice}
             onCancelOrder={() => {}}
-            onClosePosition={() => {}}
+            onClosePosition={handleClosePosition}
           />
         </div>
 

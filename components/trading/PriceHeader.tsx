@@ -83,13 +83,15 @@ export default function PriceHeader({ onTokenPickerOpen, selectedSymbol, tokenPr
       <div className="flex flex-col mr-5 shrink-0">
         <div className="flex items-center gap-1.5">
           <span className="text-lg font-bold leading-tight" style={{ color: "var(--buy)" }}>
-            {currentDisplayPrice > 0 ? formatPrice(currentDisplayPrice) : na}
+            ${currentDisplayPrice > 0 ? formatPrice(currentDisplayPrice) : na}
           </span>
           {pythConnected && (
             <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: "var(--buy)" }} title="Pyth SSE live" />
           )}
         </div>
-        <span className="text-[11px]" style={{ color: "var(--on-surface-muted)" }}>
+
+        {/*sub price indicator is hidden for now*/}
+        <span className="text-[11px] hidden" style={{ color: "var(--on-surface-muted)" }}>
           {currentDisplayPrice > 0 ? formatPrice(currentDisplayPrice) : na}
           {oracleSource && <span className="ml-1 opacity-60">{oracleSource === "pyth" ? "PYTH" : oracleSource.toUpperCase()}</span>}
         </span>

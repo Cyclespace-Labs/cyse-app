@@ -466,6 +466,18 @@ export default function TradingPanel({
 
     console.log("[handleAddTPSLToPosition]", { isLong: pos.isLong, sizeDelta: pos.size.toString(), tp: tpPriceRaw?.toString(), sl: slPriceRaw?.toString() });
 
+    // Cancel any existing TP/SL on this position side before placing new ones
+    const existing = decreaseOrders.filter((o) =>
+      o.isLong === pos.isLong &&
+      o.indexToken.toLowerCase() === activeIndexToken.toLowerCase()
+    );
+    if (existing.length > 0) {
+      console.log("[handleAddTPSLToPosition] cancelling", existing.length, "existing decrease orders before update");
+      for (const o of existing) {
+        await cancelDecreaseOrder(o.index);
+      }
+    }
+
     await placeTPSLOrders({
       collateralToken: activeCollateralToken,
       indexToken: activeIndexToken,
@@ -941,8 +953,11 @@ export default function TradingPanel({
                 const livePnl = pos.isLong ? liveLongPnl : liveShortPnl;
                 const livePnlPct = computeLivePnlPct(livePnl, pos.collateralUsd);
                 const pnlColor = livePnl >= 0 ? "var(--buy)" : "var(--sell)";
-                // Match attached TP/SL decrease orders to this position side
-                const attachedOrders = decreaseOrders.filter((o) => o.isLong === pos.isLong);
+                // Match attached TP/SL decrease orders to this exact position (same indexToken + isLong)
+                const attachedOrders = decreaseOrders.filter((o) =>
+                  o.isLong === pos.isLong &&
+                  o.indexToken.toLowerCase() === activeIndexToken.toLowerCase()
+                );
                 const attachedTp = attachedOrders.find((o) => (o.isLong && o.triggerAboveThreshold) || (!o.isLong && !o.triggerAboveThreshold));
                 const attachedSl = attachedOrders.find((o) => (o.isLong && !o.triggerAboveThreshold) || (!o.isLong && o.triggerAboveThreshold));
                 return (
@@ -1012,6 +1027,17 @@ export default function TradingPanel({
                         const closeOraclePriceRaw = closeOraclePrice
                           ? parseUnits(closeOraclePrice.toFixed(8), 30)
                           : (pos.isLong ? (oracleMinPriceRaw ?? oraclePriceRaw ?? pos.averagePrice) : (oracleMaxPriceRaw ?? oraclePriceRaw ?? pos.averagePrice));
+                        // Cancel attached TP/SL BEFORE closing so OrderBook is clean
+                        const attachedClose = decreaseOrders.filter((o) =>
+                          o.isLong === pos.isLong &&
+                          o.indexToken.toLowerCase() === activeIndexToken.toLowerCase()
+                        );
+                        if (attachedClose.length > 0) {
+                          console.log("[Close] cancelling", attachedClose.length, "attached decrease orders before closing");
+                          for (const o of attachedClose) {
+                            await cancelDecreaseOrder(o.index);
+                          }
+                        }
                         const hash = await closeMarketPosition({
                           collateralToken: activeCollateralToken,
                           indexToken: activeIndexToken,
@@ -1021,15 +1047,6 @@ export default function TradingPanel({
                           acceptablePrice: closeOraclePriceRaw,
                           slippageBps: BigInt(slippageBps),
                         });
-                        // On a full close, also cancel any attached TP/SL decrease orders
-                        // so they don't remain orphaned on the OrderBook.
-                        if (hash && closePercentage >= 100) {
-                          const attached = decreaseOrders.filter((o) => o.isLong === pos.isLong);
-                          for (const o of attached) {
-                            console.log("[Close] cancelling attached decrease order", o.index);
-                            await cancelDecreaseOrder(o.index);
-                          }
-                        }
                       }}
                       disabled={orderSigning}
                       className="w-full py-1.5 text-[11px] font-mono rounded transition-colors"
@@ -1125,8 +1142,8 @@ export default function TradingPanel({
                         <button
                           onClick={() => {
                             setTpslPositionKey(pos.isLong ? "long" : "short");
-                            setTpslTpPrice("");
-                            setTpslSlPrice("");
+                            setTpslTpPrice(attachedTp ? parseFloat(formatUnits(attachedTp.triggerPrice, 30)).toFixed(4) : "");
+                            setTpslSlPrice(attachedSl ? parseFloat(formatUnits(attachedSl.triggerPrice, 30)).toFixed(4) : "");
                           }}
                           disabled={orderSigning}
                           className="w-full py-1 text-[10px] font-mono rounded transition-colors"
@@ -1134,7 +1151,7 @@ export default function TradingPanel({
                           onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = "rgba(99,179,255,0.08)")}
                           onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = "transparent")}
                         >
-                          Add TP/SL
+                          {attachedTp || attachedSl ? "Update TP/SL" : "Add TP/SL"}
                         </button>
                       )}
                     </div>
