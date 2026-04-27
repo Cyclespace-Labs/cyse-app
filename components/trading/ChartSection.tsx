@@ -1,36 +1,52 @@
 "use client";
 
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
-import dynamic from "next/dynamic";
 import CandlestickChart from "./CandlestickChart";
+import type { ChartType, IndicatorId, DrawingTool } from "./CandlestickChart";
 import {
   Crosshair,
-  Ruler,
   Maximize2,
   RotateCcw,
   Camera,
-  Layers,
   TrendingUp,
-  BarChart3,
+  MousePointer2,
+  Minus,
+  ChevronDown,
+  TrendingDown,
+  MoveUpRight,
+  ArrowUpRight,
+  MoveHorizontal,
+  GripVertical,
+  Spline,
+  GitBranch,
+  Square,
+  Circle,
+  Triangle,
+  Hexagon,
+  Diamond,
+  Waves,
+  ArrowUp,
+  ArrowDown,
+  Target,
+  Type,
+  Tag,
+  Hash,
+  Ruler,
+  Trash2,
+  Eye,
+  EyeOff,
+  Lock,
+  PenLine,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { Order, Position, TokenPriceData } from "@/types/trading";
 import { formatPrice } from "@/lib/formatters";
 import { useCandleData } from "@/hooks/useCandleData";
 
-// Lazy-load TradingView widget (heavy, requires browser APIs)
-const TradingViewWidget = dynamic(() => import("./TradingViewWidget"), {
-  ssr: false,
-  loading: () => (
-    <div className="flex items-center justify-center h-full" style={{ color: "var(--on-surface-disabled)" }}>
-      <span className="text-[12px]">Loading TradingView...</span>
-    </div>
-  ),
-});
-
 const chartTabs = ["Chart", "Depth", "Margin", "Funding", "Market Info"];
 const timeframes = ["1m", "3m", "5m", "15m", "1h", "4h", "1d"];
 
-// ── Visible-range buttons → matching timeframe + candle count ─────────────────
+// ── Range shortcuts → timeframe mapping ──────────────────────────────────────
 const RANGE_TO_TF: Record<string, { tf: string; label: string }> = {
   "1d":  { tf: "1m",  label: "1 Day" },
   "5d":  { tf: "5m",  label: "5 Days" },
@@ -41,15 +57,109 @@ const RANGE_TO_TF: Record<string, { tf: string; label: string }> = {
   "All": { tf: "1d",  label: "All" },
 };
 
-// ── Built-in indicator presets ────────────────────────────────────────────────
-const INDICATOR_PRESETS: Record<string, string[]> = {
-  "None":  [],
-  "MA":    ["MASimple@tv-basicstudies", "MAExp@tv-basicstudies"],
-  "RSI":   ["RSI@tv-basicstudies"],
-  "MACD":  ["MACD@tv-basicstudies"],
-  "BB":    ["BollingerBands@tv-basicstudies"],
-  "Vol":   ["Volume@tv-basicstudies"],
-};
+// ── Chart type options ───────────────────────────────────────────────────────
+const CHART_TYPES: { id: ChartType; label: string }[] = [
+  { id: "Candlestick", label: "Candles" },
+  { id: "Bar",         label: "OHLC Bars" },
+  { id: "Line",        label: "Line" },
+  { id: "Area",        label: "Area" },
+  { id: "Baseline",    label: "Baseline" },
+];
+
+// ── Indicator definitions (multi-select) ─────────────────────────────────────
+const INDICATOR_DEFS: { id: IndicatorId; label: string; color: string }[] = [
+  { id: "SMA",  label: "SMA (20)",             color: "#F5C842" },
+  { id: "EMA",  label: "EMA (20)",             color: "#E040FB" },
+  { id: "BB",   label: "Bollinger Bands (20)",  color: "#42A5F5" },
+  { id: "VWAP", label: "VWAP",                 color: "#CE93D8" },
+  { id: "RSI",  label: "RSI (14)",             color: "#2196F3" },
+  { id: "MACD", label: "MACD (12,26,9)",       color: "#FF9800" },
+];
+
+// ── Drawing tool groups (left panel with flyout sub-menus) ───────────────────
+interface ToolDef { id: DrawingTool; icon: LucideIcon; label: string }
+interface ToolGroup { groupId: string; tools: ToolDef[] }
+
+const TOOL_GROUPS: ToolGroup[] = [
+  {
+    groupId: "cursor",
+    tools: [
+      { id: "cursor",    icon: MousePointer2, label: "Pointer" },
+      { id: "crosshair", icon: Crosshair,     label: "Crosshair" },
+    ],
+  },
+  {
+    groupId: "lines",
+    tools: [
+      { id: "trendline",     icon: TrendingUp,     label: "Trend Line" },
+      { id: "ray",           icon: MoveUpRight,     label: "Ray" },
+      { id: "extended_line", icon: MoveHorizontal,  label: "Extended Line" },
+      { id: "hline",         icon: Minus,           label: "Horizontal Line" },
+      { id: "vline",         icon: GripVertical,    label: "Vertical Line" },
+      { id: "arrow",         icon: ArrowUpRight,    label: "Arrow" },
+    ],
+  },
+  {
+    groupId: "channels",
+    tools: [
+      { id: "parallel_channel",   icon: Spline,    label: "Parallel Channel" },
+      { id: "regression_channel", icon: TrendingDown, label: "Regression Channel" },
+    ],
+  },
+  {
+    groupId: "fibonacci",
+    tools: [
+      { id: "fib_retrace",   icon: GitBranch,  label: "Fib Retracement" },
+      { id: "fib_extension",  icon: GitBranch,  label: "Fib Extension" },
+      { id: "fib_channel",    icon: GitBranch,  label: "Fib Channel" },
+      { id: "fib_time_zone",  icon: GitBranch,  label: "Fib Time Zone" },
+    ],
+  },
+  {
+    groupId: "shapes",
+    tools: [
+      { id: "rect",     icon: Square,   label: "Rectangle" },
+      { id: "circle",   icon: Circle,   label: "Circle" },
+      { id: "ellipse",  icon: Hexagon,  label: "Ellipse" },
+      { id: "triangle", icon: Triangle, label: "Triangle" },
+      { id: "arc",      icon: Spline,   label: "Arc" },
+    ],
+  },
+  {
+    groupId: "patterns",
+    tools: [
+      { id: "xabcd",           icon: Diamond,  label: "XABCD Pattern" },
+      { id: "head_shoulders",  icon: Waves,    label: "Head & Shoulders" },
+      { id: "cypher",          icon: Diamond,  label: "Cypher Pattern" },
+    ],
+  },
+  {
+    groupId: "forecasting",
+    tools: [
+      { id: "long_position",  icon: ArrowUp,    label: "Long Position" },
+      { id: "short_position", icon: ArrowDown,   label: "Short Position" },
+      { id: "projection",     icon: Target,      label: "Projection" },
+    ],
+  },
+  {
+    groupId: "annotations",
+    tools: [
+      { id: "text",           icon: Type,     label: "Text" },
+      { id: "callout",        icon: Tag,      label: "Callout" },
+      { id: "price_label",    icon: Hash,     label: "Price Label" },
+      { id: "note",           icon: PenLine,  label: "Note" },
+      { id: "anchored_note",  icon: PenLine,  label: "Anchored Note" },
+    ],
+  },
+  {
+    groupId: "measurement",
+    tools: [
+      { id: "price_range",      icon: Ruler, label: "Price Range" },
+      { id: "date_range",       icon: Ruler, label: "Date Range" },
+      { id: "date_price_range", icon: Ruler, label: "Date & Price Range" },
+    ],
+  },
+];
 
 interface ChartSectionProps {
   symbol?: string;
@@ -66,30 +176,41 @@ function fmtVol(v: number): string {
   return `$${v.toFixed(0)}`;
 }
 
-type ChartMode = "tradingview" | "overlay";
 type PriceType = "Last" | "Mark" | "Index";
 
 export default function ChartSection({ symbol = "ETH", orders = [], positions = [], tokenPriceData, currentPrice }: ChartSectionProps) {
   const [activeTab, setActiveTab] = useState("Chart");
   const [activeTimeframe, setActiveTimeframe] = useState("15m");
   const [utcClock, setUtcClock] = useState("");
-  const [chartMode, setChartMode] = useState<ChartMode>("tradingview");
-  const [tvFailed, setTvFailed] = useState(false);
+  const [chartType, setChartType] = useState<ChartType>("Candlestick");
+  const [activeIndicators, setActiveIndicators] = useState<IndicatorId[]>([]);
+  const [drawingTool, setDrawingTool] = useState<DrawingTool>("cursor");
   const [showOrderLines, setShowOrderLines] = useState(true);
-  const [showIndicatorMenu, setShowIndicatorMenu] = useState(false);
-  const [activeIndicator, setActiveIndicator] = useState("None");
   const [priceType, setPriceType] = useState<PriceType>("Last");
   const [activeRange, setActiveRange] = useState<string | null>(null);
   const [isLogScale, setIsLogScale] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showChartTypeMenu, setShowChartTypeMenu] = useState(false);
+  const [showIndicatorMenu, setShowIndicatorMenu] = useState(false);
+  const [hoveredGroup, setHoveredGroup] = useState<string | null>(null);
+  const [drawingsVisible, setDrawingsVisible] = useState(true);
+  const [drawingsLocked, setDrawingsLocked] = useState(false);
+  // Track the last-selected tool per group so the primary button shows the right icon
+  const [selectedPerGroup, setSelectedPerGroup] = useState<Record<string, string>>(() => {
+    const init: Record<string, string> = {};
+    for (const g of TOOL_GROUPS) init[g.groupId] = g.tools[0].id;
+    return init;
+  });
 
   const chartContainerRef = useRef<HTMLDivElement>(null);
+  const chartTypeMenuRef = useRef<HTMLDivElement>(null);
   const indicatorMenuRef = useRef<HTMLDivElement>(null);
+  const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // ── Real candle data from Binance via API (for OHLCV bar + overlay mode) ──
+  // ── Candle data ───────────────────────────────────────────────────────────
   const { candles, loading } = useCandleData(symbol, activeTimeframe, currentPrice);
 
-  // ── Derive OHLCV from the latest candle for the info bar ──────────────────
+  // ── OHLCV info bar ────────────────────────────────────────────────────────
   const lastCandle = candles.length > 0 ? candles[candles.length - 1] : null;
   const firstCandle = candles.length > 0 ? candles[0] : null;
 
@@ -106,11 +227,6 @@ export default function ChartSection({ symbol = "ETH", orders = [], positions = 
     return { open: firstCandle.open, high, low, close: lastCandle.close, change, changePct, volume: vol };
   }, [candles, lastCandle, firstCandle]);
 
-  // If TradingView fails to load, fall back to lightweight-charts
-  useEffect(() => {
-    if (tvFailed && chartMode === "tradingview") setChartMode("overlay");
-  }, [tvFailed, chartMode]);
-
   // UTC clock
   useEffect(() => {
     const tick = () => setUtcClock(new Date().toISOString().slice(11, 19) + " [UTC]");
@@ -119,17 +235,16 @@ export default function ChartSection({ symbol = "ETH", orders = [], positions = 
     return () => clearInterval(id);
   }, []);
 
-  // Close indicator menu on outside click
+  // Close menus on outside click
   useEffect(() => {
-    if (!showIndicatorMenu) return;
+    if (!showChartTypeMenu && !showIndicatorMenu) return;
     const handler = (e: MouseEvent) => {
-      if (indicatorMenuRef.current && !indicatorMenuRef.current.contains(e.target as Node)) {
-        setShowIndicatorMenu(false);
-      }
+      if (chartTypeMenuRef.current && !chartTypeMenuRef.current.contains(e.target as Node)) setShowChartTypeMenu(false);
+      if (indicatorMenuRef.current && !indicatorMenuRef.current.contains(e.target as Node)) setShowIndicatorMenu(false);
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
-  }, [showIndicatorMenu]);
+  }, [showChartTypeMenu, showIndicatorMenu]);
 
   // Track fullscreen exit
   useEffect(() => {
@@ -138,28 +253,17 @@ export default function ChartSection({ symbol = "ETH", orders = [], positions = 
     return () => document.removeEventListener("fullscreenchange", handler);
   }, []);
 
-  // ── Chart controls ────────────────────────────────────────────────────────
+  // ── Actions ───────────────────────────────────────────────────────────────
   const handleFullscreen = useCallback(() => {
     const el = chartContainerRef.current;
     if (!el) return;
-    if (document.fullscreenElement) {
-      document.exitFullscreen();
-      setIsFullscreen(false);
-    } else {
-      el.requestFullscreen().then(() => setIsFullscreen(true)).catch(() => {});
-    }
+    if (document.fullscreenElement) { document.exitFullscreen(); setIsFullscreen(false); }
+    else { el.requestFullscreen().then(() => setIsFullscreen(true)).catch(() => {}); }
   }, []);
 
   const handleScreenshot = useCallback(() => {
     const el = chartContainerRef.current;
     if (!el) return;
-    // For TradingView mode: the iframe doesn't allow cross-origin capture.
-    // We open a visual prompt instead. The TV widget's own screenshot button works.
-    if (chartMode === "tradingview") {
-      alert("Tip: Right-click the TradingView chart and select 'Take a snapshot' for a high-quality screenshot, or use the camera icon in the TradingView drawing toolbar.");
-      return;
-    }
-    // For overlay mode: use canvas toBlob
     const canvas = el.querySelector("canvas");
     if (!canvas) return;
     canvas.toBlob((blob) => {
@@ -171,199 +275,160 @@ export default function ChartSection({ symbol = "ETH", orders = [], positions = 
       a.click();
       URL.revokeObjectURL(url);
     });
-  }, [chartMode, symbol, activeTimeframe]);
+  }, [symbol, activeTimeframe]);
 
-  const handleReset = useCallback(() => {
-    // Force re-render by toggling a key suffix
-    setActiveRange(null);
+  const toggleIndicator = useCallback((id: IndicatorId) => {
+    setActiveIndicators((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
   }, []);
 
   const handleRangeClick = useCallback((range: string) => {
-    const mapping = RANGE_TO_TF[range];
-    if (mapping) {
-      setActiveTimeframe(mapping.tf);
-      setActiveRange(range);
-    }
+    const m = RANGE_TO_TF[range];
+    if (m) { setActiveTimeframe(m.tf); setActiveRange(range); }
   }, []);
 
-  const handleIndicatorSelect = useCallback((name: string) => {
-    setActiveIndicator(name);
-    setShowIndicatorMenu(false);
-    // In overlay mode, indicators are not supported
-    if (chartMode === "overlay") {
-      setChartMode("tradingview");
-    }
-  }, [chartMode]);
+  const selectToolFromGroup = useCallback((groupId: string, toolId: DrawingTool) => {
+    setSelectedPerGroup((prev) => ({ ...prev, [groupId]: toolId }));
+    setDrawingTool(toolId);
+    setHoveredGroup(null);
+  }, []);
 
-  const tvStudies = useMemo(() => INDICATOR_PRESETS[activeIndicator] ?? [], [activeIndicator]);
+  const handleClearDrawings = useCallback(() => {
+    // After erase_all finishes, reset back to cursor
+    setDrawingTool("cursor");
+  }, []);
 
   const displayPrice = currentPrice && currentPrice > 0 ? currentPrice : (ohlcInfo?.close ?? 0);
 
+  // ── Indicator badge text ──────────────────────────────────────────────────
+  const indicatorBadge = activeIndicators.length > 0 ? activeIndicators.join(", ") : "Indicators";
+
+  // Style helpers
+  const bdr = "1px solid rgba(66,70,84,0.4)";
+  const toolBtn = (active: boolean) => ({
+    color: active ? "var(--on-surface)" : "var(--on-surface-disabled)",
+    background: active ? "var(--surface-container-high)" : "transparent",
+  });
+
   return (
-    <div
-      ref={chartContainerRef}
-      className="flex flex-col h-full"
-      style={{ background: "var(--surface-container-lowest)", borderRight: "1px solid rgba(66,70,84,0.4)" }}
-    >
-      {/* ── Chart Tabs ─────────────────────────────────────────────────────── */}
-      <div className="flex items-center px-2" style={{ borderBottom: "1px solid rgba(66,70,84,0.4)" }}>
+    <div ref={chartContainerRef} className="flex flex-col h-full" style={{ background: "var(--surface-container-lowest)", borderRight: bdr }}>
+
+      {/* ── Chart Tabs ───────────────────────────────────────────────────── */}
+      <div className="flex items-center px-2" style={{ borderBottom: bdr }}>
         {chartTabs.map((tab) => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className="px-3 py-2.5 text-[12px] transition-colors"
-            style={{
-              color: activeTab === tab ? "var(--on-surface)" : "var(--on-surface-disabled)",
-              borderBottom: activeTab === tab ? "2px solid var(--primary)" : "2px solid transparent",
-            }}
-          >
+          <button key={tab} onClick={() => setActiveTab(tab)} className="px-3 py-2.5 text-[12px] transition-colors"
+            style={{ color: activeTab === tab ? "var(--on-surface)" : "var(--on-surface-disabled)", borderBottom: activeTab === tab ? "2px solid var(--primary)" : "2px solid transparent" }}>
             {tab}
           </button>
         ))}
-
-        {/* Right side: Price type selector + chart mode toggle */}
         <div className="ml-auto flex items-center gap-1">
           {(["Last", "Mark", "Index"] as PriceType[]).map((label) => (
-            <button
-              key={label}
-              onClick={() => setPriceType(label)}
-              className="px-2 py-1 text-[11px] rounded transition-colors"
-              style={{
-                color: priceType === label ? "var(--on-surface)" : "var(--on-surface-disabled)",
-                background: priceType === label ? "var(--surface-container-high)" : "transparent",
-              }}
-            >
+            <button key={label} onClick={() => setPriceType(label)} className="px-2 py-1 text-[11px] rounded transition-colors" style={toolBtn(priceType === label)}>
               {label}
             </button>
           ))}
-          <div className="w-px h-4 mx-1" style={{ background: "rgba(66,70,84,0.4)" }} />
-          <button
-            onClick={() => setChartMode(chartMode === "tradingview" ? "overlay" : "tradingview")}
-            className="px-2 py-1 text-[10px] rounded transition-colors flex items-center gap-1"
-            style={{
-              color: chartMode === "overlay" ? "var(--primary)" : "var(--on-surface-disabled)",
-              background: chartMode === "overlay" ? "rgba(14,118,253,0.1)" : "transparent",
-            }}
-            title={chartMode === "tradingview" ? "Switch to Overlay mode (positions/orders on chart)" : "Switch to TradingView (full indicators & tools)"}
-          >
-            <Layers size={12} />
-            {chartMode === "overlay" ? "OVL" : "TV"}
-          </button>
         </div>
       </div>
 
-      {/* ── Timeframe + Tools ──────────────────────────────────────────────── */}
-      <div className="flex items-center gap-1 px-2 py-1.5" style={{ borderBottom: "1px solid rgba(66,70,84,0.4)" }}>
+      {/* ── Timeframe + Chart type + Indicators + Tools ──────────────────── */}
+      <div className="flex items-center gap-1 px-2 py-1.5" style={{ borderBottom: bdr }}>
         {timeframes.map((tf) => (
-          <button
-            key={tf}
-            onClick={() => { setActiveTimeframe(tf); setActiveRange(null); }}
-            className="px-2 py-1 text-[11px] rounded transition-colors"
-            style={{
-              color: activeTimeframe === tf ? "var(--on-surface)" : "var(--on-surface-disabled)",
-              background: activeTimeframe === tf ? "var(--surface-container-high)" : "transparent",
-            }}
-          >
+          <button key={tf} onClick={() => { setActiveTimeframe(tf); setActiveRange(null); }}
+            className="px-2 py-1 text-[11px] rounded transition-colors" style={toolBtn(activeTimeframe === tf)}>
             {tf}
           </button>
         ))}
 
         <div className="w-px h-4 mx-1" style={{ background: "rgba(66,70,84,0.4)" }} />
 
-        {/* Indicators dropdown */}
-        <div className="relative" ref={indicatorMenuRef}>
-          <button
-            onClick={() => setShowIndicatorMenu(!showIndicatorMenu)}
+        {/* Chart type dropdown */}
+        <div className="relative" ref={chartTypeMenuRef}>
+          <button onClick={() => { setShowChartTypeMenu(!showChartTypeMenu); setShowIndicatorMenu(false); }}
             className="px-2 py-1 text-[11px] rounded transition-colors flex items-center gap-1"
-            style={{
-              color: activeIndicator !== "None" ? "var(--primary)" : "var(--on-surface-disabled)",
-              background: activeIndicator !== "None" ? "rgba(14,118,253,0.1)" : "transparent",
-            }}
-          >
-            <TrendingUp size={12} />
-            {activeIndicator !== "None" ? activeIndicator : "Indicators"}
+            style={{ color: "var(--on-surface-disabled)" }}>
+            {CHART_TYPES.find((t) => t.id === chartType)?.label ?? "Candles"}
+            <ChevronDown size={10} />
           </button>
-          {showIndicatorMenu && (
-            <div
-              className="absolute top-full left-0 mt-1 z-50 rounded-md shadow-lg py-1 min-w-[140px]"
-              style={{ background: "var(--surface-container-high)", border: "1px solid rgba(66,70,84,0.6)" }}
-            >
-              {Object.keys(INDICATOR_PRESETS).map((name) => (
-                <button
-                  key={name}
-                  onClick={() => handleIndicatorSelect(name)}
-                  className="w-full text-left px-3 py-1.5 text-[11px] transition-colors"
-                  style={{
-                    color: activeIndicator === name ? "var(--primary)" : "var(--on-surface)",
-                    background: activeIndicator === name ? "rgba(14,118,253,0.08)" : "transparent",
-                  }}
-                  onMouseEnter={(e) => { (e.target as HTMLElement).style.background = "rgba(66,70,84,0.3)"; }}
-                  onMouseLeave={(e) => { (e.target as HTMLElement).style.background = activeIndicator === name ? "rgba(14,118,253,0.08)" : "transparent"; }}
-                >
-                  {name === "None" ? "No Indicators" : name === "MA" ? "Moving Averages (SMA + EMA)" : name === "BB" ? "Bollinger Bands" : name === "Vol" ? "Volume Profile" : name}
+          {showChartTypeMenu && (
+            <div className="absolute top-full left-0 mt-1 z-50 rounded-md shadow-lg py-1 min-w-[120px]" style={{ background: "var(--surface-container-high)", border: "1px solid rgba(66,70,84,0.6)" }}>
+              {CHART_TYPES.map(({ id, label }) => (
+                <button key={id} onClick={() => { setChartType(id); setShowChartTypeMenu(false); }}
+                  className="w-full text-left px-3 py-1.5 text-[11px] transition-colors hover:bg-white/5"
+                  style={{ color: chartType === id ? "var(--primary)" : "var(--on-surface)", background: chartType === id ? "rgba(14,118,253,0.08)" : "transparent" }}>
+                  {label}
                 </button>
               ))}
             </div>
           )}
         </div>
 
-        {/* Order Lines toggle */}
-        <button
-          onClick={() => setShowOrderLines(!showOrderLines)}
+        {/* Indicators dropdown (multi-select) */}
+        <div className="relative" ref={indicatorMenuRef}>
+          <button onClick={() => { setShowIndicatorMenu(!showIndicatorMenu); setShowChartTypeMenu(false); }}
+            className="px-2 py-1 text-[11px] rounded transition-colors flex items-center gap-1"
+            style={{ color: activeIndicators.length > 0 ? "var(--primary)" : "var(--on-surface-disabled)", background: activeIndicators.length > 0 ? "rgba(14,118,253,0.1)" : "transparent" }}>
+            <TrendingUp size={12} />
+            {indicatorBadge}
+            <ChevronDown size={10} />
+          </button>
+          {showIndicatorMenu && (
+            <div className="absolute top-full left-0 mt-1 z-50 rounded-md shadow-lg py-1 min-w-[180px]" style={{ background: "var(--surface-container-high)", border: "1px solid rgba(66,70,84,0.6)" }}>
+              {INDICATOR_DEFS.map(({ id, label, color }) => {
+                const active = activeIndicators.includes(id);
+                return (
+                  <button key={id} onClick={() => toggleIndicator(id)}
+                    className="w-full text-left px-3 py-1.5 text-[11px] flex items-center gap-2 transition-colors hover:bg-white/5"
+                    style={{ color: active ? "var(--primary)" : "var(--on-surface)" }}>
+                    <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: active ? color : "transparent", border: active ? "none" : `1px solid ${color}` }} />
+                    {label}
+                    {active && <span className="ml-auto text-[10px] opacity-60">ON</span>}
+                  </button>
+                );
+              })}
+              {activeIndicators.length > 0 && (
+                <>
+                  <div className="h-px my-1" style={{ background: "rgba(66,70,84,0.4)" }} />
+                  <button onClick={() => setActiveIndicators([])}
+                    className="w-full text-left px-3 py-1.5 text-[11px] transition-colors hover:bg-white/5"
+                    style={{ color: "var(--sell)" }}>
+                    Clear all
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* OL toggle */}
+        <button onClick={() => setShowOrderLines(!showOrderLines)}
           className="px-1.5 py-1 text-[11px] rounded font-semibold transition-colors"
-          style={{
-            color: showOrderLines ? "var(--tertiary)" : "var(--on-surface-disabled)",
-            background: showOrderLines ? "rgba(255,182,143,0.1)" : "transparent",
-          }}
-          title={showOrderLines ? "Hide order/position lines" : "Show order/position lines"}
-        >
+          style={{ color: showOrderLines ? "var(--tertiary)" : "var(--on-surface-disabled)", background: showOrderLines ? "rgba(255,182,143,0.1)" : "transparent" }}
+          title={showOrderLines ? "Hide order/position lines" : "Show order/position lines"}>
           OL
         </button>
 
-        {/* Trading Events toggle */}
-        <button
-          className="px-1.5 py-1 text-[11px] rounded transition-colors"
-          style={{ color: "var(--on-surface-disabled)" }}
-          title="Trading events (coming soon)"
-        >
-          TE
-        </button>
-
         <div className="ml-auto flex items-center gap-0.5">
-          {[
-            { icon: <Crosshair size={14} />, title: "Crosshair", action: () => {} },
-            { icon: <Ruler size={14} />, title: "Measure", action: () => {} },
-            { icon: <BarChart3 size={14} />, title: "Chart type", action: () => {} },
-            { icon: <Camera size={14} />, title: "Screenshot", action: handleScreenshot },
-            { icon: <Maximize2 size={14} />, title: isFullscreen ? "Exit Fullscreen" : "Fullscreen", action: handleFullscreen },
-          ].map(({ icon, title, action }) => (
-            <button
-              key={title}
-              onClick={action}
-              className="p-1 rounded transition-colors"
-              style={{ color: "var(--on-surface-disabled)" }}
-              title={title}
-              onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.color = "var(--on-surface)")}
-              onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.color = "var(--on-surface-disabled)")}
-            >
-              {icon}
-            </button>
-          ))}
-          <button
-            onClick={handleReset}
-            className="px-2 py-1 text-[11px] rounded transition-colors"
-            style={{ color: "var(--on-surface-disabled)" }}
-            title="Reset chart view"
+          <button onClick={handleScreenshot} className="p-1 rounded transition-colors" style={{ color: "var(--on-surface-disabled)" }} title="Screenshot"
             onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.color = "var(--on-surface)")}
-            onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.color = "var(--on-surface-disabled)")}
-          >
+            onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.color = "var(--on-surface-disabled)")}>
+            <Camera size={14} />
+          </button>
+          <button onClick={handleFullscreen} className="p-1 rounded transition-colors" style={{ color: "var(--on-surface-disabled)" }} title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
+            onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.color = "var(--on-surface)")}
+            onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.color = "var(--on-surface-disabled)")}>
+            <Maximize2 size={14} />
+          </button>
+          <button onClick={() => setActiveRange(null)} className="p-1 rounded transition-colors" style={{ color: "var(--on-surface-disabled)" }} title="Reset"
+            onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.color = "var(--on-surface)")}
+            onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.color = "var(--on-surface-disabled)")}>
             <RotateCcw size={14} />
           </button>
         </div>
       </div>
 
-      {/* ── OHLCV info bar ─────────────────────────────────────────────────── */}
-      <div className="flex items-center gap-2 px-3 py-1 text-[11px]" style={{ color: "var(--on-surface-disabled)", borderBottom: "1px solid rgba(66,70,84,0.4)" }}>
+      {/* ── OHLCV info bar ───────────────────────────────────────────────── */}
+      <div className="flex items-center gap-2 px-3 py-1 text-[11px]" style={{ color: "var(--on-surface-disabled)", borderBottom: bdr }}>
         <span style={{ color: "var(--on-surface)" }}>{symbol}-PERP · {activeTimeframe} · Cyclespace</span>
         <span style={{ color: "var(--on-surface-muted)" }}>·</span>
         {ohlcInfo ? (
@@ -372,96 +437,189 @@ export default function ChartSection({ symbol = "ETH", orders = [], positions = 
               O <span style={{ color: "var(--on-surface)" }}>{formatPrice(ohlcInfo.open)}</span>{" "}
               H <span style={{ color: "var(--on-surface)" }}>{formatPrice(ohlcInfo.high)}</span>{" "}
               L <span style={{ color: "var(--on-surface)" }}>{formatPrice(ohlcInfo.low)}</span>{" "}
-              C <span style={{ color: ohlcInfo.change >= 0 ? "var(--buy)" : "var(--sell)" }}>
-                {formatPrice(displayPrice)}
-              </span>
+              C <span style={{ color: ohlcInfo.change >= 0 ? "var(--buy)" : "var(--sell)" }}>{formatPrice(displayPrice)}</span>
             </span>
             <span style={{ color: ohlcInfo.change >= 0 ? "var(--buy)" : "var(--sell)" }}>
               {ohlcInfo.change >= 0 ? "+" : ""}{formatPrice(ohlcInfo.change)} ({ohlcInfo.changePct.toFixed(2)}%)
             </span>
-            <span style={{ color: "var(--on-surface-disabled)" }}>
-              Vol <span style={{ color: "var(--on-surface-muted)" }}>{fmtVol(ohlcInfo.volume)}</span>
-            </span>
+            <span>Vol <span style={{ color: "var(--on-surface-muted)" }}>{fmtVol(ohlcInfo.volume)}</span></span>
           </>
         ) : tokenPriceData ? (
           <span>
             O <span style={{ color: "var(--on-surface)" }}>{formatPrice(tokenPriceData.openPrice ?? tokenPriceData.price)}</span>{" "}
             H <span style={{ color: "var(--on-surface)" }}>{formatPrice(tokenPriceData.high24h)}</span>{" "}
             L <span style={{ color: "var(--on-surface)" }}>{formatPrice(tokenPriceData.low24h)}</span>{" "}
-            C <span style={{ color: tokenPriceData.change24h >= 0 ? "var(--buy)" : "var(--sell)" }}>
-              {formatPrice(displayPrice || tokenPriceData.price)}
-            </span>
+            C <span style={{ color: tokenPriceData.change24h >= 0 ? "var(--buy)" : "var(--sell)" }}>{formatPrice(displayPrice || tokenPriceData.price)}</span>
           </span>
         ) : null}
       </div>
 
-      {/* ── Chart Area ─────────────────────────────────────────────────────── */}
-      <div className="flex-1 relative min-h-0">
-        {activeTab === "Chart" ? (
-          chartMode === "tradingview" && !tvFailed ? (
-            <TradingViewWidget
-              key={`${symbol}-${activeTimeframe}-${activeIndicator}-${activeRange ?? "x"}`}
-              symbol={symbol}
-              interval={activeTimeframe}
-              studies={tvStudies}
-              onReady={() => setTvFailed(false)}
-              onError={() => setTvFailed(true)}
-            />
-          ) : (
-            <CandlestickChart
-              key={`${symbol}-${activeTimeframe}`}
-              candles={candles}
-              orders={showOrderLines ? orders : []}
-              positions={showOrderLines ? positions : []}
-              currentPrice={currentPrice}
-              loading={loading}
-            />
-          )
-        ) : (
-          <div className="flex items-center justify-center h-full text-[13px]" style={{ color: "var(--on-surface-disabled)" }}>
-            {activeTab} — Coming soon
+      {/* ── Chart Area = LEFT DRAWING PANEL + CHART ──────────────────────── */}
+      <div className="flex-1 flex min-h-0">
+        {/* Left drawing tools panel — grouped with flyout sub-menus */}
+        {activeTab === "Chart" && (
+          <div
+            className="flex flex-col items-center py-1.5 gap-0.5 overflow-y-auto scrollbar-none"
+            style={{ width: 38, borderRight: bdr, flexShrink: 0 }}
+          >
+            {TOOL_GROUPS.map((group) => {
+              const selectedId = selectedPerGroup[group.groupId] ?? group.tools[0].id;
+              const selectedTool = group.tools.find((t) => t.id === selectedId) ?? group.tools[0];
+              const PrimaryIcon = selectedTool.icon;
+              const isActive = group.tools.some((t) => t.id === drawingTool);
+              const isHovered = hoveredGroup === group.groupId;
+              const hasMultiple = group.tools.length > 1;
+
+              return (
+                <div
+                  key={group.groupId}
+                  className="relative"
+                  onMouseEnter={() => {
+                    if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+                    if (hasMultiple) setHoveredGroup(group.groupId);
+                  }}
+                  onMouseLeave={() => {
+                    hoverTimeoutRef.current = setTimeout(() => setHoveredGroup(null), 200);
+                  }}
+                >
+                  {/* Primary button — shows the last-selected tool from this group */}
+                  <button
+                    onClick={() => {
+                      setDrawingTool(selectedTool.id as DrawingTool);
+                    }}
+                    className="p-1.5 rounded transition-colors relative"
+                    title={selectedTool.label}
+                    style={{
+                      color: isActive ? "var(--primary)" : "var(--on-surface-disabled)",
+                      background: isActive ? "rgba(14,118,253,0.12)" : "transparent",
+                    }}
+                  >
+                    <PrimaryIcon size={15} />
+                    {/* Small triangle indicator for groups with multiple tools */}
+                    {hasMultiple && (
+                      <span
+                        className="absolute bottom-0.5 right-0.5"
+                        style={{ width: 0, height: 0, borderLeft: "3px solid transparent", borderRight: "3px solid transparent", borderTop: "3px solid currentColor", opacity: 0.5 }}
+                      />
+                    )}
+                  </button>
+
+                  {/* Flyout sub-menu */}
+                  {isHovered && hasMultiple && (
+                    <div
+                      className="absolute left-full top-0 ml-1 z-50 rounded-md shadow-lg py-1 min-w-[160px]"
+                      style={{ background: "var(--surface-container-high)", border: "1px solid rgba(66,70,84,0.6)" }}
+                      onMouseEnter={() => {
+                        if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+                      }}
+                      onMouseLeave={() => {
+                        hoverTimeoutRef.current = setTimeout(() => setHoveredGroup(null), 200);
+                      }}
+                    >
+                      {group.tools.map(({ id, icon: ToolIcon, label }) => (
+                        <button
+                          key={id}
+                          onClick={() => selectToolFromGroup(group.groupId, id as DrawingTool)}
+                          className="w-full text-left px-3 py-1.5 text-[11px] flex items-center gap-2 transition-colors hover:bg-white/5"
+                          style={{
+                            color: drawingTool === id ? "var(--primary)" : "var(--on-surface)",
+                            background: drawingTool === id ? "rgba(14,118,253,0.08)" : "transparent",
+                          }}
+                        >
+                          <ToolIcon size={13} />
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+
+            {/* Separator */}
+            <div className="h-px w-5 my-0.5" style={{ background: "rgba(66,70,84,0.4)" }} />
+
+            {/* Erase all */}
+            <button
+              onClick={() => setDrawingTool("erase_all")}
+              className="p-1.5 rounded transition-colors"
+              title="Erase all drawings"
+              style={{ color: "var(--on-surface-disabled)" }}
+              onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.color = "var(--sell)")}
+              onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.color = "var(--on-surface-disabled)")}
+            >
+              <Trash2 size={15} />
+            </button>
+
+            {/* Toggle visibility */}
+            <button
+              onClick={() => setDrawingsVisible(!drawingsVisible)}
+              className="p-1.5 rounded transition-colors"
+              title={drawingsVisible ? "Hide drawings" : "Show drawings"}
+              style={{ color: drawingsVisible ? "var(--on-surface-disabled)" : "var(--primary)" }}
+            >
+              {drawingsVisible ? <Eye size={15} /> : <EyeOff size={15} />}
+            </button>
+
+            {/* Lock */}
+            <button
+              onClick={() => setDrawingsLocked(!drawingsLocked)}
+              className="p-1.5 rounded transition-colors"
+              title={drawingsLocked ? "Unlock drawings" : "Lock drawings"}
+              style={{ color: drawingsLocked ? "var(--primary)" : "var(--on-surface-disabled)" }}
+            >
+              <Lock size={15} />
+            </button>
           </div>
         )}
+
+        {/* Chart */}
+        <div className="flex-1 relative min-h-0 min-w-0">
+          {activeTab === "Chart" ? (
+            <CandlestickChart
+              key={`${symbol}-${activeTimeframe}-${chartType}`}
+              candles={candles}
+              chartType={chartType}
+              indicators={activeIndicators}
+              logScale={isLogScale}
+              drawingTool={drawingsLocked ? "cursor" : drawingTool}
+              showOrderLines={showOrderLines}
+              orders={orders}
+              positions={positions}
+              currentPrice={currentPrice}
+              loading={loading}
+              onClearDrawings={handleClearDrawings}
+            />
+          ) : (
+            <div className="flex items-center justify-center h-full text-[13px]" style={{ color: "var(--on-surface-disabled)" }}>
+              {activeTab} — Coming soon
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* ── Bottom bar ─────────────────────────────────────────────────────── */}
-      <div className="flex items-center gap-2 px-3 py-1.5 text-[11px]" style={{ borderTop: "1px solid rgba(66,70,84,0.4)" }}>
+      {/* ── Bottom bar ───────────────────────────────────────────────────── */}
+      <div className="flex items-center gap-2 px-3 py-1.5 text-[11px]" style={{ borderTop: bdr }}>
         {Object.keys(RANGE_TO_TF).reverse().map((range) => (
-          <button
-            key={range}
-            onClick={() => handleRangeClick(range)}
-            className="transition-colors"
-            style={{
-              color: activeRange === range ? "var(--on-surface)" : "var(--on-surface-disabled)",
-              fontWeight: activeRange === range ? 600 : 400,
-            }}
+          <button key={range} onClick={() => handleRangeClick(range)} className="transition-colors"
+            style={{ color: activeRange === range ? "var(--on-surface)" : "var(--on-surface-disabled)", fontWeight: activeRange === range ? 600 : 400 }}
             title={RANGE_TO_TF[range].label}
             onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.color = "var(--on-surface)")}
-            onMouseLeave={(e) => {
-              if (activeRange !== range) (e.currentTarget as HTMLElement).style.color = "var(--on-surface-disabled)";
-            }}
-          >
+            onMouseLeave={(e) => { if (activeRange !== range) (e.currentTarget as HTMLElement).style.color = "var(--on-surface-disabled)"; }}>
             {range}
           </button>
         ))}
         <div className="ml-auto flex items-center gap-2">
           <span style={{ color: "var(--on-surface-disabled)" }}>{utcClock}</span>
-          <button
-            onClick={() => setIsLogScale(!isLogScale)}
-            className="transition-colors"
+          <button onClick={() => setIsLogScale(!isLogScale)} className="transition-colors"
             style={{ color: isLogScale ? "var(--primary)" : "var(--on-surface-disabled)" }}
-            title={isLogScale ? "Switch to linear scale" : "Switch to log scale"}
-          >
+            title={isLogScale ? "Switch to linear scale" : "Switch to log scale"}>
             log
           </button>
-          <button
-            onClick={handleReset}
-            className="transition-colors"
-            style={{ color: "var(--on-surface-disabled)" }}
-            title="Auto-fit content"
+          <button onClick={() => setActiveRange(null)} className="transition-colors"
+            style={{ color: "var(--on-surface-disabled)" }} title="Auto-fit content"
             onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.color = "var(--on-surface)")}
-            onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.color = "var(--on-surface-disabled)")}
-          >
+            onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.color = "var(--on-surface-disabled)")}>
             auto
           </button>
         </div>
