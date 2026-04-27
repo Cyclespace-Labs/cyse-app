@@ -291,7 +291,9 @@ export async function POST(req: NextRequest) {
           executionFee.toString(),
           isEthCollateral,
         ],
-        value: (collateralAmountRaw + executionFee).toString(),
+        value: isEthCollateral
+          ? (collateralAmountRaw + executionFee).toString()
+          : executionFee.toString(),
       };
     } else if (orderType === "decrease") {
       // OrderBook.createDecreaseOrder

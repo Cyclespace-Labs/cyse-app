@@ -1,43 +1,125 @@
 "use client";
 
-import { useVaultPosition } from "./useVaultPosition";
+import { useReadContracts, useAccount } from "wagmi";
 import { contracts } from "@/lib/protocol/contracts";
 import { Position } from "@/types/trading";
+import { useMemo } from "react";
+import { formatUnits } from "viem";
+import type { Abi } from "viem";
 
-type VaultPos = NonNullable<ReturnType<typeof useVaultPosition>["position"]>;
-
-function toUIPosition(pos: VaultPos, symbol: string, isLong: boolean): Position {
-  const leverage = pos.collateralUsd > 0 ? pos.sizeUsd / pos.collateralUsd : 1;
-  return {
-    id: `${symbol}-${isLong ? "long" : "short"}`,
-    symbol: `${symbol}-PERP`,
-    side: isLong ? "long" : "short",
-    entryPrice: pos.avgPriceFormatted,
-    quantity: pos.sizeUsd,
-    leverage: parseFloat(leverage.toFixed(2)),
-    liquidationPrice: pos.liquidationPrice,
-    unrealizedPnl: pos.unrealizedPnlUsd,
-    unrealizedPnlPct: pos.unrealizedPnlPct,
-    margin: pos.collateralUsd,
-    createdAt: Number(pos.lastIncreasedTime),
-  };
+function fmt30(raw: bigint): number {
+  return parseFloat(formatUnits(raw, 30));
 }
 
+// All valid (collateral, index, direction) combos the Vault can hold.
+const COMBOS = [
+  { collateral: contracts.weth.address, index: contracts.weth.address, symbol: "ETH", isLong: true },
+  { collateral: contracts.usdc.address, index: contracts.weth.address, symbol: "ETH", isLong: true },
+  { collateral: contracts.usdt.address, index: contracts.weth.address, symbol: "ETH", isLong: true },
+  { collateral: contracts.usdc.address, index: contracts.weth.address, symbol: "ETH", isLong: false },
+  { collateral: contracts.usdt.address, index: contracts.weth.address, symbol: "ETH", isLong: false },
+  { collateral: contracts.btc.address,  index: contracts.btc.address,  symbol: "BTC", isLong: true },
+  { collateral: contracts.weth.address, index: contracts.btc.address,  symbol: "BTC", isLong: true },
+  { collateral: contracts.usdc.address, index: contracts.btc.address,  symbol: "BTC", isLong: true },
+  { collateral: contracts.usdt.address, index: contracts.btc.address,  symbol: "BTC", isLong: true },
+  { collateral: contracts.usdc.address, index: contracts.btc.address,  symbol: "BTC", isLong: false },
+  { collateral: contracts.usdt.address, index: contracts.btc.address,  symbol: "BTC", isLong: false },
+];
+
 export function useAllPositions() {
-  const weth = contracts.weth.address;
-  const btc = contracts.btc.address;
+  const { address } = useAccount();
 
-  const { position: ethLong, isLoading: l1 } = useVaultPosition({ collateralToken: weth, indexToken: weth, isLong: true });
-  const { position: ethShort, isLoading: l2 } = useVaultPosition({ collateralToken: weth, indexToken: weth, isLong: false });
-  const { position: btcLong, isLoading: l3 } = useVaultPosition({ collateralToken: btc, indexToken: btc, isLong: true });
-  const { position: btcShort, isLoading: l4 } = useVaultPosition({ collateralToken: btc, indexToken: btc, isLong: false });
+  // ── Batch 1: getPosition for every combo ─────────────────────────────────
+  const positionCalls = useMemo(
+    () =>
+      address
+        ? COMBOS.map((c) => ({
+            address: contracts.vault.address,
+            abi: contracts.vault.abi as Abi,
+            functionName: "getPosition" as const,
+            args: [address, c.collateral, c.index, c.isLong],
+          }))
+        : [],
+    [address]
+  );
 
-  const positions: Position[] = [
-    ethLong ? toUIPosition(ethLong, "ETH", true) : null,
-    ethShort ? toUIPosition(ethShort, "ETH", false) : null,
-    btcLong ? toUIPosition(btcLong, "BTC", true) : null,
-    btcShort ? toUIPosition(btcShort, "BTC", false) : null,
-  ].filter(Boolean) as Position[];
+  const { data: posData, isLoading, refetch } = useReadContracts({
+    contracts: positionCalls,
+    query: { enabled: positionCalls.length > 0, refetchInterval: 2_000, staleTime: 500 },
+  });
 
-  return { positions, isLoading: l1 || l2 || l3 || l4 };
+  // ── Identify non-zero positions so we only fetch deltas for those ────────
+  const nonZeroIndices = useMemo(() => {
+    if (!posData) return [];
+    return posData
+      .map((r, i) => {
+        if (r.status !== "success" || !r.result) return -1;
+        const raw = r.result as [bigint, ...unknown[]];
+        return raw[0] > 0n ? i : -1;
+      })
+      .filter((i) => i >= 0);
+  }, [posData]);
+
+  // ── Batch 2: getPositionDelta only for non-zero positions ────────────────
+  const deltaCalls = useMemo(
+    () =>
+      address
+        ? nonZeroIndices.map((i) => ({
+            address: contracts.vault.address,
+            abi: contracts.vault.abi as Abi,
+            functionName: "getPositionDelta" as const,
+            args: [address, COMBOS[i].collateral, COMBOS[i].index, COMBOS[i].isLong],
+          }))
+        : [],
+    [address, nonZeroIndices]
+  );
+
+  const { data: deltaData } = useReadContracts({
+    contracts: deltaCalls,
+    query: { enabled: deltaCalls.length > 0, refetchInterval: 2_000, staleTime: 500 },
+  });
+
+  // ── Build UI positions ───────────────────────────────────────────────────
+  const positions = useMemo((): Position[] => {
+    if (!posData) return [];
+    return nonZeroIndices
+      .map((comboIdx, deltaIdx) => {
+        const result = posData[comboIdx];
+        if (result.status !== "success" || !result.result) return null;
+        const raw = result.result as [bigint, bigint, bigint, bigint, bigint, bigint, boolean, bigint];
+        const [size, collateral, averagePrice, , , , , lastIncreasedTime] = raw;
+        if (size === 0n) return null;
+        const combo = COMBOS[comboIdx];
+        const sizeUsd = fmt30(size);
+        const collateralUsd = fmt30(collateral);
+        const avgPrice = fmt30(averagePrice);
+        const leverage = collateralUsd > 0 ? sizeUsd / collateralUsd : 1;
+        const liqDist = leverage > 0 ? avgPrice / leverage : 0;
+
+        let pnl = 0;
+        let pnlPct = 0;
+        if (deltaData?.[deltaIdx]?.status === "success" && deltaData[deltaIdx].result) {
+          const [hasProfit, delta] = deltaData[deltaIdx].result as [boolean, bigint];
+          pnl = hasProfit ? fmt30(delta) : -fmt30(delta);
+          pnlPct = collateralUsd > 0 ? (pnl / collateralUsd) * 100 : 0;
+        }
+
+        return {
+          id: `${combo.symbol}-${combo.isLong ? "long" : "short"}-${combo.collateral.slice(0, 8)}`,
+          symbol: `${combo.symbol}-PERP`,
+          side: combo.isLong ? "long" : "short",
+          entryPrice: avgPrice,
+          quantity: sizeUsd,
+          leverage: parseFloat(leverage.toFixed(2)),
+          liquidationPrice: combo.isLong ? avgPrice - liqDist : avgPrice + liqDist,
+          unrealizedPnl: pnl,
+          unrealizedPnlPct: pnlPct,
+          margin: collateralUsd,
+          createdAt: Number(lastIncreasedTime),
+        } as Position;
+      })
+      .filter(Boolean) as Position[];
+  }, [posData, deltaData, nonZeroIndices]);
+
+  return { positions, isLoading, refetch };
 }

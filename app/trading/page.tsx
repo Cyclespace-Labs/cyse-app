@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import TopNavigation from "@/components/trading/TopNavigation";
 import PriceHeader from "@/components/trading/PriceHeader";
 import ChartSection from "@/components/trading/ChartSection";
@@ -73,9 +73,14 @@ export default function TradingPage() {
   const [tokenPriceData, setTokenPriceData] = useState<TokenPriceData | null>(null);
 
   const { wallet } = useWallet();
-  const { positions } = useAllPositions();
-  const { increaseOrders, decreaseOrders } = useOpenOrders();
+  const { positions, refetch: refetchPositions } = useAllPositions();
+  const { increaseOrders, decreaseOrders, refetch: refetchOrders } = useOpenOrders();
   const { closeMarketPosition, cancelDecreaseOrder } = useTradingActions();
+
+  const handleTradeConfirmed = useCallback(() => {
+    refetchPositions();
+    refetchOrders();
+  }, [refetchPositions, refetchOrders]);
 
   const symbol = selectedToken.symbol;
   const indexToken: `0x${string}` = (selectedToken.indexAddress ?? contracts.weth.address) as `0x${string}`;
@@ -182,6 +187,7 @@ export default function TradingPage() {
             tokenPriceData={tokenPriceData}
             indexToken={indexToken}
             collateralToken={collateralToken}
+            onTradeConfirmed={handleTradeConfirmed}
           />
         </div>
       </div>

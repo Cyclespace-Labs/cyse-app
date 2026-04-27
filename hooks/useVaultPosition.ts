@@ -27,7 +27,7 @@ export function useVaultPosition({ collateralToken, indexToken, isLong }: UseVau
     ...contracts.vault,
     functionName: "getPosition",
     args: address ? [address, collateralToken, indexToken, isLong] : undefined,
-    query: { enabled: !!address, refetchInterval: 5_000, staleTime: 2_000 },
+    query: { enabled: !!address, refetchInterval: 2_000, staleTime: 500 },
   });
 
   const positionExists =
@@ -38,7 +38,7 @@ export function useVaultPosition({ collateralToken, indexToken, isLong }: UseVau
     ...contracts.vault,
     functionName: "getPositionDelta",
     args: address ? [address, collateralToken, indexToken, isLong] : undefined,
-    query: { enabled: !!address && positionExists, refetchInterval: 5_000, staleTime: 2_000 },
+    query: { enabled: !!address && positionExists, refetchInterval: 2_000, staleTime: 500 },
   });
 
   if (!positionData) return { position: null, isLoading, refetch };

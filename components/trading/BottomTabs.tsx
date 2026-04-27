@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Order, Position } from "@/types/trading";
 import { X } from "lucide-react";
 import { computeLivePnl, computeLivePnlPct } from "@/lib/formatters";
@@ -35,12 +35,16 @@ export default function BottomTabs({
   onClosePosition,
 }: BottomTabsProps) {
   const [activeTab, setActiveTab] = useState("Balances");
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+
+  const authed = mounted && isAuthenticated;
 
   const openOrders = orders.filter((o) => o.status === "open");
   const filledOrders = orders.filter((o) => o.status === "filled");
 
   const renderContent = () => {
-    if (!isAuthenticated) {
+    if (!authed) {
       return (
         <div className="flex items-center justify-center h-16 text-[12px]" style={{ color: "var(--on-surface-disabled)" }}>
           <span>Connect wallet or log in to view your {activeTab.toLowerCase()}</span>

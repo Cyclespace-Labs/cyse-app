@@ -44,6 +44,7 @@ export default function CandlestickChart({
   const priceLinesRef = useRef<any[]>([]);
   const currentPriceLineRef = useRef<unknown>(null);
   const prevCandleLenRef = useRef(0);
+  const prevFirstTimeRef = useRef(0);
   const { theme } = useTheme();
 
   // ── Read live CSS variables so colours perfectly match the design system ──
@@ -154,8 +155,11 @@ export default function CandlestickChart({
 
     const c = getColors();
 
-    // Full re-set when data length changes significantly (new fetch)
-    const isNewFetch = Math.abs(candleData.length - prevCandleLenRef.current) > 5;
+    // Full re-set when data changes (new timeframe, new symbol, or significantly different length)
+    const firstTime = candleData[0]?.time ?? 0;
+    const isNewFetch =
+      prevFirstTimeRef.current !== firstTime ||
+      Math.abs(candleData.length - prevCandleLenRef.current) > 5;
 
     if (isNewFetch) {
       const formatted = candleData.map((d) => ({
@@ -175,6 +179,7 @@ export default function CandlestickChart({
       volSeries.setData(formattedVol);
       chart.timeScale().fitContent();
       prevCandleLenRef.current = candleData.length;
+      prevFirstTimeRef.current = firstTime;
     } else {
       // Incremental update — update the last candle
       const last = candleData[candleData.length - 1];
@@ -195,6 +200,7 @@ export default function CandlestickChart({
         } catch { /* series not ready */ }
       }
       prevCandleLenRef.current = candleData.length;
+      prevFirstTimeRef.current = firstTime;
     }
   }, [candleData, getColors]);
 

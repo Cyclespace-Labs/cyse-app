@@ -29,6 +29,12 @@ const INTERVAL_SECONDS: Record<string, number> = {
   "1d":  86400,
 };
 
+// Dynamic candle count per interval — matches API defaults for full chart history
+const DEFAULT_LIMITS: Record<string, number> = {
+  "1m": 1000, "3m": 1000, "5m": 1000, "15m": 750, "30m": 750,
+  "1h": 750, "4h": 500, "1d": 500,
+};
+
 /**
  * Fetches real historical candle data from Binance via our API route,
  * and keeps the latest candle updated with the live price from Pyth SSE.
@@ -56,8 +62,9 @@ export function useCandleData(
     readyRef.current = false;
     setCandles([]); // Clear old data when fetching new
     try {
+      const candleLimit = DEFAULT_LIMITS[interval] ?? 500;
       const res = await fetch(
-        `/api/trading/candles?symbol=${encodeURIComponent(symbol)}&interval=${encodeURIComponent(interval)}&limit=300`
+        `/api/trading/candles?symbol=${encodeURIComponent(symbol)}&interval=${encodeURIComponent(interval)}&limit=${candleLimit}`
       );
       if (id !== fetchIdRef.current) return; // stale
       if (!res.ok) {

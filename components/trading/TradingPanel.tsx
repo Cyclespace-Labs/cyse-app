@@ -8,6 +8,8 @@ import { useWallet } from "@/contexts/WalletContext";
 import { useTradingActions } from "@/hooks/useTradingActions";
 import { useOpenOrders } from "@/hooks/useOpenOrders";
 import { useVaultPosition } from "@/hooks/useVaultPosition";
+import { useAllVaultPositions, VaultPositionEntry } from "@/hooks/useAllVaultPositions";
+import { useOrderKeeper } from "@/hooks/useOrderKeeper";
 import { usePriceOracle } from "@/hooks/usePriceOracle";
 import { usePositionHealth } from "@/hooks/usePositionHealth";
 import { validateOrder, validateTPSL, formatValidationErrors, validatePositionHealth } from "@/lib/validation/trading";
@@ -37,6 +39,7 @@ interface TradingPanelProps {
   tokenPriceData: TokenPriceData | null;
   indexToken?: `0x${string}`;
   collateralToken?: `0x${string}`;
+  onTradeConfirmed?: () => void;
 }
 
 export default function TradingPanel({
@@ -44,6 +47,7 @@ export default function TradingPanel({
   tokenPriceData,
   indexToken = contracts.weth.address,
   collateralToken = contracts.weth.address,
+  onTradeConfirmed,
 }: TradingPanelProps) {
   const { wallet, CustomConnectButton } = useWallet();
 
@@ -154,7 +158,15 @@ export default function TradingPanel({
     approveToken,
   } = useTradingActions();
 
-  const { increaseOrders, decreaseOrders } = useOpenOrders(activeIndexToken);
+  const { increaseOrders, decreaseOrders, refetch: refetchOrders } = useOpenOrders(activeIndexToken);
+
+  useOrderKeeper({
+    decreaseOrders,
+    increaseOrders,
+    minPrice: oracleMinPrice,
+    maxPrice: oracleMaxPrice,
+    enabled: wallet.connected && isOracleValid,
+  });
 
   // Short positions require stable collateral (USDC). When WETH is selected for a
   // short, the Router swaps it to USDC; the Vault stores the position with USDC as
@@ -169,6 +181,17 @@ export default function TradingPanel({
 
   const { position: longPosition } = useVaultPosition({ collateralToken: activeCollateralToken, indexToken: activeIndexToken, isLong: true });
   const { position: shortPosition } = useVaultPosition({ collateralToken: effectiveCollateralToken, indexToken: activeIndexToken, isLong: false });
+  const { positions: allPositions, refetch: refetchPositions } = useAllVaultPositions(activeIndexToken);
+
+  // Instant data refresh when a trade is confirmed on-chain
+  useEffect(() => {
+    if (isConfirmed) {
+      refetchPositions();
+      refetchOrders();
+      onTradeConfirmed?.();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isConfirmed]);
 
   // Position health tracking
   const activePosition = isLong ? longPosition : shortPosition;
@@ -448,7 +471,7 @@ export default function TradingPanel({
     }
   }, [activeType, currentPrice, priceNum, qtyNum, leverage, wallet.address, activeCollateralToken, activeIndexToken, isLong, placeMarketOrder, placeLimitOrder, placeDecreaseOrder, placeTPSLOrders, isOracleValid, oraclePriceRaw, slippageBps, tpsl, tpPrice, slPrice, oracleMinPrice, oracleMaxPrice, collateralDecimals, vaultRouterApproved, approveVaultRouter, routerApproved, approvePlugin, isNativeCollateral, approveToken, reduceOnly, longPosition, shortPosition]);
 
-  const handleAddTPSLToPosition = useCallback(async (pos: typeof longPosition & { isLong: boolean }) => {
+  const handleAddTPSLToPosition = useCallback(async (pos: VaultPositionEntry) => {
     if (!wallet.address || !pos) return;
     const tp = tpslTpPrice ? parseFloat(tpslTpPrice) : null;
     const sl = tpslSlPrice ? parseFloat(tpslSlPrice) : null;
@@ -479,7 +502,7 @@ export default function TradingPanel({
     }
 
     await placeTPSLOrders({
-      collateralToken: activeCollateralToken,
+      collateralToken: pos.collateralToken,
       indexToken: activeIndexToken,
       collateralDelta: 0n,
       sizeDelta: pos.size,
@@ -492,7 +515,7 @@ export default function TradingPanel({
     setTpslPositionKey(null);
     setTpslTpPrice("");
     setTpslSlPrice("");
-  }, [wallet.address, tpslTpPrice, tpslSlPrice, activeCollateralToken, activeIndexToken, placeTPSLOrders]);
+  }, [wallet.address, tpslTpPrice, tpslSlPrice, activeIndexToken, placeTPSLOrders, cancelDecreaseOrder, decreaseOrders]);
 
   return (
     <div className="flex flex-col h-full" style={{ background: "var(--surface-container-lowest)", color: "var(--on-surface)" }}>
@@ -943,14 +966,16 @@ export default function TradingPanel({
         )}
 
         {/* Active Positions (on-chain) */}
-        {wallet.connected && (longPosition || shortPosition) && (
+        {wallet.connected && allPositions.length > 0 && (
           <div className="pt-2" style={{ borderTop: "1px solid rgba(66,70,84,0.4)" }}>
             <span className="text-[11px] mb-2 block" style={{ color: "var(--on-surface-disabled)" }}>Active Positions</span>
-            {([longPosition ? { ...longPosition, isLong: true } : null, shortPosition ? { ...shortPosition, isLong: false } : null] as const)
-              .filter(Boolean)
-              .map((pos) => {
-                if (!pos) return null;
-                const livePnl = pos.isLong ? liveLongPnl : liveShortPnl;
+            {allPositions.map((pos) => {
+                const priceDelta = pos.isLong
+                  ? currentPrice - pos.avgPriceFormatted
+                  : pos.avgPriceFormatted - currentPrice;
+                const livePnl = pos.avgPriceFormatted > 0
+                  ? pos.sizeUsd * (priceDelta / pos.avgPriceFormatted)
+                  : 0;
                 const livePnlPct = computeLivePnlPct(livePnl, pos.collateralUsd);
                 const pnlColor = livePnl >= 0 ? "var(--buy)" : "var(--sell)";
                 // Match attached TP/SL decrease orders to this exact position (same indexToken + isLong)
@@ -961,7 +986,7 @@ export default function TradingPanel({
                 const attachedTp = attachedOrders.find((o) => (o.isLong && o.triggerAboveThreshold) || (!o.isLong && !o.triggerAboveThreshold));
                 const attachedSl = attachedOrders.find((o) => (o.isLong && !o.triggerAboveThreshold) || (!o.isLong && o.triggerAboveThreshold));
                 return (
-                  <div key={pos.isLong ? "long" : "short"} className="rounded p-2.5 mb-2" style={{ background: "var(--surface-container-low)" }}>
+                  <div key={pos.id} className="rounded p-2.5 mb-2" style={{ background: "var(--surface-container-low)" }}>
                     <div className="flex items-center justify-between mb-1.5">
                       <span className="text-[11px] font-mono font-medium" style={{ color: pos.isLong ? "var(--buy)" : "var(--sell)" }}>
                         {pos.isLong ? "LONG" : "SHORT"} {symbol}
@@ -1039,7 +1064,7 @@ export default function TradingPanel({
                           }
                         }
                         const hash = await closeMarketPosition({
-                          collateralToken: activeCollateralToken,
+                          collateralToken: pos.collateralToken,
                           indexToken: activeIndexToken,
                           sizeDelta,
                           collateralDelta,
@@ -1088,7 +1113,7 @@ export default function TradingPanel({
 
                     {/* Standalone TP/SL for existing position */}
                     <div className="mt-2 pt-2" style={{ borderTop: "1px solid rgba(66,70,84,0.3)" }}>
-                      {tpslPositionKey === (pos.isLong ? "long" : "short") ? (
+                      {tpslPositionKey === pos.id ? (
                         <div className="space-y-2">
                           <div>
                             <label className="text-[10px] mb-1 block" style={{ color: "var(--buy)" }}>Take Profit</label>
@@ -1141,7 +1166,7 @@ export default function TradingPanel({
                       ) : (
                         <button
                           onClick={() => {
-                            setTpslPositionKey(pos.isLong ? "long" : "short");
+                            setTpslPositionKey(pos.id);
                             setTpslTpPrice(attachedTp ? parseFloat(formatUnits(attachedTp.triggerPrice, 30)).toFixed(4) : "");
                             setTpslSlPrice(attachedSl ? parseFloat(formatUnits(attachedSl.triggerPrice, 30)).toFixed(4) : "");
                           }}
