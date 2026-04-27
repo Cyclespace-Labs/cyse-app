@@ -34,6 +34,9 @@ import {
   createDrawing,
   makeConverter,
   renderDrawings,
+  hitTestDrawing,
+  moveDrawing,
+  renderSelectionHandles,
 } from "@/lib/chart/drawings";
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -52,6 +55,8 @@ interface CandlestickChartProps {
   positions?: Position[];
   currentPrice?: number;
   loading?: boolean;
+  initialDrawings?: Drawing[];
+  onDrawingsChange?: (drawings: Drawing[]) => void;
   onClearDrawings?: () => void;
 }
 
@@ -87,6 +92,8 @@ export default function CandlestickChart({
   positions = [],
   currentPrice,
   loading,
+  initialDrawings,
+  onDrawingsChange,
   onClearDrawings,
 }: CandlestickChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -103,10 +110,18 @@ export default function CandlestickChart({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const hlinePriceLines = useRef<any[]>([]);
   const prevDataKeyRef = useRef("");
-  const drawingsRef = useRef<Drawing[]>([]);
+  const drawingsRef = useRef<Drawing[]>(initialDrawings ?? []);
   const pendingPointsRef = useRef<DrawingPoint[]>([]);
   const cursorPosRef = useRef<DrawingPoint | null>(null);
+  const selectedIdRef = useRef<string | null>(null);
+  const dragStartRef = useRef<DrawingPoint | null>(null);
+  const drawingToolRef = useRef<DrawingTool>(drawingTool);
+  const onDrawingsChangeRef = useRef(onDrawingsChange);
   const { theme } = useTheme();
+
+  // Keep refs in sync with latest props
+  drawingToolRef.current = drawingTool;
+  onDrawingsChangeRef.current = onDrawingsChange;
 
   const indicatorsKey = indicators.slice().sort().join(",");
 
@@ -163,7 +178,7 @@ export default function CandlestickChart({
         horzLines: { color: c.grid, style: LineStyle.Dotted },
       },
       crosshair: {
-        mode: drawingTool === "crosshair" ? 1 : 0,
+        mode: drawingToolRef.current === "crosshair" ? 1 : 0,
         vertLine: { color: c.crosshair, width: 1, style: LineStyle.Dashed, labelBackgroundColor: c.bg },
         horzLine: { color: c.crosshair, width: 1, style: LineStyle.Dashed, labelBackgroundColor: c.bg },
       },
@@ -342,76 +357,157 @@ export default function CandlestickChart({
 
     // ── Drawing overlay renderer ────────────────────────────────────────
     const redrawOverlay = () => {
-      const canvas = overlayCanvasRef.current;
-      if (!canvas || !mainSeriesRef.current || !chartRef.current) return;
-      const ctx = canvas.getContext("2d");
+      const cvs = overlayCanvasRef.current;
+      if (!cvs || !mainSeriesRef.current || !chartRef.current) return;
+      const ctx = cvs.getContext("2d");
       if (!ctx) return;
       const conv = makeConverter(chartRef.current, mainSeriesRef.current);
+      const tool = drawingToolRef.current;
       // Combine completed + in-progress (pending + cursor) drawings
       const all = [...drawingsRef.current];
-      if (pendingPointsRef.current.length > 0 && isDrawingTool(drawingTool)) {
+      if (pendingPointsRef.current.length > 0 && isDrawingTool(tool)) {
         const pts = [...pendingPointsRef.current];
         if (cursorPosRef.current) pts.push(cursorPosRef.current);
         if (pts.length > 0) {
-          all.push(createDrawing(drawingTool, pts, "#FFFFFF80", 1));
+          all.push(createDrawing(tool, pts, "#FFFFFF80", 1));
         }
       }
-      renderDrawings(ctx, all, conv, canvas.width, canvas.height);
+      renderDrawings(ctx, all, conv, cvs.width, cvs.height);
+      // Render selection handles for selected drawing
+      const selId = selectedIdRef.current;
+      if (selId) {
+        const selDraw = drawingsRef.current.find(d => d.id === selId);
+        if (selDraw) renderSelectionHandles(ctx, selDraw, conv);
+      }
     };
 
-    // ── Click handler for all drawing tools ──────────────────────────────
+    // Helper to notify parent of drawing changes
+    const notifyChange = () => {
+      onDrawingsChangeRef.current?.(drawingsRef.current.slice());
+    };
+
+    // ── Click handler — handles placement, selection, and drag ───────────
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const clickHandler = (param: any) => {
-      if (!param.point || !isDrawingTool(drawingTool)) return;
+      if (!param.point) return;
+      const tool = drawingToolRef.current;
+
       try {
         const price = mainSeries.coordinateToPrice(param.point.y);
         const time = chart.timeScale().coordinateToTime(param.point.x);
         if (price == null || !isFinite(price) || time == null) return;
-
         const pt: DrawingPoint = { time: time as unknown as number, price };
 
-        // Special case: hline uses native price lines for crisp rendering
-        if (drawingTool === "hline") {
+        // ─ If in cursor mode: handle selection and drag-drop ─
+        if (tool === "cursor" || tool === "crosshair") {
+          // If dragging — drop the drawing at new position
+          if (dragStartRef.current && selectedIdRef.current) {
+            const timeDelta = pt.time - dragStartRef.current.time;
+            const priceDelta = pt.price - dragStartRef.current.price;
+            const idx = drawingsRef.current.findIndex(d => d.id === selectedIdRef.current);
+            if (idx >= 0) {
+              drawingsRef.current[idx] = moveDrawing(drawingsRef.current[idx], timeDelta, priceDelta);
+              notifyChange();
+            }
+            dragStartRef.current = null;
+            redrawOverlay();
+            return;
+          }
+
+          // Hit-test for selection
+          const conv = makeConverter(chart, mainSeries);
+          let found: string | null = null;
+          for (let i = drawingsRef.current.length - 1; i >= 0; i--) {
+            if (hitTestDrawing(drawingsRef.current[i], param.point.x, param.point.y, conv)) {
+              found = drawingsRef.current[i].id;
+              break;
+            }
+          }
+          if (found) {
+            selectedIdRef.current = found;
+            dragStartRef.current = pt; // start potential drag
+          } else {
+            selectedIdRef.current = null;
+            dragStartRef.current = null;
+          }
+          redrawOverlay();
+          return;
+        }
+
+        // ─ Drawing tool active: place points ─
+        if (!isDrawingTool(tool)) return;
+
+        // Special case: hline uses native price lines
+        if (tool === "hline") {
           const pl = mainSeries.createPriceLine({
             price, color: "#FFFFFFCC", lineWidth: 1,
             lineStyle: LineStyle.Solid, axisLabelVisible: true, title: "",
           });
           hlinePriceLines.current.push(pl);
+          // Also store as a drawing for persistence
+          const d = createDrawing("hline", [pt], "#FFFFFFCC", 1);
+          drawingsRef.current.push(d);
+          notifyChange();
+          redrawOverlay();
           return;
         }
 
-        const needed = TOOL_POINTS[drawingTool] ?? 0;
+        const needed = TOOL_POINTS[tool] ?? 0;
         pendingPointsRef.current.push(pt);
 
         if (pendingPointsRef.current.length >= needed) {
-          // Complete the drawing
-          const d = createDrawing(drawingTool, [...pendingPointsRef.current], "#FFFFFFCC", 1);
-          // For text/note tools, prompt for text
-          if (drawingTool === "text" || drawingTool === "note" || drawingTool === "anchored_note" || drawingTool === "callout") {
+          const d = createDrawing(tool, [...pendingPointsRef.current], "#FFFFFFCC", 1);
+          if (tool === "text" || tool === "note" || tool === "anchored_note" || tool === "callout") {
             d.text = prompt("Enter text:") || "Text";
           }
           drawingsRef.current.push(d);
           pendingPointsRef.current = [];
+          notifyChange();
         }
         redrawOverlay();
       } catch { /* ignore */ }
     };
     chart.subscribeClick(clickHandler);
 
-    // ── Crosshair move for in-progress drawing preview ───────────────────
+    // ── Crosshair move — preview in-progress drawing + drag update ────────
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const moveHandler = (param: any) => {
-      if (!param.point || !isDrawingTool(drawingTool) || pendingPointsRef.current.length === 0) {
-        if (cursorPosRef.current) { cursorPosRef.current = null; redrawOverlay(); }
+      if (!param.point) return;
+      const tool = drawingToolRef.current;
+
+      // In-progress drawing preview
+      if (isDrawingTool(tool) && pendingPointsRef.current.length > 0) {
+        try {
+          const price = mainSeries.coordinateToPrice(param.point.y);
+          const time = chart.timeScale().coordinateToTime(param.point.x);
+          if (price == null || !isFinite(price) || time == null) return;
+          cursorPosRef.current = { time: time as unknown as number, price };
+          redrawOverlay();
+        } catch { /* ignore */ }
         return;
       }
-      try {
-        const price = mainSeries.coordinateToPrice(param.point.y);
-        const time = chart.timeScale().coordinateToTime(param.point.x);
-        if (price == null || !isFinite(price) || time == null) return;
-        cursorPosRef.current = { time: time as unknown as number, price };
-        redrawOverlay();
-      } catch { /* ignore */ }
+
+      // Drag preview (move drawing as cursor moves)
+      if (dragStartRef.current && selectedIdRef.current && (tool === "cursor" || tool === "crosshair")) {
+        try {
+          const price = mainSeries.coordinateToPrice(param.point.y);
+          const time = chart.timeScale().coordinateToTime(param.point.x);
+          if (price == null || !isFinite(price) || time == null) return;
+          // Update drag target for real-time preview
+          const timeDelta = (time as unknown as number) - dragStartRef.current.time;
+          const priceDelta = price - dragStartRef.current.price;
+          const idx = drawingsRef.current.findIndex(d => d.id === selectedIdRef.current);
+          if (idx >= 0) {
+            drawingsRef.current[idx] = moveDrawing(drawingsRef.current[idx], timeDelta, priceDelta);
+            dragStartRef.current = { time: time as unknown as number, price };
+          }
+          redrawOverlay();
+        } catch { /* ignore */ }
+        return;
+      }
+
+      // Clear cursor pos if not in drawing mode
+      if (cursorPosRef.current) { cursorPosRef.current = null; redrawOverlay(); }
     };
     chart.subscribeCrosshairMove(moveHandler);
 
@@ -424,11 +520,10 @@ export default function CandlestickChart({
       for (const entry of entries) {
         const { width, height } = entry.contentRect;
         chart.applyOptions({ width, height });
-        // Sync overlay canvas size
-        const canvas = overlayCanvasRef.current;
-        if (canvas) {
-          canvas.width = width;
-          canvas.height = height;
+        const cvs = overlayCanvasRef.current;
+        if (cvs) {
+          cvs.width = width;
+          cvs.height = height;
           redrawOverlay();
         }
       }
@@ -458,7 +553,7 @@ export default function CandlestickChart({
       chartRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [theme, chartType, indicatorsKey, logScale, drawingTool]);
+  }, [theme, chartType, indicatorsKey, logScale]);
 
   // ── Effect 2 — Incremental data update (new candle ticks) ─────────────────
   useEffect(() => {
@@ -589,14 +684,23 @@ export default function CandlestickChart({
     }
   }, [orders, positions, showOrderLines, getColors]);
 
-  // ── Effect 5 — Erase all drawings when tool is erase_all ────────────────
+  // ── Effect 5 — Update crosshair mode when drawingTool changes ───────────
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart) return;
+    chart.applyOptions({
+      crosshair: { mode: drawingTool === "crosshair" ? 1 : 0 },
+    });
+  }, [drawingTool]);
+
+  // ── Effect 6 — Erase all drawings when tool is erase_all ────────────────
   useEffect(() => {
     if (drawingTool !== "erase_all") return;
-    // Clear canvas drawings
     drawingsRef.current = [];
     pendingPointsRef.current = [];
     cursorPosRef.current = null;
-    // Clear hline price lines
+    selectedIdRef.current = null;
+    dragStartRef.current = null;
     const series = mainSeriesRef.current;
     if (series) {
       for (const pl of hlinePriceLines.current) {
@@ -604,12 +708,12 @@ export default function CandlestickChart({
       }
     }
     hlinePriceLines.current = [];
-    // Redraw (clear) overlay
     const canvas = overlayCanvasRef.current;
     if (canvas) {
       const ctx = canvas.getContext("2d");
       if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
     }
+    onDrawingsChangeRef.current?.([]);
     onClearDrawings?.();
   }, [drawingTool, onClearDrawings]);
 
@@ -618,6 +722,46 @@ export default function CandlestickChart({
     pendingPointsRef.current = [];
     cursorPosRef.current = null;
   }, [drawingTool]);
+
+  // ── Effect 7 — Keyboard: Delete/Backspace removes selected drawing ─────
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.key === "Delete" || e.key === "Backspace") && selectedIdRef.current) {
+        // Don't delete if user is typing in an input
+        if ((e.target as HTMLElement)?.tagName === "INPUT" || (e.target as HTMLElement)?.tagName === "TEXTAREA") return;
+        drawingsRef.current = drawingsRef.current.filter(d => d.id !== selectedIdRef.current);
+        selectedIdRef.current = null;
+        dragStartRef.current = null;
+        onDrawingsChangeRef.current?.(drawingsRef.current.slice());
+        // Re-render overlay
+        const canvas = overlayCanvasRef.current;
+        if (canvas && mainSeriesRef.current && chartRef.current) {
+          const ctx = canvas.getContext("2d");
+          if (ctx) {
+            const conv = makeConverter(chartRef.current, mainSeriesRef.current);
+            renderDrawings(ctx, drawingsRef.current, conv, canvas.width, canvas.height);
+          }
+        }
+        e.preventDefault();
+      }
+      // Escape deselects
+      if (e.key === "Escape") {
+        selectedIdRef.current = null;
+        dragStartRef.current = null;
+        pendingPointsRef.current = [];
+        const canvas = overlayCanvasRef.current;
+        if (canvas && mainSeriesRef.current && chartRef.current) {
+          const ctx = canvas.getContext("2d");
+          if (ctx) {
+            const conv = makeConverter(chartRef.current, mainSeriesRef.current);
+            renderDrawings(ctx, drawingsRef.current, conv, canvas.width, canvas.height);
+          }
+        }
+      }
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, []);
 
   return (
     <div className="w-full h-full relative">

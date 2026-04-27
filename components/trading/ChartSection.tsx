@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import CandlestickChart from "./CandlestickChart";
 import type { ChartType, IndicatorId, DrawingTool } from "./CandlestickChart";
+import type { Drawing } from "@/lib/chart/drawings";
 import {
   Crosshair,
   Maximize2,
@@ -169,6 +170,97 @@ interface ChartSectionProps {
   currentPrice?: number;
 }
 
+// ── ToolGroupButton — renders primary icon + fixed-position flyout ────────────
+function ToolGroupButton({
+  groupId, PrimaryIcon, isActive, isHovered, hasMultiple, selectedTool, tools, drawingTool,
+  onPrimaryClick, onHover, onLeave, onFlyoutEnter, onFlyoutLeave, onSelectTool,
+}: {
+  groupId: string;
+  PrimaryIcon: LucideIcon;
+  isActive: boolean;
+  isHovered: boolean;
+  hasMultiple: boolean;
+  selectedTool: ToolDef;
+  tools: ToolDef[];
+  drawingTool: DrawingTool;
+  onPrimaryClick: () => void;
+  onHover: (groupId: string) => void;
+  onLeave: () => void;
+  onFlyoutEnter: () => void;
+  onFlyoutLeave: () => void;
+  onSelectTool: (toolId: string) => void;
+}) {
+  const btnRef = useRef<HTMLDivElement>(null);
+  const [flyoutPos, setFlyoutPos] = useState<{ top: number; left: number } | null>(null);
+
+  useEffect(() => {
+    if (isHovered && hasMultiple && btnRef.current) {
+      const rect = btnRef.current.getBoundingClientRect();
+      setFlyoutPos({ top: rect.top, left: rect.right + 4 });
+    } else {
+      setFlyoutPos(null);
+    }
+  }, [isHovered, hasMultiple]);
+
+  return (
+    <div
+      ref={btnRef}
+      onMouseEnter={() => onHover(groupId)}
+      onMouseLeave={onLeave}
+    >
+      <button
+        onClick={onPrimaryClick}
+        className="p-1.5 rounded transition-colors relative"
+        title={selectedTool.label}
+        style={{
+          color: isActive ? "var(--primary)" : "var(--on-surface-disabled)",
+          background: isActive ? "rgba(14,118,253,0.12)" : "transparent",
+        }}
+      >
+        <PrimaryIcon size={15} />
+        {hasMultiple && (
+          <span
+            className="absolute bottom-0.5 right-0.5"
+            style={{ width: 0, height: 0, borderLeft: "3px solid transparent", borderRight: "3px solid transparent", borderTop: "3px solid currentColor", opacity: 0.5 }}
+          />
+        )}
+      </button>
+
+      {/* Fixed-position flyout — escapes any overflow:hidden ancestors */}
+      {isHovered && hasMultiple && flyoutPos && (
+        <div
+          className="rounded-md shadow-lg py-1 min-w-[160px]"
+          style={{
+            position: "fixed",
+            top: flyoutPos.top,
+            left: flyoutPos.left,
+            zIndex: 9999,
+            background: "var(--surface-container-high)",
+            border: "1px solid rgba(66,70,84,0.6)",
+          }}
+          onMouseEnter={onFlyoutEnter}
+          onMouseLeave={onFlyoutLeave}
+        >
+          {tools.map(({ id, icon: ToolIcon, label }) => (
+            <button
+              key={id}
+              onClick={() => onSelectTool(id)}
+              className="w-full text-left px-3 py-1.5 text-[11px] flex items-center gap-2 transition-colors hover:bg-white/5"
+              style={{
+                color: drawingTool === id ? "var(--primary)" : "var(--on-surface)",
+                background: drawingTool === id ? "rgba(14,118,253,0.08)" : "transparent",
+              }}
+            >
+              <ToolIcon size={13} />
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function fmtVol(v: number): string {
   if (v >= 1e9) return `$${(v / 1e9).toFixed(2)}B`;
   if (v >= 1e6) return `$${(v / 1e6).toFixed(1)}M`;
@@ -178,23 +270,39 @@ function fmtVol(v: number): string {
 
 type PriceType = "Last" | "Mark" | "Index";
 
+// ── LocalStorage persistence helpers ─────────────────────────────────────────
+const STORAGE_PREFIX = "cyse_chart_";
+function loadJSON<T>(key: string, fallback: T): T {
+  if (typeof window === "undefined") return fallback;
+  try {
+    const raw = localStorage.getItem(STORAGE_PREFIX + key);
+    return raw ? JSON.parse(raw) : fallback;
+  } catch { return fallback; }
+}
+function saveJSON(key: string, value: unknown) {
+  if (typeof window === "undefined") return;
+  try { localStorage.setItem(STORAGE_PREFIX + key, JSON.stringify(value)); } catch { /* ignore */ }
+}
+
 export default function ChartSection({ symbol = "ETH", orders = [], positions = [], tokenPriceData, currentPrice }: ChartSectionProps) {
   const [activeTab, setActiveTab] = useState("Chart");
-  const [activeTimeframe, setActiveTimeframe] = useState("15m");
+  const [activeTimeframe, setActiveTimeframe] = useState(() => loadJSON<string>(`${symbol}_tf`, "15m"));
   const [utcClock, setUtcClock] = useState("");
-  const [chartType, setChartType] = useState<ChartType>("Candlestick");
-  const [activeIndicators, setActiveIndicators] = useState<IndicatorId[]>([]);
+  const [chartType, setChartType] = useState<ChartType>(() => loadJSON<ChartType>(`${symbol}_chartType`, "Candlestick"));
+  const [activeIndicators, setActiveIndicators] = useState<IndicatorId[]>(() => loadJSON<IndicatorId[]>(`${symbol}_indicators`, []));
   const [drawingTool, setDrawingTool] = useState<DrawingTool>("cursor");
-  const [showOrderLines, setShowOrderLines] = useState(true);
+  const [showOrderLines, setShowOrderLines] = useState(() => loadJSON<boolean>(`${symbol}_orderLines`, true));
   const [priceType, setPriceType] = useState<PriceType>("Last");
   const [activeRange, setActiveRange] = useState<string | null>(null);
-  const [isLogScale, setIsLogScale] = useState(false);
+  const [isLogScale, setIsLogScale] = useState(() => loadJSON<boolean>(`${symbol}_logScale`, false));
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showChartTypeMenu, setShowChartTypeMenu] = useState(false);
   const [showIndicatorMenu, setShowIndicatorMenu] = useState(false);
   const [hoveredGroup, setHoveredGroup] = useState<string | null>(null);
   const [drawingsVisible, setDrawingsVisible] = useState(true);
   const [drawingsLocked, setDrawingsLocked] = useState(false);
+  // Drawings state — persisted to localStorage
+  const [savedDrawings] = useState<Drawing[]>(() => loadJSON<Drawing[]>(`${symbol}_drawings`, []));
   // Track the last-selected tool per group so the primary button shows the right icon
   const [selectedPerGroup, setSelectedPerGroup] = useState<Record<string, string>>(() => {
     const init: Record<string, string> = {};
@@ -206,6 +314,13 @@ export default function ChartSection({ symbol = "ETH", orders = [], positions = 
   const chartTypeMenuRef = useRef<HTMLDivElement>(null);
   const indicatorMenuRef = useRef<HTMLDivElement>(null);
   const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // ── Persist chart state on change ──────────────────────────────────────────
+  useEffect(() => { saveJSON(`${symbol}_tf`, activeTimeframe); }, [symbol, activeTimeframe]);
+  useEffect(() => { saveJSON(`${symbol}_chartType`, chartType); }, [symbol, chartType]);
+  useEffect(() => { saveJSON(`${symbol}_indicators`, activeIndicators); }, [symbol, activeIndicators]);
+  useEffect(() => { saveJSON(`${symbol}_orderLines`, showOrderLines); }, [symbol, showOrderLines]);
+  useEffect(() => { saveJSON(`${symbol}_logScale`, isLogScale); }, [symbol, isLogScale]);
 
   // ── Candle data ───────────────────────────────────────────────────────────
   const { candles, loading } = useCandleData(symbol, activeTimeframe, currentPrice);
@@ -294,10 +409,14 @@ export default function ChartSection({ symbol = "ETH", orders = [], positions = 
     setHoveredGroup(null);
   }, []);
 
+  const handleDrawingsChange = useCallback((drawings: Drawing[]) => {
+    saveJSON(`${symbol}_drawings`, drawings);
+  }, [symbol]);
+
   const handleClearDrawings = useCallback(() => {
-    // After erase_all finishes, reset back to cursor
+    saveJSON(`${symbol}_drawings`, []);
     setDrawingTool("cursor");
-  }, []);
+  }, [symbol]);
 
   const displayPrice = currentPrice && currentPrice > 0 ? currentPrice : (ohlcInfo?.close ?? 0);
 
@@ -455,12 +574,12 @@ export default function ChartSection({ symbol = "ETH", orders = [], positions = 
       </div>
 
       {/* ── Chart Area = LEFT DRAWING PANEL + CHART ──────────────────────── */}
-      <div className="flex-1 flex min-h-0">
+      <div className="flex-1 flex min-h-0" style={{ overflow: "visible" }}>
         {/* Left drawing tools panel — grouped with flyout sub-menus */}
         {activeTab === "Chart" && (
           <div
-            className="flex flex-col items-center py-1.5 gap-0.5 overflow-y-auto scrollbar-none"
-            style={{ width: 38, borderRight: bdr, flexShrink: 0 }}
+            className="flex flex-col items-center py-1.5 gap-0.5"
+            style={{ width: 38, borderRight: bdr, flexShrink: 0, overflow: "visible" }}
           >
             {TOOL_GROUPS.map((group) => {
               const selectedId = selectedPerGroup[group.groupId] ?? group.tools[0].id;
@@ -471,68 +590,32 @@ export default function ChartSection({ symbol = "ETH", orders = [], positions = 
               const hasMultiple = group.tools.length > 1;
 
               return (
-                <div
+                <ToolGroupButton
                   key={group.groupId}
-                  className="relative"
-                  onMouseEnter={() => {
+                  groupId={group.groupId}
+                  PrimaryIcon={PrimaryIcon}
+                  isActive={isActive}
+                  isHovered={isHovered}
+                  hasMultiple={hasMultiple}
+                  selectedTool={selectedTool}
+                  tools={group.tools}
+                  drawingTool={drawingTool}
+                  onPrimaryClick={() => setDrawingTool(selectedTool.id as DrawingTool)}
+                  onHover={(gId) => {
                     if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
-                    if (hasMultiple) setHoveredGroup(group.groupId);
+                    if (hasMultiple) setHoveredGroup(gId);
                   }}
-                  onMouseLeave={() => {
+                  onLeave={() => {
                     hoverTimeoutRef.current = setTimeout(() => setHoveredGroup(null), 200);
                   }}
-                >
-                  {/* Primary button — shows the last-selected tool from this group */}
-                  <button
-                    onClick={() => {
-                      setDrawingTool(selectedTool.id as DrawingTool);
-                    }}
-                    className="p-1.5 rounded transition-colors relative"
-                    title={selectedTool.label}
-                    style={{
-                      color: isActive ? "var(--primary)" : "var(--on-surface-disabled)",
-                      background: isActive ? "rgba(14,118,253,0.12)" : "transparent",
-                    }}
-                  >
-                    <PrimaryIcon size={15} />
-                    {/* Small triangle indicator for groups with multiple tools */}
-                    {hasMultiple && (
-                      <span
-                        className="absolute bottom-0.5 right-0.5"
-                        style={{ width: 0, height: 0, borderLeft: "3px solid transparent", borderRight: "3px solid transparent", borderTop: "3px solid currentColor", opacity: 0.5 }}
-                      />
-                    )}
-                  </button>
-
-                  {/* Flyout sub-menu */}
-                  {isHovered && hasMultiple && (
-                    <div
-                      className="absolute left-full top-0 ml-1 z-50 rounded-md shadow-lg py-1 min-w-[160px]"
-                      style={{ background: "var(--surface-container-high)", border: "1px solid rgba(66,70,84,0.6)" }}
-                      onMouseEnter={() => {
-                        if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
-                      }}
-                      onMouseLeave={() => {
-                        hoverTimeoutRef.current = setTimeout(() => setHoveredGroup(null), 200);
-                      }}
-                    >
-                      {group.tools.map(({ id, icon: ToolIcon, label }) => (
-                        <button
-                          key={id}
-                          onClick={() => selectToolFromGroup(group.groupId, id as DrawingTool)}
-                          className="w-full text-left px-3 py-1.5 text-[11px] flex items-center gap-2 transition-colors hover:bg-white/5"
-                          style={{
-                            color: drawingTool === id ? "var(--primary)" : "var(--on-surface)",
-                            background: drawingTool === id ? "rgba(14,118,253,0.08)" : "transparent",
-                          }}
-                        >
-                          <ToolIcon size={13} />
-                          {label}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                  onFlyoutEnter={() => {
+                    if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+                  }}
+                  onFlyoutLeave={() => {
+                    hoverTimeoutRef.current = setTimeout(() => setHoveredGroup(null), 200);
+                  }}
+                  onSelectTool={(toolId) => selectToolFromGroup(group.groupId, toolId as DrawingTool)}
+                />
               );
             })}
 
@@ -588,6 +671,8 @@ export default function ChartSection({ symbol = "ETH", orders = [], positions = 
               positions={positions}
               currentPrice={currentPrice}
               loading={loading}
+              initialDrawings={savedDrawings}
+              onDrawingsChange={handleDrawingsChange}
               onClearDrawings={handleClearDrawings}
             />
           ) : (

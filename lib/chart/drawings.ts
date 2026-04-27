@@ -98,12 +98,130 @@ export function createDrawing(
   };
 }
 
+// ── Canvas types ─────────────────────────────────────────────────────────────
+type Pt = [number, number];
+
+// ── Hit-testing (check if a pixel coordinate is near a drawing) ──────────────
+function ptToSegDist(px: number, py: number, ax: number, ay: number, bx: number, by: number): number {
+  const dx = bx - ax, dy = by - ay;
+  const lenSq = dx * dx + dy * dy;
+  if (lenSq === 0) return Math.hypot(px - ax, py - ay);
+  let t = ((px - ax) * dx + (py - ay) * dy) / lenSq;
+  t = Math.max(0, Math.min(1, t));
+  return Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
+}
+
+function ptInRect(px: number, py: number, ax: number, ay: number, bx: number, by: number): boolean {
+  const x1 = Math.min(ax, bx), x2 = Math.max(ax, bx);
+  const y1 = Math.min(ay, by), y2 = Math.max(ay, by);
+  return px >= x1 && px <= x2 && py >= y1 && py <= y2;
+}
+
+/** Returns true if pixel (px, py) is within `threshold` pixels of the drawing. */
+export function hitTestDrawing(
+  drawing: Drawing,
+  px: number,
+  py: number,
+  converter: CoordConverter,
+  threshold = 8,
+): boolean {
+  const pts = drawing.points.map(p => {
+    const x = converter.timeToX(p.time);
+    const y = converter.priceToY(p.price);
+    if (x == null || y == null) return null;
+    return [x, y] as Pt;
+  }).filter(Boolean) as Pt[];
+
+  if (pts.length === 0) return false;
+
+  switch (drawing.type) {
+    case "trendline": case "ray": case "extended_line": case "arrow":
+    case "regression_channel":
+      if (pts.length >= 2) return ptToSegDist(px, py, pts[0][0], pts[0][1], pts[1][0], pts[1][1]) <= threshold;
+      break;
+    case "hline":
+      if (pts.length >= 1) return Math.abs(py - pts[0][1]) <= threshold;
+      break;
+    case "vline":
+      if (pts.length >= 1) return Math.abs(px - pts[0][0]) <= threshold;
+      break;
+    case "rect": case "long_position": case "short_position":
+    case "price_range": case "date_range": case "date_price_range":
+      if (pts.length >= 2) return ptInRect(px, py, pts[0][0], pts[0][1], pts[1][0], pts[1][1]);
+      break;
+    case "circle":
+      if (pts.length >= 2) {
+        const r = Math.hypot(pts[1][0] - pts[0][0], pts[1][1] - pts[0][1]);
+        const d = Math.hypot(px - pts[0][0], py - pts[0][1]);
+        return Math.abs(d - r) <= threshold;
+      }
+      break;
+    case "ellipse":
+      if (pts.length >= 2) return ptInRect(px, py, pts[0][0], pts[0][1], pts[1][0], pts[1][1]);
+      break;
+    case "triangle": case "parallel_channel": case "fib_channel":
+      if (pts.length >= 3) {
+        for (let i = 0; i < pts.length - 1; i++) {
+          if (ptToSegDist(px, py, pts[i][0], pts[i][1], pts[i+1][0], pts[i+1][1]) <= threshold) return true;
+        }
+        return ptToSegDist(px, py, pts[pts.length-1][0], pts[pts.length-1][1], pts[0][0], pts[0][1]) <= threshold;
+      }
+      break;
+    case "fib_retrace": case "fib_extension": case "fib_time_zone":
+      if (pts.length >= 2) return ptToSegDist(px, py, pts[0][0], pts[0][1], pts[1][0], pts[1][1]) <= threshold * 2;
+      break;
+    default:
+      // Multi-point patterns: check proximity to any segment
+      for (let i = 0; i < pts.length - 1; i++) {
+        if (ptToSegDist(px, py, pts[i][0], pts[i][1], pts[i+1][0], pts[i+1][1]) <= threshold) return true;
+      }
+      // Single-point tools (text, note, etc.)
+      if (pts.length === 1) return Math.hypot(px - pts[0][0], py - pts[0][1]) <= threshold * 2;
+      break;
+  }
+  return false;
+}
+
+/** Move all points of a drawing by a price/time delta. */
+export function moveDrawing(drawing: Drawing, timeDelta: number, priceDelta: number): Drawing {
+  return {
+    ...drawing,
+    points: drawing.points.map(p => ({
+      time: p.time + timeDelta,
+      price: p.price + priceDelta,
+    })),
+  };
+}
+
+/** Render selection highlight (circles at anchor points). */
+export function renderSelectionHandles(
+  ctx: CanvasRenderingContext2D,
+  drawing: Drawing,
+  converter: CoordConverter,
+) {
+  const pts = drawing.points.map(p => {
+    const x = converter.timeToX(p.time);
+    const y = converter.priceToY(p.price);
+    if (x == null || y == null) return null;
+    return [x, y] as Pt;
+  }).filter(Boolean) as Pt[];
+
+  ctx.fillStyle = "#0E76FD";
+  ctx.strokeStyle = "#FFFFFF";
+  ctx.lineWidth = 1.5;
+  for (const [x, y] of pts) {
+    ctx.beginPath();
+    ctx.arc(x, y, 5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+  }
+}
+
 // ── Fib constants ────────────────────────────────────────────────────────────
 const FIB_LEVELS = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1];
 const FIB_COLORS = ["#787B86", "#F44336", "#FF9800", "#4CAF50", "#00BCD4", "#2196F3", "#787B86"];
 
 // ── Canvas rendering ─────────────────────────────────────────────────────────
-type Pt = [number, number];
 
 function toXY(pt: DrawingPoint, c: CoordConverter): Pt | null {
   const x = c.timeToX(pt.time);
