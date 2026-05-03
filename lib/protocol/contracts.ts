@@ -73,7 +73,7 @@ type NetworkKey = keyof typeof addresses;
 function getNetwork(): NetworkKey {
   const chainId = process.env.NEXT_PUBLIC_CHAIN_ID ?? "31337";
   const map: Record<string, NetworkKey> = {
-    "31337": "localhost",
+    "31337": "localhost", // GO Testnet uses localhost addresses for now
     "11155111": "localhost", // Sepolia uses localhost addresses for now
     "97": "localhost", // BSC Testnet uses localhost addresses for now
     "421614": "localhost", // Arbitrum Sepolia uses localhost addresses for now

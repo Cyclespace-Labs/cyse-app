@@ -78,7 +78,7 @@ export function useOrderKeeper({
         console.log(`[OrderKeeper] executeDecreaseOrder submitted hash=${hash}`);
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
-        if (!msg.includes("503") && !msg.includes("not configured")) {
+        if (!msg.includes("503") && !msg.includes("not configured") && !msg.includes("invalid price for execution")) {
           console.error(`[OrderKeeper] executeDecreaseOrder failed (order ${order.index}):`, msg);
         }
       } finally {
@@ -112,7 +112,7 @@ export function useOrderKeeper({
         console.log(`[OrderKeeper] executeIncreaseOrder submitted hash=${hash}`);
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
-        if (!msg.includes("503") && !msg.includes("not configured")) {
+        if (!msg.includes("503") && !msg.includes("not configured") && !msg.includes("invalid price for execution")) {
           console.error(`[OrderKeeper] executeIncreaseOrder failed (order ${order.index}):`, msg);
         }
       } finally {

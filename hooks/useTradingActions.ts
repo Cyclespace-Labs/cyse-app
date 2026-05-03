@@ -100,12 +100,21 @@ export function useTradingActions() {
     });
   }, [minExecFee, executionFee]);
 
-  const { data: routerApproved } = useReadContract({
+  const { data: routerApprovedPositionManager } = useReadContract({
     ...contracts.router,
     functionName: "approvedPlugins",
     args: address ? [address, contracts.positionManager.address] : undefined,
     query: { enabled: !!address },
   });
+
+  const { data: routerApprovedOrderBook } = useReadContract({
+    ...contracts.router,
+    functionName: "approvedPlugins",
+    args: address ? [address, contracts.orderBook.address] : undefined,
+    query: { enabled: !!address },
+  });
+
+  const routerApproved = !!routerApprovedPositionManager && !!routerApprovedOrderBook;
 
   const { data: vaultRouterApproved } = useReadContract({
     ...contracts.vault,
@@ -117,12 +126,22 @@ export function useTradingActions() {
   const approvePlugin = useCallback(async () => {
     setTxStatus({ state: "pending" });
     try {
-      const hash = await writeContractAsync({
-        ...contracts.router,
-        functionName: "approvePlugin",
-        args: [contracts.positionManager.address],
-        gas: 100_000n,
-      });
+      let hash: `0x${string}`;
+      if (!routerApprovedPositionManager) {
+        hash = await writeContractAsync({
+          ...contracts.router,
+          functionName: "approvePlugin",
+          args: [contracts.positionManager.address],
+          gas: 100_000n,
+        });
+      } else {
+        hash = await writeContractAsync({
+          ...contracts.router,
+          functionName: "approvePlugin",
+          args: [contracts.orderBook.address],
+          gas: 100_000n,
+        });
+      }
       setPendingHash(hash);
       setTxStatus({ state: "submitted", hash });
       return hash;
@@ -131,7 +150,7 @@ export function useTradingActions() {
       setTxStatus({ state: "failed", error: message });
       return null;
     }
-  }, [writeContractAsync]);
+  }, [routerApprovedPositionManager, writeContractAsync]);
 
   const approveVaultRouter = useCallback(async () => {
     if (!address) return null;
@@ -217,14 +236,14 @@ export function useTradingActions() {
         // Router wraps native ETH → WETH → swaps to USDC via the path.
         const hash = isEth
           ? await writeContractAsync({
-              ...contracts.router,
+              ...contracts.positionManager,
               functionName: "increasePositionETH",
               args: [path, indexToken, 0n, sizeDelta, isLong, slippedPrice],
               value: collateralAmount,
               gas: 1_000_000n,
             })
           : await writeContractAsync({
-              ...contracts.router,
+              ...contracts.positionManager,
               functionName: "increasePosition",
               args: [path, indexToken, collateralAmount, 0n, sizeDelta, isLong, slippedPrice],
               gas: 800_000n,
@@ -273,7 +292,7 @@ export function useTradingActions() {
 
         // For ETH collateral: use decreasePositionETH so proceeds are unwrapped to native ETH.
         const hash = await writeContractAsync({
-          ...contracts.router,
+          ...contracts.positionManager,
           functionName: isEth ? "decreasePositionETH" : "decreasePosition",
           args: [effectiveCollateral, indexToken, collateralDelta, sizeDelta, isLong, address, slippedPrice],
           gas: isEth ? 800_000n : 600_000n,
