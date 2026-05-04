@@ -1,6 +1,6 @@
 "use client";
 
-import { Search, Bell, Settings, Globe, X, Wallet, ChevronDown, CheckCircle2, AlertCircle, Info, Zap, Moon, Sun, Monitor, Volume2, VolumeX, Shield, HelpCircle, LogOut, Loader2, AlertTriangle } from "lucide-react";
+import { Search, Bell, Settings, Globe, X, Wallet, ChevronDown, CheckCircle2, AlertCircle, Info, Zap, Moon, Sun, Monitor, Volume2, VolumeX, Shield, HelpCircle, LogOut, Loader2, AlertTriangle, Eye, EyeOff } from "lucide-react";
 import { Tourney } from "next/font/google";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -50,6 +50,7 @@ export default function TopNavigation() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [mounted, setMounted] = useState(false);
+  const [hideBalances, setHideBalances] = useState(false);
 
   // Global account equity: wallet balance (native ETH → USD) + all position unrealized PnL
   const { data: nativeBalance } = useBalance({
@@ -65,11 +66,56 @@ export default function TopNavigation() {
   const { positions } = useAllPositions();
 
   const ethPrice = ethPriceRaw ? parseFloat(formatUnits(ethPriceRaw as bigint, 30)) : 0;
-  const walletUsd = nativeBalance?.value
-    ? parseFloat(formatUnits(nativeBalance.value, 18)) * ethPrice
+  const nativeBalanceEth = nativeBalance?.value
+    ? parseFloat(formatUnits(nativeBalance.value, nativeBalance.decimals))
     : 0;
+  const [walletUsdSnapshot, setWalletUsdSnapshot] = useState<{ balance: number; usd: number }>({ balance: 0, usd: 0 });
+  const hasNativeBalanceData = Boolean(nativeBalance);
+
+  useEffect(() => {
+    if (!wallet.connected) {
+      if (walletUsdSnapshot.balance !== 0 || walletUsdSnapshot.usd !== 0) {
+        setWalletUsdSnapshot({ balance: 0, usd: 0 });
+      }
+      return;
+    }
+
+    if (!hasNativeBalanceData || ethPrice <= 0) return;
+
+    const balanceChanged = Math.abs(nativeBalanceEth - walletUsdSnapshot.balance) > 1e-7;
+    const snapshotUninitialized = walletUsdSnapshot.balance === 0 && walletUsdSnapshot.usd === 0;
+    if ((snapshotUninitialized || balanceChanged) && Number.isFinite(nativeBalanceEth)) {
+      setWalletUsdSnapshot({ balance: nativeBalanceEth, usd: nativeBalanceEth * ethPrice });
+    }
+  }, [wallet.connected, hasNativeBalanceData, nativeBalanceEth, ethPrice, walletUsdSnapshot.balance, walletUsdSnapshot.usd]);
+
+  useEffect(() => {
+    if (!wallet.connected) {
+      setWalletUsdSnapshot({ balance: 0, usd: 0 });
+    }
+  }, [wallet.connected, wallet.address]);
+
+  const staticWalletUsd = wallet.connected ? walletUsdSnapshot.usd : 0;
   const totalPnl = positions.reduce((sum, p) => sum + p.unrealizedPnl, 0);
-  const equity = walletUsd + totalPnl;
+  const equity = staticWalletUsd + totalPnl;
+  const showLiveDelta = Math.abs(totalPnl) >= 0.01;
+  const equityTooltip = hideBalances
+    ? "Balances hidden"
+    : `Balance $${staticWalletUsd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} | Equity $${equity.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const balanceLabel = hideBalances
+    ? "••••"
+    : `$${staticWalletUsd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const equityLabel = hideBalances
+    ? "••••"
+    : `$${equity.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const deltaLabel = hideBalances
+    ? ""
+    : showLiveDelta
+      ? `(Δ ${totalPnl >= 0 ? "+" : ""}${totalPnl.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`
+      : "";
+  const nativeTokenLabel = hideBalances
+    ? "••••"
+    : `${wallet.balance.toLocaleString("en-US", { minimumFractionDigits: 4 })} ${wallet.nativeCurrencySymbol}`;
 
   useEffect(() => {
     setMounted(true);
@@ -374,35 +420,53 @@ export default function TopNavigation() {
               </div>
             )}
 
-            <div
-              className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-[12px] font-mono"
-              style={{ background: "var(--surface-container)", color: "var(--on-surface-variant)" }}
-            >
-              <div
-                className="w-2 h-2 rounded-full"
-                style={{
-                  background: wallet.isCorrectNetwork
-                    ? wallet.securityLevel === "secure"
-                      ? "var(--buy)"
-                      : "var(--primary)"
-                    : "#FFA500",
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => setHideBalances((prev) => !prev)}
+                className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold transition-colors"
+                style={{ background: "var(--surface-container)", color: "var(--on-surface-muted)" }}
+                title={hideBalances ? "Show balances" : "Hide balances"}
+                onMouseEnter={(e) => {
+                  (e.currentTarget as HTMLElement).style.color = "var(--on-surface)";
                 }}
-              />
-              <span
-                style={{ color: totalPnl >= 0 ? "var(--buy)" : totalPnl < 0 ? "var(--sell)" : "var(--on-surface)" }}
-                title={`Wallet $${walletUsd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} + PnL $${totalPnl.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLElement).style.color = "var(--on-surface-muted)";
+                }}
               >
-                ${equity.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                {totalPnl !== 0 && (
-                  <span className="text-[10px] ml-0.5">
-                    ({totalPnl >= 0 ? "+" : ""}{totalPnl.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
-                  </span>
-                )}
-              </span>
-              <span className="opacity-50">|</span>
-              <span style={{ color: "var(--on-surface)" }}>{wallet.balance.toLocaleString("en-US", { minimumFractionDigits: 4 })} {wallet.nativeCurrencySymbol}</span>
-              <span className="opacity-50">|</span>
-              <span>{wallet.shortAddress}</span>
+                {hideBalances ? <EyeOff size={12} /> : <Eye size={12} />}
+                <span>{hideBalances ? "Show" : "Hide"}</span>
+              </button>
+              <div
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-[12px] font-mono"
+                style={{ background: "var(--surface-container)", color: "var(--on-surface-variant)" }}
+              >
+                <div
+                  className="w-2 h-2 rounded-full"
+                  style={{
+                    background: wallet.isCorrectNetwork
+                      ? wallet.securityLevel === "secure"
+                        ? "var(--buy)"
+                        : "var(--primary)"
+                      : "#FFA500",
+                  }}
+                />
+                <div className="flex flex-col leading-tight" title={equityTooltip}>
+                  <div className="flex items-center gap-2 text-[12px]" style={{ color: "var(--on-surface)" }}>
+                    <span
+                      style={{ color: hideBalances ? "var(--on-surface-muted)" : totalPnl >= 0 ? "var(--buy)" : totalPnl < 0 ? "var(--sell)" : "var(--on-surface-muted)" }}
+                    >
+                      Equity {equityLabel}
+                      {!hideBalances && deltaLabel && <span className="ml-1">{deltaLabel}</span>}
+                    </span>
+                    <span className="opacity-50">|</span>
+                    <span>Balance {balanceLabel}</span>
+                  </div>
+                </div>
+                <span className="opacity-50">|</span>
+                <span style={{ color: "var(--on-surface)" }}>{nativeTokenLabel}</span>
+                <span className="opacity-50">|</span>
+                <span>{hideBalances ? "••••" : wallet.shortAddress}</span>
+              </div>
             </div>
             <button
               onClick={disconnect}

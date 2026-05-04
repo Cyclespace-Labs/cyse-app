@@ -85,6 +85,8 @@ export function useOpenOrders(indexToken?: `0x${string}`) {
           executionFee: raw[8] as bigint,
         };
         if (order.sizeDelta === 0n) return null;
+        if (order.indexToken === "0x0000000000000000000000000000000000000000") return null;
+        if (order.purchaseToken === "0x0000000000000000000000000000000000000000") return null;
         if (indexToken && order.indexToken.toLowerCase() !== indexToken.toLowerCase()) return null;
         return order;
       })
@@ -110,6 +112,8 @@ export function useOpenOrders(indexToken?: `0x${string}`) {
           executionFee: raw[7] as bigint,
         };
         if (order.sizeDelta === 0n) return null;
+        if (order.indexToken === "0x0000000000000000000000000000000000000000") return null;
+        if (order.collateralToken === "0x0000000000000000000000000000000000000000") return null;
         if (indexToken && order.indexToken.toLowerCase() !== indexToken.toLowerCase()) return null;
         return order;
       })

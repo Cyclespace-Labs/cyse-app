@@ -236,14 +236,14 @@ export function useTradingActions() {
         // Router wraps native ETH → WETH → swaps to USDC via the path.
         const hash = isEth
           ? await writeContractAsync({
-              ...contracts.positionManager,
+              ...contracts.router,
               functionName: "increasePositionETH",
               args: [path, indexToken, 0n, sizeDelta, isLong, slippedPrice],
               value: collateralAmount,
               gas: 1_000_000n,
             })
           : await writeContractAsync({
-              ...contracts.positionManager,
+              ...contracts.router,
               functionName: "increasePosition",
               args: [path, indexToken, collateralAmount, 0n, sizeDelta, isLong, slippedPrice],
               gas: 800_000n,
@@ -292,7 +292,7 @@ export function useTradingActions() {
 
         // For ETH collateral: use decreasePositionETH so proceeds are unwrapped to native ETH.
         const hash = await writeContractAsync({
-          ...contracts.positionManager,
+          ...contracts.router,
           functionName: isEth ? "decreasePositionETH" : "decreasePosition",
           args: [effectiveCollateral, indexToken, collateralDelta, sizeDelta, isLong, address, slippedPrice],
           gas: isEth ? 800_000n : 600_000n,
