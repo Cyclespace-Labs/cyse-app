@@ -78,7 +78,7 @@ export function useOrderKeeper({
         console.log(`[OrderKeeper] executeDecreaseOrder submitted hash=${hash}`);
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
-        if (!msg.includes("503") && !msg.includes("not configured") && !msg.includes("invalid price for execution")) {
+        if (!msg.includes("503") && !msg.includes("not configured") && !msg.includes("invalid price for execution") && !msg.includes("reverted without a reason string")) {
           console.error(`[OrderKeeper] executeDecreaseOrder failed (order ${order.index}):`, msg);
         }
       } finally {
@@ -112,7 +112,7 @@ export function useOrderKeeper({
         console.log(`[OrderKeeper] executeIncreaseOrder submitted hash=${hash}`);
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
-        if (!msg.includes("503") && !msg.includes("not configured") && !msg.includes("invalid price for execution") && !msg.includes("VaultPriceFeed: invalid price feed")) {
+        if (!msg.includes("503") && !msg.includes("not configured") && !msg.includes("invalid price for execution") && !msg.includes("VaultPriceFeed: invalid price feed") && !msg.includes("reverted without a reason string")) {
           console.error(`[OrderKeeper] executeIncreaseOrder failed (order ${order.index}):`, msg);
         }
       } finally {
