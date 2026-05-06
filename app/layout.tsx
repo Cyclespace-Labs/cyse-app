@@ -5,9 +5,11 @@ import "@rainbow-me/rainbowkit/styles.css";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { WalletProvider } from "@/contexts/WalletContext";
 import { Providers } from "@/components/Providers";
+import { cn } from "@/lib/utils";
+
 
 const alexandria = Alexandria({
-  variable: "--font-alexandria",
+  variable: "--font-sans",
   subsets: ["latin"],
   weight: ["300", "400", "500", "600", "700", "800"],
   display: "swap",
@@ -54,10 +56,16 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${alexandria.variable} ${geistMono.variable} h-full font-sans antialiased`}
+      className={cn( alexandria.variable, geistMono.variable, "h-full", "font-sans", "antialiased")}
     >
       <body className="min-h-full flex flex-col">
-        <ThemeProvider><Providers><WalletProvider>{children}</WalletProvider></Providers></ThemeProvider>
+        <ThemeProvider>
+          <Providers>
+            <WalletProvider>
+              {children}
+            </WalletProvider>
+          </Providers>
+        </ThemeProvider>
       </body>
     </html>
   );

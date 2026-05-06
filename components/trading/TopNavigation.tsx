@@ -41,7 +41,7 @@ const notifIconColor: Record<string, string> = {
 
 export default function TopNavigation() {
   const pathname = usePathname();
-  const { theme, toggleTheme, mounted: themeMounted } = useTheme();
+  const { theme, toggleTheme, resolvedTheme } = useTheme();
   const { wallet, CustomConnectButton, disconnect } = useWallet();
   const [primaryColor, setPrimaryColor] = useState("#0E76FD");
   const [searchOpen, setSearchOpen] = useState(false);
@@ -169,8 +169,7 @@ export default function TopNavigation() {
 
   return (
     <header
-      className="flex items-center justify-between h-12 px-4 shrink-0 relative z-40"
-      style={{ background: "var(--surface-container-lowest)", borderBottom: "1px solid rgba(66,70,84,0.4)" }}
+      className="flex items-center justify-between h-12 px-4 shrink-0 relative z-40 bg-slate-50 dark:bg-slate-900 font-sans "
     >
       {/* Left: Logo + Nav */}
       <div className="flex items-center gap-1">
@@ -190,10 +189,7 @@ export default function TopNavigation() {
             <Link
               key={item.label}
               href={item.href}
-              className="flex items-center gap-0.5 px-3 py-1.5 text-[13px] rounded transition-colors"
-              style={{ color: isActive ? "var(--on-surface)" : "var(--on-surface-muted)", background: isActive ? "var(--surface-container)" : "transparent" }}
-              onMouseEnter={(e) => { if (!isActive) { (e.currentTarget as HTMLElement).style.color = "var(--on-surface)"; (e.currentTarget as HTMLElement).style.background = "var(--surface-container-low)"; } }}
-              onMouseLeave={(e) => { if (!isActive) { (e.currentTarget as HTMLElement).style.color = "var(--on-surface-muted)"; (e.currentTarget as HTMLElement).style.background = "transparent"; } }}
+              className="flex items-center gap-0.5 px-3 py-1.5 text-[13px] rounded transition-colors selected:bg-slate-200 dark:selected:bg-slate-600 active:bg-slate-200 dark:active:bg-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800"
             >
               {item.label}
               {item.hasDropdown && <ChevronDown size={11} style={{ opacity: 0.6 }} />}
@@ -242,7 +238,7 @@ export default function TopNavigation() {
         {iconBtn(() => {}, "Language", <Globe size={15} />)}
 
         {/* Theme Toggle */}
-        {themeMounted && iconBtn(toggleTheme, theme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode", theme === "dark" ? <Sun size={15} /> : <Moon size={15} />)}
+        {resolvedTheme && iconBtn(toggleTheme, resolvedTheme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode", resolvedTheme === "dark" ? <Sun size={15} /> : <Moon size={15} />)}
 
         {/* Notifications */}
         <div className="relative" ref={notifRef}>
