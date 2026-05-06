@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { ChevronDown, Loader2, X, AlertTriangle, Shield } from "lucide-react";
 import { TokenPriceData } from "@/types/trading";
 import { getTickSize } from "@/lib/tradingData";
@@ -34,6 +34,13 @@ const TOKEN_CONFIG = {
 const COLLATERAL_TOKENS = ["WETH", "USDC", "USDT"];
 const INDEX_TOKENS = ["WETH", "BTC"];
 
+const TOKEN_ICONS: Record<string, string> = {
+  WETH: "/tokens/Ethereum ETH.svg",
+  USDC: "/tokens/USD Coin.svg",
+  USDT: "/tokens/Tether.svg",
+  BTC: "/tokens/Bitcoin.svg",
+};
+
 interface TradingPanelProps {
   symbol: string;
   tokenPriceData: TokenPriceData | null;
@@ -54,6 +61,23 @@ export default function TradingPanel({
   // Token selection state
   const [selectedCollateralTokenKey, setSelectedCollateralTokenKey] = useState<"WETH" | "USDC" | "USDT">("WETH");
   const [selectedIndexTokenKey, setSelectedIndexTokenKey] = useState<"WETH" | "BTC">("WETH");
+  const [collateralDropdownOpen, setCollateralDropdownOpen] = useState(false);
+  const [indexDropdownOpen, setIndexDropdownOpen] = useState(false);
+  const collateralDropdownRef = useRef<HTMLDivElement>(null);
+  const indexDropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (collateralDropdownRef.current && !collateralDropdownRef.current.contains(e.target as Node)) {
+        setCollateralDropdownOpen(false);
+      }
+      if (indexDropdownRef.current && !indexDropdownRef.current.contains(e.target as Node)) {
+        setIndexDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const [activeType, setActiveType] = useState("Limit");
   const [side, setSide] = useState<"buy" | "sell">("buy");
@@ -657,54 +681,126 @@ export default function TradingPanel({
         {/* Token Selection */}
         <div className="grid grid-cols-2 gap-2">
           {/* Collateral Token */}
-          <div>
+          <div ref={collateralDropdownRef} className="relative">
             <label className="text-[11px] mb-1 block" style={{ color: "var(--on-surface-disabled)" }}>Collateral</label>
-            <div className="relative">
-              <select
-                value={selectedCollateralTokenKey}
-                onChange={(e) => setSelectedCollateralTokenKey(e.target.value as "WETH" | "USDC" | "USDT")}
-                className="w-full px-2 py-1.5 text-[11px] rounded outline-none font-mono"
-                style={{
-                  background: "var(--surface-container-low)",
-                  color: "var(--on-surface)",
-                  border: "1px solid var(--outline-variant)",
-                  appearance: "none",
-                  paddingRight: "24px",
-                }}
+            <button
+              onClick={() => { setCollateralDropdownOpen((v) => !v); setIndexDropdownOpen(false); }}
+              className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded transition-colors"
+              style={{
+                background: collateralDropdownOpen ? "var(--surface-container)" : "var(--surface-container-low)",
+                border: `1px solid ${collateralDropdownOpen ? "var(--outline-variant)" : "var(--outline-variant)"}`,
+                color: "var(--on-surface)",
+              }}
+            >
+              {TOKEN_ICONS[selectedCollateralTokenKey] ? (
+                <img src={TOKEN_ICONS[selectedCollateralTokenKey]} alt={selectedCollateralTokenKey} className="w-4 h-4 rounded-full shrink-0 object-contain" />
+              ) : (
+                <div className="w-4 h-4 rounded-full shrink-0 flex items-center justify-center text-white text-[8px] font-bold" style={{ background: "var(--primary)" }}>
+                  {selectedCollateralTokenKey.charAt(0)}
+                </div>
+              )}
+              <span className="flex-1 text-left text-[11px] font-mono">{TOKEN_CONFIG[selectedCollateralTokenKey].symbol}</span>
+              <ChevronDown
+                size={11}
+                className="shrink-0 transition-transform"
+                style={{ color: "var(--on-surface-disabled)", transform: collateralDropdownOpen ? "rotate(180deg)" : "rotate(0deg)" }}
+              />
+            </button>
+            {collateralDropdownOpen && (
+              <div
+                className="absolute left-0 right-0 top-full mt-1 rounded-lg z-20 overflow-hidden"
+                style={{ background: "var(--surface-container-low)", border: "1px solid rgba(66,70,84,0.5)", boxShadow: "0 8px 24px rgba(0,0,0,0.4)" }}
               >
-                {COLLATERAL_TOKENS.map((token) => (
-                  <option key={token} value={token}>
-                    {TOKEN_CONFIG[token as keyof typeof TOKEN_CONFIG].symbol}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: "var(--on-surface-disabled)" }} />
-            </div>
+                {COLLATERAL_TOKENS.map((token) => {
+                  const cfg = TOKEN_CONFIG[token as keyof typeof TOKEN_CONFIG];
+                  const isSelected = token === selectedCollateralTokenKey;
+                  return (
+                    <button
+                      key={token}
+                      onClick={() => { setSelectedCollateralTokenKey(token as "WETH" | "USDC" | "USDT"); setCollateralDropdownOpen(false); }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 transition-colors"
+                      style={{ background: isSelected ? "var(--surface-container)" : "transparent" }}
+                      onMouseEnter={(e) => { if (!isSelected) (e.currentTarget as HTMLElement).style.background = "var(--surface-container)"; }}
+                      onMouseLeave={(e) => { if (!isSelected) (e.currentTarget as HTMLElement).style.background = "transparent"; }}
+                    >
+                      {TOKEN_ICONS[token] ? (
+                        <img src={TOKEN_ICONS[token]} alt={token} className="w-5 h-5 rounded-full shrink-0 object-contain" />
+                      ) : (
+                        <div className="w-5 h-5 rounded-full shrink-0 flex items-center justify-center text-white text-[9px] font-bold" style={{ background: "var(--primary)" }}>
+                          {token.charAt(0)}
+                        </div>
+                      )}
+                      <div className="flex flex-col items-start">
+                        <span className="text-[11px] font-medium" style={{ color: isSelected ? "var(--primary)" : "var(--on-surface)" }}>{cfg.symbol}</span>
+                        <span className="text-[9px]" style={{ color: "var(--on-surface-disabled)" }}>{cfg.name}</span>
+                      </div>
+                      {isSelected && <div className="ml-auto w-1.5 h-1.5 rounded-full" style={{ background: "var(--primary)" }} />}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
           {/* Index Token */}
-          <div>
+          <div ref={indexDropdownRef} className="relative">
             <label className="text-[11px] mb-1 block" style={{ color: "var(--on-surface-disabled)" }}>Index Token</label>
-            <div className="relative">
-              <select
-                value={selectedIndexTokenKey}
-                onChange={(e) => setSelectedIndexTokenKey(e.target.value as "WETH" | "BTC")}
-                className="w-full px-2 py-1.5 text-[11px] rounded outline-none font-mono"
-                style={{
-                  background: "var(--surface-container-low)",
-                  color: "var(--on-surface)",
-                  border: "1px solid var(--outline-variant)",
-                  appearance: "none",
-                  paddingRight: "24px",
-                }}
+            <button
+              onClick={() => { setIndexDropdownOpen((v) => !v); setCollateralDropdownOpen(false); }}
+              className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded transition-colors"
+              style={{
+                background: indexDropdownOpen ? "var(--surface-container)" : "var(--surface-container-low)",
+                border: `1px solid ${indexDropdownOpen ? "var(--outline-variant)" : "var(--outline-variant)"}`,
+                color: "var(--on-surface)",
+              }}
+            >
+              {TOKEN_ICONS[selectedIndexTokenKey] ? (
+                <img src={TOKEN_ICONS[selectedIndexTokenKey]} alt={selectedIndexTokenKey} className="w-4 h-4 rounded-full shrink-0 object-contain" />
+              ) : (
+                <div className="w-4 h-4 rounded-full shrink-0 flex items-center justify-center text-white text-[8px] font-bold" style={{ background: "var(--primary)" }}>
+                  {selectedIndexTokenKey.charAt(0)}
+                </div>
+              )}
+              <span className="flex-1 text-left text-[11px] font-mono">{TOKEN_CONFIG[selectedIndexTokenKey].symbol}</span>
+              <ChevronDown
+                size={11}
+                className="shrink-0 transition-transform"
+                style={{ color: "var(--on-surface-disabled)", transform: indexDropdownOpen ? "rotate(180deg)" : "rotate(0deg)" }}
+              />
+            </button>
+            {indexDropdownOpen && (
+              <div
+                className="absolute left-0 right-0 top-full mt-1 rounded-lg z-20 overflow-hidden"
+                style={{ background: "var(--surface-container-low)", border: "1px solid rgba(66,70,84,0.5)", boxShadow: "0 8px 24px rgba(0,0,0,0.4)" }}
               >
-                {INDEX_TOKENS.map((token) => (
-                  <option key={token} value={token}>
-                    {TOKEN_CONFIG[token as keyof typeof TOKEN_CONFIG].symbol}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: "var(--on-surface-disabled)" }} />
-            </div>
+                {INDEX_TOKENS.map((token) => {
+                  const cfg = TOKEN_CONFIG[token as keyof typeof TOKEN_CONFIG];
+                  const isSelected = token === selectedIndexTokenKey;
+                  return (
+                    <button
+                      key={token}
+                      onClick={() => { setSelectedIndexTokenKey(token as "WETH" | "BTC"); setIndexDropdownOpen(false); }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 transition-colors"
+                      style={{ background: isSelected ? "var(--surface-container)" : "transparent" }}
+                      onMouseEnter={(e) => { if (!isSelected) (e.currentTarget as HTMLElement).style.background = "var(--surface-container)"; }}
+                      onMouseLeave={(e) => { if (!isSelected) (e.currentTarget as HTMLElement).style.background = "transparent"; }}
+                    >
+                      {TOKEN_ICONS[token] ? (
+                        <img src={TOKEN_ICONS[token]} alt={token} className="w-5 h-5 rounded-full shrink-0 object-contain" />
+                      ) : (
+                        <div className="w-5 h-5 rounded-full shrink-0 flex items-center justify-center text-white text-[9px] font-bold" style={{ background: "var(--primary)" }}>
+                          {token.charAt(0)}
+                        </div>
+                      )}
+                      <div className="flex flex-col items-start">
+                        <span className="text-[11px] font-medium" style={{ color: isSelected ? "var(--primary)" : "var(--on-surface)" }}>{cfg.symbol}</span>
+                        <span className="text-[9px]" style={{ color: "var(--on-surface-disabled)" }}>{cfg.name}</span>
+                      </div>
+                      {isSelected && <div className="ml-auto w-1.5 h-1.5 rounded-full" style={{ background: "var(--primary)" }} />}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
 
