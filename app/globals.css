@@ -50,75 +50,211 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+
+  /* --- Custom Surface Hierarchy --------------------------- */
+  --color-surface: var(--surface);
+  --color-surface-lowest: var(--surface-container-lowest);
+  --color-surface-low: var(--surface-container-low);
+  --color-surface-container: var(--surface-container);
+  --color-surface-high: var(--surface-container-high);
+  --color-surface-highest: var(--surface-container-highest);
+  --color-surface-bright: var(--surface-bright);
+  --color-surface-variant: var(--surface-variant);
+
+  /* --- Custom Primary Palette ----------------------------- */
+  --color-primary-container: var(--primary-container);
+  --color-primary-muted: var(--primary-muted);
+  --color-on-primary: var(--on-primary);
+  --color-on-primary-container: var(--on-primary-container);
+
+  /* --- Custom Secondary / Tertiary ------------------------ */
+  --color-secondary-container: var(--secondary-container);
+  --color-on-secondary-container: var(--on-secondary-container);
+  --color-tertiary: var(--tertiary);
+  --color-error-bright: var(--error-bright);
+
+  /* --- Custom Text / On-surface --------------------------- */
+  --color-on-surface: var(--on-surface);
+  --color-on-surface-variant: var(--on-surface-variant);
+  --color-on-surface-muted: var(--on-surface-muted);
+  --color-on-surface-disabled: var(--on-surface-disabled);
+
+  /* --- Custom Outline ------------------------------------- */
+  --color-outline: var(--outline);
+  --color-outline-variant: var(--outline-variant);
+
+  /* --- Semantic Trading ----------------------------------- */
+  --color-buy: var(--buy);
+  --color-buy-container: var(--buy-container);
+  --color-buy-bright: var(--buy-bright);
+  --color-sell: var(--sell);
+  --color-sell-container: var(--sell-container);
+  --color-sell-bright: var(--sell-bright);
+  --color-warning: var(--warning);
+  --color-liquidation: var(--liquidation);
 }
 
+/* ============================================================
+   LIGHT THEME — Slate scale (slate-50 → slate-900)
+   ============================================================ */
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.5942 0.2189 258.6);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  /* shadcn base */
+  --background:              oklch(0.984 0.003 264);   /* slate-50  */
+  --foreground:              oklch(0.13  0.028 264);   /* slate-900 */
+  --card:                    oklch(0.963 0.007 264);   /* slate-100 */
+  --card-foreground:         oklch(0.13  0.028 264);
+  --popover:                 oklch(0.963 0.007 264);   /* slate-100 */
+  --popover-foreground:      oklch(0.13  0.028 264);
+  --primary:                 oklch(0.5942 0.2189 258.6); /* #0E76FD  */
+  --primary-foreground:      oklch(1 0 0);
+  --secondary:               oklch(0.922 0.01  264);   /* slate-200 */
+  --secondary-foreground:    oklch(0.32  0.037 264);   /* slate-700 */
+  --muted:                   oklch(0.922 0.01  264);   /* slate-200 */
+  --muted-foreground:        oklch(0.52  0.03  264);   /* slate-500 */
+  --accent:                  oklch(0.845 0.015 264);   /* slate-300 */
+  --accent-foreground:       oklch(0.21  0.033 264);   /* slate-800 */
+  --destructive:             oklch(0.577 0.245 27.325);
+  --border:                  oklch(0.845 0.015 264);   /* slate-300 */
+  --input:                   oklch(0.922 0.01  264);   /* slate-200 */
+  --ring:                    oklch(0.5942 0.2189 258.6);
+  --chart-1:                 oklch(0.5942 0.2189 258.6);
+  --chart-2:                 oklch(0.704 0.172 158);
+  --chart-3:                 oklch(0.663 0.022 264);   /* slate-400 */
+  --chart-4:                 oklch(0.818 0.124 55);
+  --chart-5:                 oklch(0.638 0.237 27);
+  --radius:                  0.625rem;
+  --sidebar:                 oklch(0.963 0.007 264);   /* slate-100 */
+  --sidebar-foreground:      oklch(0.32  0.037 264);   /* slate-700 */
+  --sidebar-primary:         oklch(0.5942 0.2189 258.6);
+  --sidebar-primary-foreground: oklch(1 0 0);
+  --sidebar-accent:          oklch(0.922 0.01  264);   /* slate-200 */
+  --sidebar-accent-foreground: oklch(0.21  0.033 264);
+  --sidebar-border:          oklch(0.845 0.015 264);   /* slate-300 */
+  --sidebar-ring:            oklch(0.5942 0.2189 258.6);
+
+  /* Custom surface hierarchy — light slate */
+  --surface:                  oklch(0.984 0.003 264);  /* slate-50  */
+  --surface-container-lowest: oklch(1     0     0);    /* white     */
+  --surface-container-low:    oklch(0.963 0.007 264);  /* slate-100 */
+  --surface-container:        oklch(0.922 0.01  264);  /* slate-200 */
+  --surface-container-high:   oklch(0.845 0.015 264);  /* slate-300 */
+  --surface-container-highest:oklch(0.663 0.022 264);  /* slate-400 */
+  --surface-bright:           oklch(1     0     0);
+  --surface-variant:          oklch(0.922 0.01  264);  /* slate-200 */
+
+  /* Primary palette */
+  --primary-container:        oklch(0.845 0.09  258);  /* light blue tint */
+  --primary-muted:            oklch(0.663 0.13  258);
+  --on-primary:               oklch(1 0 0);
+  --on-primary-container:     oklch(0.21  0.14  258);
+
+  /* Secondary / tertiary */
+  --secondary-container:      oklch(0.845 0.015 264);  /* slate-300 */
+  --on-secondary-container:   oklch(0.21  0.033 264);  /* slate-800 */
+  --tertiary:                 oklch(0.672 0.17  55);
+  --error:                    oklch(0.5   0.22  27);
+  --error-bright:             oklch(0.558 0.225 27);
+
+  /* Text / on-surface — light */
+  --on-surface:               oklch(0.13  0.028 264);  /* slate-900 */
+  --on-surface-variant:       oklch(0.32  0.037 264);  /* slate-700 */
+  --on-surface-muted:         oklch(0.52  0.03  264);  /* slate-500 */
+  --on-surface-disabled:      oklch(0.663 0.022 264);  /* slate-400 */
+
+  /* Outline — light */
+  --outline:                  oklch(0.52  0.03  264);  /* slate-500 */
+  --outline-variant:          oklch(0.845 0.015 264);  /* slate-300 */
+
+  /* Semantic trading */
+  --buy:                      oklch(0.631 0.155 158);
+  --buy-container:            oklch(0.942 0.065 158);
+  --buy-bright:               oklch(0.704 0.172 158);
+  --sell:                     oklch(0.558 0.225 27);
+  --sell-container:           oklch(0.955 0.04  22);
+  --sell-bright:              oklch(0.648 0.228 27);
+  --warning:                  oklch(0.657 0.175 52);
+  --liquidation:              oklch(0.682 0.21  40);
 }
 
+/* ============================================================
+   DARK THEME — Slate scale (slate-950 → slate-100)
+   ============================================================ */
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.5942 0.2189 258.6);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  /* shadcn base */
+  --background:              oklch(0.13  0.028 264);   /* slate-900 */
+  --foreground:              oklch(0.963 0.007 264);   /* slate-100 */
+  --card:                    oklch(0.21  0.033 264);   /* slate-800 */
+  --card-foreground:         oklch(0.963 0.007 264);
+  --popover:                 oklch(0.21  0.033 264);   /* slate-800 */
+  --popover-foreground:      oklch(0.963 0.007 264);
+  --primary:                 oklch(0.5942 0.2189 258.6); /* #0E76FD  */
+  --primary-foreground:      oklch(1 0 0);
+  --secondary:               oklch(0.32  0.037 264);   /* slate-700 */
+  --secondary-foreground:    oklch(0.963 0.007 264);
+  --muted:                   oklch(0.32  0.037 264);   /* slate-700 */
+  --muted-foreground:        oklch(0.663 0.022 264);   /* slate-400 */
+  --accent:                  oklch(0.42  0.034 264);   /* slate-600 */
+  --accent-foreground:       oklch(0.963 0.007 264);
+  --destructive:             oklch(0.704 0.191 22.216);
+  --border:                  oklch(1 0 0 / 8%);
+  --input:                   oklch(1 0 0 / 12%);
+  --ring:                    oklch(0.5942 0.2189 258.6);
+  --chart-1:                 oklch(0.5942 0.2189 258.6);
+  --chart-2:                 oklch(0.704 0.172 158);
+  --chart-3:                 oklch(0.663 0.022 264);   /* slate-400 */
+  --chart-4:                 oklch(0.818 0.124 55);
+  --chart-5:                 oklch(0.638 0.237 27);
+  --sidebar:                 oklch(0.13  0.028 264);   /* slate-900 */
+  --sidebar-foreground:      oklch(0.963 0.007 264);
+  --sidebar-primary:         oklch(0.5942 0.2189 258.6);
+  --sidebar-primary-foreground: oklch(1 0 0);
+  --sidebar-accent:          oklch(0.32  0.037 264);   /* slate-700 */
+  --sidebar-accent-foreground: oklch(0.963 0.007 264);
+  --sidebar-border:          oklch(1 0 0 / 8%);
+  --sidebar-ring:            oklch(0.5942 0.2189 258.6);
+
+  /* Custom surface hierarchy — dark slate */
+  --surface:                  oklch(0.13  0.028 264);  /* slate-900 */
+  --surface-container-lowest: oklch(0.13  0.028 264);  /* slate-900 */
+  --surface-container-low:    oklch(0.21  0.033 264);  /* slate-800 */
+  --surface-container:        oklch(0.32  0.037 264);  /* slate-700 */
+  --surface-container-high:   oklch(0.42  0.034 264);  /* slate-600 */
+  --surface-container-highest:oklch(0.42  0.034 264);  /* slate-600 */
+  --surface-bright:           oklch(0.52  0.03  264);  /* slate-500 */
+  --surface-variant:          oklch(0.32  0.037 264);  /* slate-700 */
+
+  /* Primary palette */
+  --primary-container:        oklch(0.42  0.12  258);  /* deep blue-slate */
+  --primary-muted:            oklch(0.663 0.12  258);
+  --on-primary:               oklch(1 0 0);
+  --on-primary-container:     oklch(0.845 0.09  258);
+
+  /* Secondary / tertiary */
+  --secondary-container:      oklch(0.32  0.037 264);  /* slate-700 */
+  --on-secondary-container:   oklch(0.845 0.015 264);  /* slate-300 */
+  --tertiary:                 oklch(0.818 0.124 55);
+  --error:                    oklch(0.818 0.108 22);
+  --error-bright:             oklch(0.638 0.237 27);
+
+  /* Text / on-surface — dark */
+  --on-surface:               oklch(0.963 0.007 264);  /* slate-100 */
+  --on-surface-variant:       oklch(0.845 0.015 264);  /* slate-300 */
+  --on-surface-muted:         oklch(0.663 0.022 264);  /* slate-400 */
+  --on-surface-disabled:      oklch(0.52  0.03  264);  /* slate-500 */
+
+  /* Outline — dark */
+  --outline:                  oklch(0.52  0.03  264);  /* slate-500 */
+  --outline-variant:          oklch(0.32  0.037 264);  /* slate-700 */
+
+  /* Semantic trading */
+  --buy:                      oklch(0.704 0.172 158);
+  --buy-container:            oklch(0.21  0.09  158);
+  --buy-bright:               oklch(0.784 0.185 158);
+  --sell:                     oklch(0.638 0.237 27);
+  --sell-container:           oklch(0.198 0.11  27);
+  --sell-bright:              oklch(0.678 0.2   27);
+  --warning:                  oklch(0.818 0.124 55);
+  --liquidation:              oklch(0.682 0.21  40);
 }
 
 
@@ -173,13 +309,13 @@
    ============================================================ */
 
 .glass {
-  background: rgba(50, 53, 60, 0.5);
+  background: oklch(0.32 0.037 264 / 50%);  /* slate-700/50 */
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
 }
 
 .glass-subtle {
-  background: rgba(29, 32, 38, 0.7);
+  background: oklch(0.21 0.033 264 / 70%);  /* slate-800/70 */
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
 }
@@ -340,7 +476,7 @@ input[type="checkbox"]:checked::after {
    ============================================================ */
 
 .divider-ghost {
-  border-color: rgba(66, 70, 84, 0.15);
+  border-color: oklch(0.32 0.037 264 / 15%);  /* slate-700/15 */
 }
 
 /* ============================================================
@@ -348,10 +484,10 @@ input[type="checkbox"]:checked::after {
    ============================================================ */
 
 .depth-bar-sell {
-  background: rgba(255, 77, 79, 0.1);
+  background: oklch(0.638 0.237 27 / 10%);
 }
 
 .depth-bar-buy {
-  background: rgba(0, 192, 118, 0.1);
+  background: oklch(0.704 0.172 158 / 10%);
 }
 

@@ -159,18 +159,13 @@ export default function TopNavigation() {
       onClick={onClick}
       title={title}
       className="relative p-1.5 rounded transition-colors"
-      style={{ color: active ? "var(--on-surface)" : "var(--on-surface-muted)", background: active ? "var(--surface-container)" : "transparent" }}
-      onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = "var(--on-surface)"; (e.currentTarget as HTMLElement).style.background = "var(--surface-container)"; }}
-      onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = active ? "var(--on-surface)" : "var(--on-surface-muted)"; (e.currentTarget as HTMLElement).style.background = active ? "var(--surface-container)" : "transparent"; }}
     >
       {children}
     </button>
   );
 
   return (
-    <header
-      className="flex items-center justify-between h-12 px-4 shrink-0 relative z-40 bg-slate-50 dark:bg-slate-900 font-sans "
-    >
+    <header className="flex items-center justify-between h-12 px-4 shrink-0 relative z-40 bg-background border-b border-outline-variant font-sans">
       {/* Left: Logo + Nav */}
       <div className="flex items-center gap-1">
         <Link href="/" className="flex items-center gap-1.5 pr-5">
@@ -179,53 +174,44 @@ export default function TopNavigation() {
             <path d="M125.807 21.3854C108.841 22.5059 89 33.4938 89 33.4938C89 33.4938 110.862 35.6524 122.776 41.1486C135.785 47.1503 144.604 53.1327 152.654 64.6696C159.034 73.8123 160.737 90 160.737 90H228C228 90 225.957 79.1846 219.484 68.2883C212.123 53.3962 197.111 40.3233 183.254 32.5196C164.979 22.2275 147.371 19.9612 125.807 21.3854Z" fill={primaryColor} stroke={primaryColor} />
             <path d="M125.807 235.615C108.841 234.494 89 223.506 89 223.506C89 223.506 110.862 221.348 122.776 215.851C135.785 209.85 144.604 203.867 152.654 192.33C159.034 183.188 160.737 167 160.737 167H228C228 167 225.957 177.815 219.484 188.712C212.123 203.604 197.111 216.677 183.254 224.48C164.979 234.773 147.371 237.039 125.807 235.615Z" fill={primaryColor} stroke={primaryColor} />
           </svg>
-          <span className={`${tourney.className} text-md font-semibold bg-linear-to-r from-black to-slate-800 dark:from-white dark:to-slate-200
-             bg-clip-text text-transparent`}>CYCLESPACE</span>
+          <span className={`${tourney.className} text-md font-semibold bg-linear-to-r from-foreground to-on-surface-variant bg-clip-text text-transparent`}>
+            CYCLESPACE
+          </span>
         </Link>
 
-        {navItems.map((item) => {
-          const isActive = pathname === item.href;
-          return (
-            <Link
-              key={item.label}
-              href={item.href}
-              className="flex items-center gap-0.5 px-3 py-1.5 text-[13px] rounded transition-colors selected:bg-slate-200 dark:selected:bg-slate-600 active:bg-slate-200 dark:active:bg-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800"
-            >
-              {item.label}
-              {item.hasDropdown && <ChevronDown size={11} style={{ opacity: 0.6 }} />}
-            </Link>
-          );
-        })}
+        {navItems.map((item) => (
+          <Link
+            key={item.label}
+            href={item.href}
+            className={`flex items-center gap-0.5 px-3 py-1.5 text-[13px] rounded transition-colors text-on-surface-variant hover:text-on-surface hover:bg-surface-high ${pathname === item.href ? "bg-surface-high text-on-surface" : ""}`}
+          >
+            {item.label}
+            {item.hasDropdown && <ChevronDown size={11} className="opacity-60" />}
+          </Link>
+        ))}
       </div>
 
       {/* Right: Actions */}
       <div className="flex items-center gap-1">
 
         {/* Expandable Search */}
-        <div className="flex items-center">
+        <div className="flex items-center text-on-surface-muted">
           {searchOpen ? (
-            <div
-              className="flex items-center gap-2 rounded-lg px-3 py-1.5 transition-all"
-              style={{ background: "var(--surface-container)", border: "1px solid rgba(66,70,84,0.6)", width: "260px" }}
-            >
-              <Search size={13} style={{ color: "var(--on-surface-disabled)", flexShrink: 0 }} />
+            <div className="flex items-center gap-2 rounded-lg px-3 py-1.5 transition-all bg-surface-low border border-outline-variant w-[260px]">
+              <Search size={13} className="text-on-surface-disabled shrink-0" />
               <input
                 ref={searchRef}
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search markets, tokens..."
-                className="flex-1 bg-transparent text-[12px] outline-none"
-                style={{ color: "var(--on-surface)" }}
+                className="flex-1 bg-transparent text-[12px] outline-none text-on-surface placeholder:text-on-surface-disabled"
                 onKeyDown={(e) => { if (e.key === "Escape") { setSearchOpen(false); setSearchQuery(""); } }}
               />
               <button
                 onClick={() => { setSearchOpen(false); setSearchQuery(""); }}
                 title="Close search"
-                className="p-0.5 rounded transition-colors"
-                style={{ color: "var(--on-surface-disabled)" }}
-                onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.color = "var(--on-surface)")}
-                onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.color = "var(--on-surface-disabled)")}
+                className="p-0.5 rounded transition-colors text-on-surface-muted hover:text-on-surface"
               >
                 <X size={13} />
               </button>
@@ -235,66 +221,60 @@ export default function TopNavigation() {
           )}
         </div>
 
-        {iconBtn(() => {}, "Language", <Globe size={15} />)}
+        {iconBtn(() => {}, "Language", <Globe size={15} className="text-on-surface-muted" />)}
 
         {/* Theme Toggle */}
-        {resolvedTheme && iconBtn(toggleTheme, resolvedTheme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode", resolvedTheme === "dark" ? <Sun size={15} /> : <Moon size={15} />)}
+        {resolvedTheme && iconBtn(
+          toggleTheme,
+          resolvedTheme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode",
+          resolvedTheme === "dark"
+            ? <Sun size={15} className="text-on-surface-muted" />
+            : <Moon size={15} className="text-on-surface-muted" />
+        )}
 
         {/* Notifications */}
         <div className="relative" ref={notifRef}>
           <button
             onClick={() => { setNotifOpen(!notifOpen); setSettingsOpen(false); }}
             title="Notifications"
-            className="relative p-1.5 rounded transition-colors"
-            style={{ color: notifOpen ? "var(--on-surface)" : "var(--on-surface-muted)", background: notifOpen ? "var(--surface-container)" : "transparent" }}
-            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = "var(--on-surface)"; (e.currentTarget as HTMLElement).style.background = "var(--surface-container)"; }}
-            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = notifOpen ? "var(--on-surface)" : "var(--on-surface-muted)"; (e.currentTarget as HTMLElement).style.background = notifOpen ? "var(--surface-container)" : "transparent"; }}
+            className="relative p-1.5 rounded transition-colors text-on-surface-muted hover:text-on-surface hover:bg-surface-high"
           >
             <Bell size={15} />
             {unreadCount > 0 && (
-              <span
-                className="absolute top-0.5 right-0.5 w-3.5 h-3.5 rounded-full flex items-center justify-center text-[8px] font-bold"
-                style={{ background: "var(--sell)", color: "#fff" }}
-              >
+              <span className="absolute top-0.5 right-0.5 w-3.5 h-3.5 rounded-full flex items-center justify-center text-[8px] font-bold bg-primary text-on-primary">
                 {unreadCount}
               </span>
             )}
           </button>
 
           {notifOpen && (
-            <div
-              className="absolute right-0 top-full mt-2 w-[340px] rounded-xl overflow-hidden shadow-2xl z-50"
-              style={{ background: "var(--surface-container-low)", border: "1px solid rgba(66,70,84,0.5)" }}
-            >
-              <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: "1px solid rgba(66,70,84,0.4)" }}>
-                <span className="text-[13px] font-semibold" style={{ color: "var(--on-surface)" }}>Notifications</span>
-                <button className="text-[11px] transition-colors" style={{ color: "var(--primary)" }}>Mark all read</button>
+            <div className="absolute right-0 top-full mt-2 w-[340px] rounded-xl overflow-hidden shadow-2xl z-50 bg-surface-low border border-outline-variant">
+              <div className="flex items-center justify-between px-4 py-3 border-b border-outline-variant">
+                <span className="text-[13px] font-semibold text-on-surface">Notifications</span>
+                <button className="text-[11px] transition-colors text-primary hover:text-primary/80">Mark all read</button>
               </div>
               <div className="max-h-[320px] overflow-y-auto">
                 {mockNotifications.map((n) => (
                   <div
                     key={n.id}
-                    className="flex items-start gap-3 px-4 py-3 cursor-pointer transition-colors"
-                    style={{ borderBottom: "1px solid rgba(66,70,84,0.2)", background: n.unread ? "rgba(14,118,253,0.04)" : "transparent" }}
-                    onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = "var(--surface-container)")}
-                    onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = n.unread ? "rgba(14,118,253,0.04)" : "transparent")}
+                    className={`flex items-start gap-3 px-4 py-3 cursor-pointer transition-colors border-b border-outline-variant/50 hover:bg-surface-container ${n.unread ? "bg-primary/[0.04]" : "bg-transparent"}`}
                   >
                     <div className="mt-0.5 shrink-0">
                       <n.icon size={14} style={{ color: notifIconColor[n.type] }} />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-2">
-                        <span className="text-[12px] font-medium" style={{ color: "var(--on-surface)" }}>{n.title}</span>
-                        <span className="text-[10px] shrink-0" style={{ color: "var(--on-surface-disabled)" }}>{n.time}</span>
+                        <span className="text-[12px] font-medium text-on-surface">{n.title}</span>
+                        <span className="text-[10px] shrink-0 text-on-surface-disabled">{n.time}</span>
                       </div>
-                      <p className="text-[11px] mt-0.5 leading-relaxed" style={{ color: "var(--on-surface-muted)" }}>{n.body}</p>
+                      <p className="text-[11px] mt-0.5 leading-relaxed text-on-surface-muted">{n.body}</p>
                     </div>
-                    {n.unread && <div className="w-1.5 h-1.5 rounded-full mt-1.5 shrink-0" style={{ background: "var(--primary)" }} />}
+                    {n.unread && <div className="w-1.5 h-1.5 rounded-full mt-1.5 shrink-0 bg-primary" />}
                   </div>
                 ))}
               </div>
-              <div className="px-4 py-2.5 text-center" style={{ borderTop: "1px solid rgba(66,70,84,0.3)" }}>
-                <button className="text-[11px] transition-colors" style={{ color: "var(--on-surface-muted)" }}>View all notifications</button>
+              <div className="px-4 py-2.5 text-center border-t border-outline-variant/60">
+                <button className="text-[11px] transition-colors text-on-surface-muted hover:text-on-surface">View all notifications</button>
               </div>
             </div>
           )}
@@ -305,39 +285,37 @@ export default function TopNavigation() {
           <button
             onClick={() => { setSettingsOpen(!settingsOpen); setNotifOpen(false); }}
             title="Settings"
-            className="p-1.5 rounded transition-colors"
-            style={{ color: settingsOpen ? "var(--on-surface)" : "var(--on-surface-muted)", background: settingsOpen ? "var(--surface-container)" : "transparent" }}
-            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = "var(--on-surface)"; (e.currentTarget as HTMLElement).style.background = "var(--surface-container)"; }}
-            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = settingsOpen ? "var(--on-surface)" : "var(--on-surface-muted)"; (e.currentTarget as HTMLElement).style.background = settingsOpen ? "var(--surface-container)" : "transparent"; }}
+            className={`p-1.5 rounded transition-colors ${settingsOpen ? "text-on-surface bg-surface-container" : "text-on-surface-muted hover:text-on-surface hover:bg-surface-high"}`}
           >
             <Settings size={15} />
           </button>
 
           {settingsOpen && (
-            <div
-              className="absolute right-0 top-full mt-2 w-[260px] rounded-xl overflow-hidden shadow-2xl z-50"
-              style={{ background: "var(--surface-container-low)", border: "1px solid rgba(66,70,84,0.5)" }}
-            >
-              <div className="px-4 py-3" style={{ borderBottom: "1px solid rgba(66,70,84,0.4)" }}>
-                <span className="text-[13px] font-semibold" style={{ color: "var(--on-surface)" }}>Settings</span>
+            <div className="absolute right-0 top-full mt-2 w-[260px] rounded-xl overflow-hidden shadow-2xl z-50 bg-surface-low border border-outline-variant">
+              <div className="px-4 py-3 border-b border-outline-variant">
+                <span className="text-[13px] font-semibold text-on-surface">Settings</span>
               </div>
               <div className="py-1">
                 {/* Sound toggle */}
                 <div className="flex items-center justify-between px-4 py-2.5">
                   <div className="flex items-center gap-2.5">
-                    {soundEnabled ? <Volume2 size={14} style={{ color: "var(--on-surface-muted)" }} /> : <VolumeX size={14} style={{ color: "var(--on-surface-disabled)" }} />}
-                    <span className="text-[12px]" style={{ color: "var(--on-surface-variant)" }}>Trade Sounds</span>
+                    {soundEnabled
+                      ? <Volume2 size={14} className="text-on-surface-muted" />
+                      : <VolumeX size={14} className="text-on-surface-disabled" />}
+                    <span className="text-[12px] text-on-surface-variant">Trade Sounds</span>
                   </div>
                   <button
                     onClick={() => setSoundEnabled(!soundEnabled)}
                     title={soundEnabled ? "Disable trade sounds" : "Enable trade sounds"}
-                    className="w-9 h-5 rounded-full relative transition-colors"
-                    style={{ background: soundEnabled ? "var(--primary)" : "var(--surface-container-high)" }}
+                    className={`w-9 h-5 rounded-full relative transition-colors ${soundEnabled ? "bg-primary" : "bg-surface-high"}`}
                   >
-                    <span className="absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform" style={{ left: soundEnabled ? "calc(100% - 18px)" : "2px" }} />
+                    <span
+                      className="absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform"
+                      style={{ left: soundEnabled ? "calc(100% - 18px)" : "2px" }}
+                    />
                   </button>
                 </div>
-                <div className="h-px mx-4" style={{ background: "rgba(66,70,84,0.3)" }} />
+                <div className="h-px mx-4 bg-outline-variant/60" />
                 {[
                   { icon: Monitor, label: "Display Settings" },
                   { icon: Shield, label: "Security" },
@@ -345,24 +323,18 @@ export default function TopNavigation() {
                 ].map(({ icon: Icon, label }) => (
                   <button
                     key={label}
-                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[12px] transition-colors text-left"
-                    style={{ color: "var(--on-surface-variant)" }}
-                    onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "var(--surface-container)"; (e.currentTarget as HTMLElement).style.color = "var(--on-surface)"; }}
-                    onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent"; (e.currentTarget as HTMLElement).style.color = "var(--on-surface-variant)"; }}
+                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[12px] transition-colors text-left text-on-surface-variant hover:text-on-surface hover:bg-surface-container"
                   >
-                    <Icon size={14} style={{ color: "var(--on-surface-muted)" }} />
+                    <Icon size={14} className="text-on-surface-muted" />
                     {label}
                   </button>
                 ))}
                 {wallet.connected && (
                   <>
-                    <div className="h-px mx-4" style={{ background: "rgba(66,70,84,0.3)" }} />
+                    <div className="h-px mx-4 bg-outline-variant/60" />
                     <button
                       onClick={() => { disconnect(); setSettingsOpen(false); }}
-                      className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[12px] transition-colors text-left"
-                      style={{ color: "var(--sell)" }}
-                      onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = "rgba(255,77,79,0.06)")}
-                      onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = "transparent")}
+                      className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[12px] transition-colors text-left text-sell hover:bg-sell/[0.06]"
                     >
                       <LogOut size={14} />
                       Disconnect Wallet
@@ -374,7 +346,7 @@ export default function TopNavigation() {
           )}
         </div>
 
-        <div className="w-px h-5 mx-1.5" style={{ background: "rgba(66,70,84,0.5)" }} />
+        <div className="w-px h-5 mx-1.5 bg-outline-variant/50" />
 
         {/* Wallet */}
         {!mounted ? (
@@ -387,8 +359,7 @@ export default function TopNavigation() {
             {!wallet.isCorrectNetwork && (
               <button
                 onClick={() => {}}
-                className="flex items-center gap-1 px-2 py-1 rounded text-[10px]"
-                style={{ background: "rgba(255,165,0,0.1)", color: "#FFA500" }}
+                className="flex items-center gap-1 px-2 py-1 rounded text-[10px] bg-warning/10 text-warning"
                 title="Wrong network detected"
               >
                 <AlertTriangle size={10} />
@@ -397,8 +368,7 @@ export default function TopNavigation() {
             )}
             {wallet.isHardwareWallet && (
               <div
-                className="flex items-center gap-1 px-2 py-1 rounded text-[10px]"
-                style={{ background: "rgba(0,192,118,0.1)", color: "var(--buy)" }}
+                className="flex items-center gap-1 px-2 py-1 rounded text-[10px] bg-buy/10 text-buy"
                 title="Hardware wallet connected"
               >
                 <Shield size={10} />
@@ -407,8 +377,7 @@ export default function TopNavigation() {
             )}
             {wallet.isCorrectNetwork && (
               <div
-                className="flex items-center gap-1 px-2 py-1 rounded text-[10px]"
-                style={{ background: "rgba(14,118,253,0.1)", color: "var(--primary)" }}
+                className="flex items-center gap-1 px-2 py-1 rounded text-[10px] bg-primary/10 text-primary"
                 title={`Connected to ${wallet.chainName}`}
               >
                 <Globe size={10} />
@@ -419,23 +388,13 @@ export default function TopNavigation() {
             <div className="flex items-center gap-1.5">
               <button
                 onClick={() => setHideBalances((prev) => !prev)}
-                className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold transition-colors"
-                style={{ background: "var(--surface-container)", color: "var(--on-surface-muted)" }}
+                className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold transition-colors bg-surface-container text-on-surface-muted hover:text-on-surface"
                 title={hideBalances ? "Show balances" : "Hide balances"}
-                onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLElement).style.color = "var(--on-surface)";
-                }}
-                onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLElement).style.color = "var(--on-surface-muted)";
-                }}
               >
                 {hideBalances ? <EyeOff size={12} /> : <Eye size={12} />}
                 <span>{hideBalances ? "Show" : "Hide"}</span>
               </button>
-              <div
-                className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-[12px] font-mono"
-                style={{ background: "var(--surface-container)", color: "var(--on-surface-variant)" }}
-              >
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-[12px] font-mono bg-surface-container text-on-surface-variant">
                 <div
                   className="w-2 h-2 rounded-full"
                   style={{
@@ -443,13 +402,13 @@ export default function TopNavigation() {
                       ? wallet.securityLevel === "secure"
                         ? "var(--buy)"
                         : "var(--primary)"
-                      : "#FFA500",
+                      : "var(--warning)",
                   }}
                 />
                 <div className="flex flex-col leading-tight" title={equityTooltip}>
-                  <div className="flex items-center gap-2 text-[12px]" style={{ color: "var(--on-surface)" }}>
+                  <div className="flex items-center gap-2 text-[12px] text-on-surface">
                     <span
-                      style={{ color: hideBalances ? "var(--on-surface-muted)" : totalPnl >= 0 ? "var(--buy)" : totalPnl < 0 ? "var(--sell)" : "var(--on-surface-muted)" }}
+                      className={hideBalances ? "text-on-surface-muted" : totalPnl >= 0 ? "text-buy" : totalPnl < 0 ? "text-sell" : "text-on-surface-muted"}
                     >
                       Equity {equityLabel}
                       {!hideBalances && deltaLabel && <span className="ml-1">{deltaLabel}</span>}
@@ -459,7 +418,7 @@ export default function TopNavigation() {
                   </div>
                 </div>
                 <span className="opacity-50">|</span>
-                <span style={{ color: "var(--on-surface)" }}>{nativeTokenLabel}</span>
+                <span className="text-on-surface">{nativeTokenLabel}</span>
                 <span className="opacity-50">|</span>
                 <span>{hideBalances ? "••••" : wallet.shortAddress}</span>
               </div>
@@ -467,10 +426,7 @@ export default function TopNavigation() {
             <button
               onClick={disconnect}
               title="Disconnect wallet"
-              className="px-3 py-1.5 text-[12px] font-mono rounded-lg transition-colors"
-              style={{ color: "var(--on-surface-disabled)", background: "var(--surface-container)" }}
-              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = "var(--sell)"; (e.currentTarget as HTMLElement).style.background = "var(--surface-container-high)"; }}
-              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = "var(--on-surface-disabled)"; (e.currentTarget as HTMLElement).style.background = "var(--surface-container)"; }}
+              className="px-3 py-1.5 text-[12px] font-mono rounded-lg transition-colors text-on-surface-disabled bg-surface-container hover:text-sell hover:bg-surface-high"
             >
               Disconnect
             </button>

@@ -286,15 +286,15 @@ function saveJSON(key: string, value: unknown) {
 
 export default function ChartSection({ symbol = "ETH", orders = [], positions = [], tokenPriceData, currentPrice }: ChartSectionProps) {
   const [activeTab, setActiveTab] = useState("Chart");
-  const [activeTimeframe, setActiveTimeframe] = useState(() => loadJSON<string>(`${symbol}_tf`, "15m"));
+  const [activeTimeframe, setActiveTimeframe] = useState("15m");
   const [utcClock, setUtcClock] = useState("");
-  const [chartType, setChartType] = useState<ChartType>(() => loadJSON<ChartType>(`${symbol}_chartType`, "Candlestick"));
-  const [activeIndicators, setActiveIndicators] = useState<IndicatorId[]>(() => loadJSON<IndicatorId[]>(`${symbol}_indicators`, []));
+  const [chartType, setChartType] = useState<ChartType>("Candlestick");
+  const [activeIndicators, setActiveIndicators] = useState<IndicatorId[]>([]);
   const [drawingTool, setDrawingTool] = useState<DrawingTool>("cursor");
-  const [showOrderLines, setShowOrderLines] = useState(() => loadJSON<boolean>(`${symbol}_orderLines`, true));
+  const [showOrderLines, setShowOrderLines] = useState(true);
   const [priceType, setPriceType] = useState<PriceType>("Last");
   const [activeRange, setActiveRange] = useState<string | null>(null);
-  const [isLogScale, setIsLogScale] = useState(() => loadJSON<boolean>(`${symbol}_logScale`, false));
+  const [isLogScale, setIsLogScale] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showChartTypeMenu, setShowChartTypeMenu] = useState(false);
   const [showIndicatorMenu, setShowIndicatorMenu] = useState(false);
@@ -314,6 +314,16 @@ export default function ChartSection({ symbol = "ETH", orders = [], positions = 
   const chartTypeMenuRef = useRef<HTMLDivElement>(null);
   const indicatorMenuRef = useRef<HTMLDivElement>(null);
   const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // ── Hydrate persisted state after mount (avoids SSR/client mismatch) ────────
+  useEffect(() => {
+    setActiveTimeframe(loadJSON<string>(`${symbol}_tf`, "15m"));
+    setChartType(loadJSON<ChartType>(`${symbol}_chartType`, "Candlestick"));
+    setActiveIndicators(loadJSON<IndicatorId[]>(`${symbol}_indicators`, []));
+    setShowOrderLines(loadJSON<boolean>(`${symbol}_orderLines`, true));
+    setIsLogScale(loadJSON<boolean>(`${symbol}_logScale`, false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [symbol]);
 
   // ── Persist chart state on change ──────────────────────────────────────────
   useEffect(() => { saveJSON(`${symbol}_tf`, activeTimeframe); }, [symbol, activeTimeframe]);
@@ -437,13 +447,15 @@ export default function ChartSection({ symbol = "ETH", orders = [], positions = 
       <div className="flex items-center px-2" style={{ borderBottom: bdr }}>
         {chartTabs.map((tab) => (
           <button key={tab} onClick={() => setActiveTab(tab)} className="px-3 py-2.5 text-[12px] transition-colors"
-            style={{ color: activeTab === tab ? "var(--on-surface)" : "var(--on-surface-disabled)", borderBottom: activeTab === tab ? "2px solid var(--primary)" : "2px solid transparent" }}>
+            style={{ color: activeTab === tab ? "var(--on-surface)" : "var(--on-surface-disabled)", borderBottom: activeTab === tab ? "2px solid var(--primary)" : "2px solid transparent" }}
+            suppressHydrationWarning>
             {tab}
           </button>
         ))}
         <div className="ml-auto flex items-center gap-1">
           {(["Last", "Mark", "Index"] as PriceType[]).map((label) => (
-            <button key={label} onClick={() => setPriceType(label)} className="px-2 py-1 text-[11px] rounded transition-colors" style={toolBtn(priceType === label)}>
+            <button key={label} onClick={() => setPriceType(label)} className="px-2 py-1 text-[11px] rounded transition-colors" style={toolBtn(priceType === label)}
+              suppressHydrationWarning>
               {label}
             </button>
           ))}
@@ -454,7 +466,8 @@ export default function ChartSection({ symbol = "ETH", orders = [], positions = 
       <div className="flex items-center gap-1 px-2 py-1.5" style={{ borderBottom: bdr }}>
         {timeframes.map((tf) => (
           <button key={tf} onClick={() => { setActiveTimeframe(tf); setActiveRange(null); }}
-            className="px-2 py-1 text-[11px] rounded transition-colors" style={toolBtn(activeTimeframe === tf)}>
+            className="px-2 py-1 text-[11px] rounded transition-colors" style={toolBtn(activeTimeframe === tf)}
+            suppressHydrationWarning>
             {tf}
           </button>
         ))}
@@ -474,7 +487,8 @@ export default function ChartSection({ symbol = "ETH", orders = [], positions = 
               {CHART_TYPES.map(({ id, label }) => (
                 <button key={id} onClick={() => { setChartType(id); setShowChartTypeMenu(false); }}
                   className="w-full text-left px-3 py-1.5 text-[11px] transition-colors hover:bg-white/5"
-                  style={{ color: chartType === id ? "var(--primary)" : "var(--on-surface)", background: chartType === id ? "rgba(14,118,253,0.08)" : "transparent" }}>
+                  style={{ color: chartType === id ? "var(--primary)" : "var(--on-surface)", background: chartType === id ? "rgba(14,118,253,0.08)" : "transparent" }}
+                  suppressHydrationWarning>
                   {label}
                 </button>
               ))}
@@ -486,7 +500,8 @@ export default function ChartSection({ symbol = "ETH", orders = [], positions = 
         <div className="relative" ref={indicatorMenuRef}>
           <button onClick={() => { setShowIndicatorMenu(!showIndicatorMenu); setShowChartTypeMenu(false); }}
             className="px-2 py-1 text-[11px] rounded transition-colors flex items-center gap-1"
-            style={{ color: activeIndicators.length > 0 ? "var(--primary)" : "var(--on-surface-disabled)", background: activeIndicators.length > 0 ? "rgba(14,118,253,0.1)" : "transparent" }}>
+            style={{ color: activeIndicators.length > 0 ? "var(--primary)" : "var(--on-surface-disabled)", background: activeIndicators.length > 0 ? "rgba(14,118,253,0.1)" : "transparent" }}
+            suppressHydrationWarning>
             <TrendingUp size={12} />
             {indicatorBadge}
             <ChevronDown size={10} />

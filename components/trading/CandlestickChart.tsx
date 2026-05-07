@@ -60,11 +60,56 @@ interface CandlestickChartProps {
   onClearDrawings?: () => void;
 }
 
-/** Read a CSS variable from :root. */
-function css(v: string, fb: string): string {
-  if (typeof window === "undefined") return fb;
-  return getComputedStyle(document.documentElement).getPropertyValue(v).trim() || fb;
+/** Resolve a CSS background-color from a DOM element to a hex string.
+ *  Reads the browser-computed value and normalises via canvas fillStyle,
+ *  which always returns a #rrggbb hex. Falls back to the provided default. */
+function resolveElBg(el: HTMLElement, fallback: string): string {
+  try {
+    const raw = getComputedStyle(el).backgroundColor;
+    const canvas = document.createElement("canvas");
+    canvas.width = canvas.height = 1;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return fallback;
+    ctx.fillStyle = raw;
+    return ctx.fillStyle; // browser normalises to #rrggbb
+  } catch {
+    return fallback;
+  }
 }
+
+/** Chart color palettes keyed by theme.
+ *  lightweight-charts only accepts hex / rgb strings — never oklch/lab.
+ *  bg is resolved at runtime from the container element. */
+const CHART_COLORS = {
+  dark: {
+    bg:          "#0f172a",  /* slate-900 — overridden at runtime */
+    text:        "#64748b",  /* slate-500 */
+    grid:        "#33415518", /* slate-700 + 10% alpha */
+    crosshair:   "#94a3b8",  /* slate-400 */
+    scaleBorder: "#33415530", /* slate-700 + 19% alpha */
+    buy:         "#00c076",
+    buyBright:   "#00d884",
+    sell:        "#ff4d4f",
+    sellBright:  "#ff6b6d",
+    liq:         "#ff6b35",
+    warning:     "#ffb68f",
+    primary:     "#0E76FD",
+  },
+  light: {
+    bg:          "#ffffff",  /* white */
+    text:        "#94a3b8",  /* slate-400 */
+    grid:        "#cbd5e118", /* slate-300 + 10% alpha */
+    crosshair:   "#64748b",  /* slate-500 */
+    scaleBorder: "#cbd5e130", /* slate-300 + 19% alpha */
+    buy:         "#00a866",
+    buyBright:   "#00c076",
+    sell:        "#e53935",
+    sellBright:  "#ff5252",
+    liq:         "#ff6b35",
+    warning:     "#f57c00",
+    primary:     "#0E76FD",
+  },
+} as const;
 
 // Indicator colour palette
 const IND_COLORS = {
@@ -125,20 +170,10 @@ export default function CandlestickChart({
 
   const indicatorsKey = indicators.slice().sort().join(",");
 
-  const getColors = useCallback(() => ({
-    bg:          css("--surface-container-lowest", theme === "light" ? "#ffffff" : "#0c0f14"),
-    text:        css("--on-surface-disabled",      theme === "light" ? "#9a9daa" : "#5a5d70"),
-    grid:        css("--outline-variant",          theme === "light" ? "#d0d4e0" : "#424654") + "26",
-    crosshair:   css("--on-surface-muted",         theme === "light" ? "#5a5d70" : "#8a8da0"),
-    scaleBorder: css("--outline-variant",          theme === "light" ? "#d0d4e0" : "#424654") + "40",
-    buy:         css("--buy",                      theme === "light" ? "#00a866" : "#00c076"),
-    buyBright:   css("--buy-bright",               theme === "light" ? "#00c076" : "#00d884"),
-    sell:        css("--sell",                      theme === "light" ? "#e53935" : "#ff4d4f"),
-    sellBright:  css("--sell-bright",               theme === "light" ? "#ff5252" : "#ff6b6d"),
-    liq:         css("--liquidation",              "#ff6b35"),
-    warning:     css("--warning",                  "#ffb68f"),
-    primary:     css("--primary",                  "#0E76FD"),
-  }), [theme]);
+  const getColors = useCallback(
+    () => CHART_COLORS[theme === "light" ? "light" : "dark"],
+    [theme]
+  );
 
   // ── Compute indicator data from candle array ──────────────────────────────
   const indicatorData = useMemo(() => {
@@ -163,12 +198,13 @@ export default function CandlestickChart({
     if (!el) return;
 
     const c = getColors();
+    const resolvedBg = resolveElBg(el, c.bg);
     const hasBottomPane = indicatorData ? indicatorData.bottomPaneCount > 0 : false;
     const mainBottom = hasBottomPane ? 0.38 : 0.22;
 
     const chart = createChart(el, {
       layout: {
-        background: { type: ColorType.Solid, color: c.bg },
+        background: { type: ColorType.Solid, color: resolvedBg },
         textColor: c.text,
         fontSize: 11,
         fontFamily: "'Alexandria', system-ui, sans-serif",
@@ -179,8 +215,8 @@ export default function CandlestickChart({
       },
       crosshair: {
         mode: drawingToolRef.current === "crosshair" ? 1 : 0,
-        vertLine: { color: c.crosshair, width: 1, style: LineStyle.Dashed, labelBackgroundColor: c.bg },
-        horzLine: { color: c.crosshair, width: 1, style: LineStyle.Dashed, labelBackgroundColor: c.bg },
+        vertLine: { color: c.crosshair, width: 1, style: LineStyle.Dashed, labelBackgroundColor: resolvedBg },
+        horzLine: { color: c.crosshair, width: 1, style: LineStyle.Dashed, labelBackgroundColor: resolvedBg },
       },
       rightPriceScale: {
         borderColor: c.scaleBorder,
