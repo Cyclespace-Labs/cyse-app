@@ -82,8 +82,8 @@ function resolveElBg(el: HTMLElement, fallback: string): string {
  *  bg is resolved at runtime from the container element. */
 const CHART_COLORS = {
   dark: {
-    bg:          "#0f172a",  /* slate-900 — overridden at runtime */
-    text:        "#64748b",  /* slate-500 */
+    bg:          "#1e293b",  /* slate-800 — overridden at runtime */
+    text:        "#94a3b8",  /* slate-400 */
     grid:        "#33415518", /* slate-700 + 10% alpha */
     crosshair:   "#94a3b8",  /* slate-400 */
     scaleBorder: "#33415530", /* slate-700 + 19% alpha */

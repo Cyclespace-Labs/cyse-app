@@ -183,7 +183,7 @@ export default function TopNavigation() {
           <Link
             key={item.label}
             href={item.href}
-            className={`flex items-center gap-0.5 px-3 py-1.5 text-[13px] rounded transition-colors text-on-surface-variant hover:text-on-surface hover:bg-surface-high ${pathname === item.href ? "bg-surface-high text-on-surface" : ""}`}
+            className={`flex items-center gap-0.5 px-3 py-1.5 text-[13px] rounded transition-colors text-on-surface-variant hover:text-on-surface hover:bg-surface-high ${pathname === item.href ? "bg-surface-low text-on-surface" : ""}`}
           >
             {item.label}
             {item.hasDropdown && <ChevronDown size={11} className="opacity-60" />}
@@ -388,13 +388,13 @@ export default function TopNavigation() {
             <div className="flex items-center gap-1.5">
               <button
                 onClick={() => setHideBalances((prev) => !prev)}
-                className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold transition-colors bg-surface-container text-on-surface-muted hover:text-on-surface"
+                className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold transition-colors bg-surface-low text-on-surface-muted hover:text-on-surface"
                 title={hideBalances ? "Show balances" : "Hide balances"}
               >
                 {hideBalances ? <EyeOff size={12} /> : <Eye size={12} />}
                 <span>{hideBalances ? "Show" : "Hide"}</span>
               </button>
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-[12px] font-mono bg-surface-container text-on-surface-variant">
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-[12px] font-mono bg-surface-low text-on-surface-variant">
                 <div
                   className="w-2 h-2 rounded-full"
                   style={{
@@ -426,7 +426,7 @@ export default function TopNavigation() {
             <button
               onClick={disconnect}
               title="Disconnect wallet"
-              className="px-3 py-1.5 text-[12px] font-mono rounded-lg transition-colors text-on-surface-disabled bg-surface-container hover:text-sell hover:bg-surface-high"
+              className="px-3 py-1.5 text-[12px] font-mono rounded-lg transition-colors text-on-surface-disabled bg-surface-low hover:text-sell hover:bg-surface-container"
             >
               Disconnect
             </button>

@@ -177,57 +177,59 @@
 }
 
 /* ============================================================
-   DARK THEME — Slate scale (slate-950 → slate-100)
+   DARK THEME — anchored to slate-800 background
+   Surface scale:  800 → 700 → 600 → 500 → 400
+   Text scale:     slate-200 (primary) → 300 → 400 → 500
    ============================================================ */
 .dark {
   /* shadcn base */
-  --background:              oklch(0.13  0.028 264);   /* slate-900 */
-  --foreground:              oklch(0.963 0.007 264);   /* slate-100 */
-  --card:                    oklch(0.21  0.033 264);   /* slate-800 */
-  --card-foreground:         oklch(0.963 0.007 264);
-  --popover:                 oklch(0.21  0.033 264);   /* slate-800 */
-  --popover-foreground:      oklch(0.963 0.007 264);
-  --primary:                 oklch(0.5942 0.2189 258.6); /* #0E76FD  */
+  --background:              oklch(0.21  0.033 264);   /* slate-800 — page bg  */
+  --foreground:              oklch(0.922 0.01  264);   /* slate-200 — softened primary text */
+  --card:                    oklch(30.509% 0.03507 263.859);   /* slate-700 — cards sit above bg */
+  --card-foreground:         oklch(0.922 0.01  264);   /* slate-200 */
+  --popover:                 oklch(0.42  0.034 264);   /* slate-600 — popovers elevated */
+  --popover-foreground:      oklch(0.922 0.01  264);   /* slate-200 */
+  --primary:                 oklch(0.5942 0.2189 258.6); /* #0E76FD */
   --primary-foreground:      oklch(1 0 0);
   --secondary:               oklch(0.32  0.037 264);   /* slate-700 */
-  --secondary-foreground:    oklch(0.963 0.007 264);
+  --secondary-foreground:    oklch(0.922 0.01  264);   /* slate-200 */
   --muted:                   oklch(0.32  0.037 264);   /* slate-700 */
   --muted-foreground:        oklch(0.663 0.022 264);   /* slate-400 */
   --accent:                  oklch(0.42  0.034 264);   /* slate-600 */
-  --accent-foreground:       oklch(0.963 0.007 264);
-  --destructive:             oklch(0.704 0.191 22.216);
-  --border:                  oklch(1 0 0 / 8%);
-  --input:                   oklch(1 0 0 / 12%);
+  --accent-foreground:       oklch(0.922 0.01  264);   /* slate-200 */
+  --destructive:             oklch(0.638 0.237 27);
+  --border:                  oklch(0.32  0.037 264 / 70%); /* slate-700/70 */
+  --input:                   oklch(0.32  0.037 264 / 80%); /* slate-700/80 */
   --ring:                    oklch(0.5942 0.2189 258.6);
   --chart-1:                 oklch(0.5942 0.2189 258.6);
   --chart-2:                 oklch(0.704 0.172 158);
   --chart-3:                 oklch(0.663 0.022 264);   /* slate-400 */
   --chart-4:                 oklch(0.818 0.124 55);
   --chart-5:                 oklch(0.638 0.237 27);
-  --sidebar:                 oklch(0.13  0.028 264);   /* slate-900 */
-  --sidebar-foreground:      oklch(0.963 0.007 264);
+  --sidebar:                 oklch(0.32  0.037 264);   /* slate-700 */
+  --sidebar-foreground:      oklch(0.922 0.01  264);   /* slate-200 */
   --sidebar-primary:         oklch(0.5942 0.2189 258.6);
   --sidebar-primary-foreground: oklch(1 0 0);
-  --sidebar-accent:          oklch(0.32  0.037 264);   /* slate-700 */
-  --sidebar-accent-foreground: oklch(0.963 0.007 264);
-  --sidebar-border:          oklch(1 0 0 / 8%);
+  --sidebar-accent:          oklch(0.42  0.034 264);   /* slate-600 */
+  --sidebar-accent-foreground: oklch(0.922 0.01  264);
+  --sidebar-border:          oklch(0.32  0.037 264 / 60%);
   --sidebar-ring:            oklch(0.5942 0.2189 258.6);
 
-  /* Custom surface hierarchy — dark slate */
-  --surface:                  oklch(0.13  0.028 264);  /* slate-900 */
-  --surface-container-lowest: oklch(0.13  0.028 264);  /* slate-900 */
-  --surface-container-low:    oklch(0.21  0.033 264);  /* slate-800 */
-  --surface-container:        oklch(0.32  0.037 264);  /* slate-700 */
-  --surface-container-high:   oklch(0.42  0.034 264);  /* slate-600 */
-  --surface-container-highest:oklch(0.42  0.034 264);  /* slate-600 */
-  --surface-bright:           oklch(0.52  0.03  264);  /* slate-500 */
-  --surface-variant:          oklch(0.32  0.037 264);  /* slate-700 */
+  /* Custom surface hierarchy — slate-800 base */
+  --surface:                  oklch(0.21  0.033 264);  /* slate-800 — base        */
+  --surface-container-lowest: oklch(0.21  0.033 264);  /* slate-800 — flush       */
+  --surface-container-low:    oklch(0.32  0.037 264);  /* slate-700 — cards       */
+  --surface-container:        oklch(0.42  0.034 264);  /* slate-600 — panels      */
+  --surface-container-high:   oklch(0.52  0.03  264);  /* slate-500 — hover/focus */
+  --surface-container-highest:oklch(0.663 0.022 264);  /* slate-400 — active      */
+  --surface-bright:           oklch(0.52  0.03  264);  /* slate-500               */
+  --surface-variant:          oklch(0.32  0.037 264);  /* slate-700               */
 
   /* Primary palette */
-  --primary-container:        oklch(0.42  0.12  258);  /* deep blue-slate */
+  --primary-container:        oklch(0.32  0.10  258);  /* muted blue on slate-700 */
   --primary-muted:            oklch(0.663 0.12  258);
   --on-primary:               oklch(1 0 0);
-  --on-primary-container:     oklch(0.845 0.09  258);
+  --on-primary-container:     oklch(0.845 0.09  258);  /* slate-300 blue tint     */
 
   /* Secondary / tertiary */
   --secondary-container:      oklch(0.32  0.037 264);  /* slate-700 */
@@ -236,22 +238,22 @@
   --error:                    oklch(0.818 0.108 22);
   --error-bright:             oklch(0.638 0.237 27);
 
-  /* Text / on-surface — dark */
-  --on-surface:               oklch(0.963 0.007 264);  /* slate-100 */
-  --on-surface-variant:       oklch(0.845 0.015 264);  /* slate-300 */
-  --on-surface-muted:         oklch(0.663 0.022 264);  /* slate-400 */
-  --on-surface-disabled:      oklch(0.52  0.03  264);  /* slate-500 */
+  /* Text / on-surface — softened for slate-800 bg */
+  --on-surface:               oklch(0.922 0.01  264);  /* slate-200 — primary text   */
+  --on-surface-variant:       oklch(0.845 0.015 264);  /* slate-300 — secondary text */
+  --on-surface-muted:         oklch(0.663 0.022 264);  /* slate-400 — muted text     */
+  --on-surface-disabled:      oklch(0.52  0.03  264);  /* slate-500 — disabled text  */
 
-  /* Outline — dark */
-  --outline:                  oklch(0.52  0.03  264);  /* slate-500 */
+  /* Outline — scaled to 800 base */
+  --outline:                  oklch(0.42  0.034 264);  /* slate-600 */
   --outline-variant:          oklch(0.32  0.037 264);  /* slate-700 */
 
-  /* Semantic trading */
+  /* Semantic trading — unchanged */
   --buy:                      oklch(0.704 0.172 158);
-  --buy-container:            oklch(0.21  0.09  158);
+  --buy-container:            oklch(0.27  0.09  158);
   --buy-bright:               oklch(0.784 0.185 158);
   --sell:                     oklch(0.638 0.237 27);
-  --sell-container:           oklch(0.198 0.11  27);
+  --sell-container:           oklch(0.24  0.11  27);
   --sell-bright:              oklch(0.678 0.2   27);
   --warning:                  oklch(0.818 0.124 55);
   --liquidation:              oklch(0.682 0.21  40);
