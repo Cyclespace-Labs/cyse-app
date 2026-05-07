@@ -106,7 +106,7 @@ export default function BottomTabs({
                 <th className="text-right px-3 py-1.5 font-normal"></th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="shrink-0 overflow-y-auto scrollbar-thin" style={{ maxHeight: "40vh" }}>
               {positions.map((pos) => (
                 <tr
                   key={pos.id}
@@ -162,7 +162,7 @@ export default function BottomTabs({
                 <th className="text-right px-3 py-1.5 font-normal"></th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="shrink-0 overflow-y-auto scrollbar-thin" style={{ maxHeight: "40vh" }}>
               {openOrders.map((order) => (
                 <tr
                   key={order.id}
@@ -238,7 +238,7 @@ export default function BottomTabs({
                 <th className="text-right px-3 py-1.5 font-normal">Time</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="shrink-0 overflow-y-auto scrollbar-thin" style={{ maxHeight: "40vh" }}>
               {allFills.slice(0, 50).map((fill) => (
                 <tr 
                   key={fill.id} 
@@ -354,7 +354,7 @@ export default function BottomTabs({
                 <th className="text-right px-3 py-1.5 font-normal">Time</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="shrink-0 overflow-y-auto scrollbar-thin" style={{ maxHeight: "40vh" }}>
               {positionHistory.slice(0, 50).map((pos) => (
                 <tr 
                   key={pos.id} 
@@ -430,7 +430,7 @@ export default function BottomTabs({
                 <th className="text-right px-3 py-1.5 font-normal">Time</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="shrink-0 overflow-y-auto scrollbar-thin" style={{ maxHeight: "40vh" }}>
               {fundingHistory.slice(0, 50).map((funding) => (
                 <tr 
                   key={funding.id} 
@@ -486,6 +486,15 @@ export default function BottomTabs({
             )}
             {tab === "Open Orders" && openOrders.length > 0 && (
               <span className="ml-1 text-[9px]" style={{ color: "var(--tertiary)" }}>({openOrders.length})</span>
+            )}
+            {tab === "Order History" && orderHistory.length > 0 && (
+              <span className="ml-1 text-[9px]" style={{ color: "var(--tertiary)" }}>({orderHistory.length})</span>
+            )}
+            {tab === "Position History" && positionHistory.length > 0 && (
+              <span className="ml-1 text-[9px]" style={{ color: "var(--tertiary)" }}>({positionHistory.length})</span>
+            )}
+            {tab === "Fill History" && fillHistory.length > 0 && (
+              <span className="ml-1 text-[9px]" style={{ color: "var(--buy)" }}>({fillHistory.length})</span>
             )}
           </button>
         ))}
