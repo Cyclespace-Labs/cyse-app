@@ -85,9 +85,6 @@ export default function PriceHeader({ onTokenPickerOpen, selectedSymbol, tokenPr
           <span className="text-lg font-bold leading-tight" style={{ color: "var(--buy)" }}>
             ${currentDisplayPrice > 0 ? formatPrice(currentDisplayPrice) : na}
           </span>
-          {pythConnected && (
-            <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: "var(--buy)" }} title="Pyth SSE live" />
-          )}
         </div>
 
         {/*sub price indicator is hidden for now*/}

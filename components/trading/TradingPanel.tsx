@@ -4,6 +4,7 @@ import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { ChevronDown, Loader2, X, AlertTriangle, Shield } from "lucide-react";
 import { TokenPriceData } from "@/types/trading";
 import { getTickSize } from "@/lib/tradingData";
+import { useTheme } from "@/contexts/ThemeContext";
 import { useWallet } from "@/contexts/WalletContext";
 import { useTradingActions } from "@/hooks/useTradingActions";
 import { useOpenOrders } from "@/hooks/useOpenOrders";
@@ -56,6 +57,7 @@ export default function TradingPanel({
   collateralToken = contracts.weth.address,
   onTradeConfirmed,
 }: TradingPanelProps) {
+  const { theme } = useTheme();
   const { wallet, CustomConnectButton } = useWallet();
 
   // Token selection state
@@ -668,7 +670,7 @@ export default function TradingPanel({
             className="px-2.5 py-1 text-[11px] rounded transition-colors"
             style={{
               color: activeType === type ? "var(--on-surface)" : "var(--on-surface-disabled)",
-              background: activeType === type ? "var(--surface-container-high)" : "transparent",
+              background: activeType === type ? (theme === "dark" ? "var(--surface-container-low)" : "var(--surface-container)") : "transparent",
             }}
           >
             {type}
@@ -824,10 +826,7 @@ export default function TradingPanel({
               />
               <button
                 onClick={() => setPrice(currentPrice > 0 ? currentPrice.toFixed(2) : "")}
-                className="text-[10px] px-1.5 py-0.5 rounded transition-colors ml-2 shrink-0"
-                style={{ color: "var(--on-surface-muted)", background: "var(--surface-container-high)" }}
-                onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.color = "var(--on-surface)")}
-                onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.color = "var(--on-surface-muted)")}
+                className="text-[10px] px-1.5 py-0.5 rounded transition-colors ml-2 shrink-0 text-on-surface-muted bg-surface-container dark:bg-surface-container-low hover:text-on-surface"
               >
                 Mark
               </button>
@@ -856,10 +855,7 @@ export default function TradingPanel({
                 <button
                   key={pct}
                   onClick={() => handlePctQuantity(pct)}
-                  className="flex-1 py-1 text-[10px] font-mono rounded transition-colors"
-                  style={{ background: "var(--surface-container-high)", color: "var(--on-surface-muted)" }}
-                  onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "var(--surface-bright)"; (e.currentTarget as HTMLElement).style.color = "var(--on-surface)"; }}
-                  onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "var(--surface-container-high)"; (e.currentTarget as HTMLElement).style.color = "var(--on-surface-muted)"; }}
+                  className="flex-1 py-1 text-[10px] font-mono rounded transition-colors bg-surface-container dark:bg-surface-low text-on-surface-muted hover:bg-surface-bright hover:text-on-surface"
                 >
                   {pct}%
                 </button>
@@ -884,7 +880,7 @@ export default function TradingPanel({
             className="w-full h-1 rounded-full appearance-none cursor-pointer"
           />
           <div className="flex justify-between mt-1">
-            {[1, 5, 10, 20, 50, 100].map((l) => (
+            {[1, 5, 10, 20, 50].map((l) => (
               <button
                 key={l}
                 onClick={() => setLeverage(l)}

@@ -169,7 +169,7 @@ export default function TopNavigation() {
       {/* Left: Logo + Nav */}
       <div className="flex items-center gap-1">
         <Link href="/" className="flex items-center gap-1.5 pr-5">
-          <svg width="20" height="20" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <svg width="22" height="22" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M105 76H38.8466C38.8466 76 33.5426 87.8169 32.5112 92.1876C27.8222 112.059 26.8737 128.971 29.2698 149.33C31.4799 168.107 38.6993 183 38.6993 183H101.759C101.759 183 89.4948 164.979 86.2884 155.157C81.4264 140.265 81.6222 128.124 84.3731 111.613C87.4302 93.2635 105 76 105 76Z" fill={primaryColor} />
             <path d="M125.807 21.3854C108.841 22.5059 89 33.4938 89 33.4938C89 33.4938 110.862 35.6524 122.776 41.1486C135.785 47.1503 144.604 53.1327 152.654 64.6696C159.034 73.8123 160.737 90 160.737 90H228C228 90 225.957 79.1846 219.484 68.2883C212.123 53.3962 197.111 40.3233 183.254 32.5196C164.979 22.2275 147.371 19.9612 125.807 21.3854Z" fill={primaryColor} stroke={primaryColor} />
             <path d="M125.807 235.615C108.841 234.494 89 223.506 89 223.506C89 223.506 110.862 221.348 122.776 215.851C135.785 209.85 144.604 203.867 152.654 192.33C159.034 183.188 160.737 167 160.737 167H228C228 167 225.957 177.815 219.484 188.712C212.123 203.604 197.111 216.677 183.254 224.48C164.979 234.773 147.371 237.039 125.807 235.615Z" fill={primaryColor} stroke={primaryColor} />
@@ -183,7 +183,9 @@ export default function TopNavigation() {
           <Link
             key={item.label}
             href={item.href}
-            className={`flex items-center gap-0.5 px-3 py-1.5 text-[13px] rounded transition-colors text-on-surface-variant hover:text-on-surface hover:bg-surface-high ${pathname === item.href ? "bg-surface-low text-on-surface" : ""}`}
+            className={`flex items-center gap-0.5 px-3 py-1.5 text-[13px] rounded transition-colors 
+              text-on-surface-variant hover:text-on-surface hover:bg-surface-high dark:hover:bg-surface-container 
+              ${pathname === item.href ? "bg-surface-container dark:bg-surface-low text-on-surface" : ""}`}
           >
             {item.label}
             {item.hasDropdown && <ChevronDown size={11} className="opacity-60" />}
@@ -388,13 +390,13 @@ export default function TopNavigation() {
             <div className="flex items-center gap-1.5">
               <button
                 onClick={() => setHideBalances((prev) => !prev)}
-                className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold transition-colors bg-surface-low text-on-surface-muted hover:text-on-surface"
+                className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold transition-colors bg-surface-container dark:bg-surface-low text-on-surface-muted hover:text-on-surface"
                 title={hideBalances ? "Show balances" : "Hide balances"}
               >
                 {hideBalances ? <EyeOff size={12} /> : <Eye size={12} />}
                 <span>{hideBalances ? "Show" : "Hide"}</span>
               </button>
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-[12px] font-mono bg-surface-low text-on-surface-variant">
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-[12px] font-mono bg-surface-container dark:bg-surface-low text-on-surface-variant">
                 <div
                   className="w-2 h-2 rounded-full"
                   style={{
@@ -426,7 +428,7 @@ export default function TopNavigation() {
             <button
               onClick={disconnect}
               title="Disconnect wallet"
-              className="px-3 py-1.5 text-[12px] font-mono rounded-lg transition-colors text-on-surface-disabled bg-surface-low hover:text-sell hover:bg-surface-container"
+              className="px-3 py-1.5 text-[12px] font-mono rounded-lg transition-colors text-on-surface-disabled bg-surface-container dark:bg-surface-low hover:text-sell hover:bg-surface-high dark:hover:bg-surface-container"
             >
               Disconnect
             </button>

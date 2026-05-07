@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { useTheme } from "@/contexts/ThemeContext";
 import CandlestickChart from "./CandlestickChart";
 import type { ChartType, IndicatorId, DrawingTool } from "./CandlestickChart";
 import type { Drawing } from "@/lib/chart/drawings";
@@ -285,6 +286,7 @@ function saveJSON(key: string, value: unknown) {
 }
 
 export default function ChartSection({ symbol = "ETH", orders = [], positions = [], tokenPriceData, currentPrice }: ChartSectionProps) {
+  const { theme } = useTheme();
   const [activeTab, setActiveTab] = useState("Chart");
   const [activeTimeframe, setActiveTimeframe] = useState("15m");
   const [utcClock, setUtcClock] = useState("");
@@ -437,7 +439,7 @@ export default function ChartSection({ symbol = "ETH", orders = [], positions = 
   const bdr = "1px solid rgba(66,70,84,0.4)";
   const toolBtn = (active: boolean) => ({
     color: active ? "var(--on-surface)" : "var(--on-surface-disabled)",
-    background: active ? "var(--surface-container-high)" : "transparent",
+    background: active ? (theme === "dark" ? "var(--surface-container-low)" : "var(--surface-container)") : "transparent",
   });
 
   return (
@@ -445,13 +447,15 @@ export default function ChartSection({ symbol = "ETH", orders = [], positions = 
 
       {/* ── Chart Tabs ───────────────────────────────────────────────────── */}
       <div className="flex items-center px-2" style={{ borderBottom: bdr }}>
+        
         {chartTabs.map((tab) => (
           <button key={tab} onClick={() => setActiveTab(tab)} className="px-3 py-2.5 text-[12px] transition-colors"
-            style={{ color: activeTab === tab ? "var(--on-surface)" : "var(--on-surface-disabled)", borderBottom: activeTab === tab ? "2px solid var(--primary)" : "2px solid transparent" }}
+            style={{ color: activeTab === tab ? "var(--on-surface)" : "var(--on-surface-disabled)", borderBottom: activeTab === tab ? "2px solid var(--primary)" : "2px solid transparent",}}
             suppressHydrationWarning>
             {tab}
           </button>
         ))}
+
         <div className="ml-auto flex items-center gap-1">
           {(["Last", "Mark", "Index"] as PriceType[]).map((label) => (
             <button key={label} onClick={() => setPriceType(label)} className="px-2 py-1 text-[11px] rounded transition-colors" style={toolBtn(priceType === label)}
@@ -460,6 +464,7 @@ export default function ChartSection({ symbol = "ETH", orders = [], positions = 
             </button>
           ))}
         </div>
+
       </div>
 
       {/* ── Timeframe + Chart type + Indicators + Tools ──────────────────── */}
