@@ -17,6 +17,10 @@ import { useAllPositions } from "@/hooks/useAllPositions";
 import { useOpenOrders } from "@/hooks/useOpenOrders";
 import { usePriceOracle } from "@/hooks/usePriceOracle";
 import { useTradingActions } from "@/hooks/useTradingActions";
+import { useOrderHistory } from "@/hooks/useOrderHistory";
+import { usePositionHistory } from "@/hooks/usePositionHistory";
+import { useFillHistory } from "@/hooks/useFillHistory";
+import { useFundingHistory } from "@/hooks/useFundingHistory";
 import { contracts } from "@/lib/protocol/contracts";
 import { formatUnits, parseUnits } from "viem";
 import { OnChainIncreaseOrder, OnChainDecreaseOrder } from "@/types/protocol";
@@ -76,6 +80,19 @@ export default function TradingPage() {
   const { positions, refetch: refetchPositions } = useAllPositions();
   const { increaseOrders, decreaseOrders, refetch: refetchOrders } = useOpenOrders();
   const { closeMarketPosition, cancelDecreaseOrder } = useTradingActions();
+
+  // History hooks for BottomTabs
+  const { orderHistory, isLoading: isLoadingOrderHistory, refresh: refreshOrderHistory } = useOrderHistory();
+  const { positionHistory, isLoading: isLoadingPositionHistory, refresh: refreshPositionHistory } = usePositionHistory();
+  const { fillHistory, isLoading: isLoadingFillHistory, refresh: refreshFillHistory } = useFillHistory();
+  const { fundingHistory, isLoading: isLoadingFundingHistory, isAvailable: fundingAvailable, refresh: refreshFundingHistory } = useFundingHistory();
+
+  const handleRefreshHistory = useCallback(() => {
+    refreshOrderHistory();
+    refreshPositionHistory();
+    refreshFillHistory();
+    refreshFundingHistory();
+  }, [refreshOrderHistory, refreshPositionHistory, refreshFillHistory, refreshFundingHistory]);
 
   const handleTradeConfirmed = useCallback(() => {
     refetchPositions();
@@ -176,8 +193,18 @@ export default function TradingPage() {
             positions={positions}
             orders={orders}
             currentPrice={currentPrice}
+            orderHistory={orderHistory}
+            positionHistory={positionHistory}
+            fillHistory={fillHistory}
+            fundingHistory={fundingHistory}
+            fundingAvailable={fundingAvailable}
+            isLoadingOrderHistory={isLoadingOrderHistory}
+            isLoadingPositionHistory={isLoadingPositionHistory}
+            isLoadingFillHistory={isLoadingFillHistory}
+            isLoadingFundingHistory={isLoadingFundingHistory}
             onCancelOrder={() => {}}
             onClosePosition={handleClosePosition}
+            onRefreshHistory={handleRefreshHistory}
           />
         </div>
 

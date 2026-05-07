@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import { Order, Position } from "@/types/trading";
-import { X } from "lucide-react";
+import { Order, Position, OrderHistoryEntry, PositionHistoryEntry, FillHistoryEntry, FundingHistoryEntry } from "@/types/trading";
+import { X, Loader2 } from "lucide-react";
 import { computeLivePnl, computeLivePnlPct } from "@/lib/formatters";
+import { formatDistanceToNow } from "@/lib/formatters";
 
 const tabs = [
   "Balances",
@@ -22,8 +23,23 @@ interface BottomTabsProps {
   positions?: Position[];
   orders?: Order[];
   currentPrice?: number;
+  
+  // History data
+  orderHistory?: OrderHistoryEntry[];
+  positionHistory?: PositionHistoryEntry[];
+  fillHistory?: FillHistoryEntry[];
+  fundingHistory?: FundingHistoryEntry[];
+  fundingAvailable?: boolean;
+  
+  // Loading states
+  isLoadingOrderHistory?: boolean;
+  isLoadingPositionHistory?: boolean;
+  isLoadingFillHistory?: boolean;
+  isLoadingFundingHistory?: boolean;
+  
   onCancelOrder?: (orderId: string) => void;
   onClosePosition?: (positionId: string) => void;
+  onRefreshHistory?: () => void;
 }
 
 export default function BottomTabs({
@@ -31,8 +47,23 @@ export default function BottomTabs({
   positions = [],
   orders = [],
   currentPrice = 0,
+  
+  // History data
+  orderHistory = [],
+  positionHistory = [],
+  fillHistory = [],
+  fundingHistory = [],
+  fundingAvailable = true,
+  
+  // Loading states
+  isLoadingOrderHistory = false,
+  isLoadingPositionHistory = false,
+  isLoadingFillHistory = false,
+  isLoadingFundingHistory = false,
+  
   onCancelOrder,
   onClosePosition,
+  onRefreshHistory,
 }: BottomTabsProps) {
   const [activeTab, setActiveTab] = useState("Balances");
   const [mounted, setMounted] = useState(false);
@@ -51,6 +82,14 @@ export default function BottomTabs({
         </div>
       );
     }
+
+    // Loading state component
+    const LoadingState = () => (
+      <div className="flex items-center justify-center h-16 text-[12px]" style={{ color: "var(--on-surface-disabled)" }}>
+        <Loader2 size={14} className="animate-spin mr-2" />
+        <span>Loading {activeTab.toLowerCase()}...</span>
+      </div>
+    );
 
     if (activeTab === "Positions" && positions.length > 0) {
       return (
@@ -158,7 +197,33 @@ export default function BottomTabs({
       );
     }
 
-    if (activeTab === "Fill History" && filledOrders.length > 0) {
+    // Enhanced Fill History with real data
+    if (activeTab === "Fill History") {
+      if (isLoadingFillHistory) return <LoadingState />;
+      if (fillHistory.length === 0 && filledOrders.length === 0) {
+        return (
+          <div className="flex items-center justify-center h-16 text-[12px]" style={{ color: "var(--on-surface-disabled)" }}>
+            <span>No fill history to display</span>
+          </div>
+        );
+      }
+
+      // Combine real fill history with local filled orders
+      const allFills = [...fillHistory, ...filledOrders.map(o => ({
+        id: o.id,
+        orderIndex: 0,
+        symbol: o.symbol,
+        side: o.side,
+        type: o.type,
+        executionPrice: o.price,
+        sizeDelta: o.filled,
+        collateralDelta: 0,
+        fee: 0,
+        txHash: "",
+        blockNumber: 0,
+        timestamp: o.createdAt,
+      }))].sort((a, b) => b.timestamp - a.timestamp);
+
       return (
         <div className="overflow-x-auto">
           <table className="w-full text-[11px] font-mono">
@@ -166,21 +231,226 @@ export default function BottomTabs({
               <tr style={{ color: "var(--on-surface-disabled)", borderBottom: "1px solid rgba(66,70,84,0.3)" }}>
                 <th className="text-left px-3 py-1.5 font-normal">Symbol</th>
                 <th className="text-left px-3 py-1.5 font-normal">Side</th>
-                <th className="text-right px-3 py-1.5 font-normal">Price</th>
-                <th className="text-right px-3 py-1.5 font-normal">Qty</th>
-                <th className="text-right px-3 py-1.5 font-normal">Status</th>
+                <th className="text-left px-3 py-1.5 font-normal">Type</th>
+                <th className="text-right px-3 py-1.5 font-normal">Exec Price</th>
+                <th className="text-right px-3 py-1.5 font-normal">Size</th>
+                <th className="text-right px-3 py-1.5 font-normal">Fee</th>
+                <th className="text-right px-3 py-1.5 font-normal">Time</th>
               </tr>
             </thead>
             <tbody>
-              {filledOrders.map((order) => (
-                <tr key={order.id} style={{ borderBottom: "1px solid rgba(66,70,84,0.2)" }}>
+              {allFills.slice(0, 50).map((fill) => (
+                <tr 
+                  key={fill.id} 
+                  style={{ borderBottom: "1px solid rgba(66,70,84,0.2)" }}
+                  onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = "var(--surface-container-low)")}
+                  onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = "transparent")}
+                >
+                  <td className="px-3 py-1.5" style={{ color: "var(--on-surface)" }}>{fill.symbol}</td>
+                  <td className="px-3 py-1.5" style={{ color: fill.side === "buy" ? "var(--buy)" : "var(--sell)" }}>
+                    {fill.side.toUpperCase()}
+                  </td>
+                  <td className="px-3 py-1.5" style={{ color: "var(--on-surface-muted)" }}>{fill.type}</td>
+                  <td className="px-3 py-1.5 text-right" style={{ color: "var(--on-surface)" }}>${fill.executionPrice.toFixed(2)}</td>
+                  <td className="px-3 py-1.5 text-right" style={{ color: "var(--on-surface)" }}>${fill.sizeDelta.toFixed(2)}</td>
+                  <td className="px-3 py-1.5 text-right" style={{ color: "var(--on-surface-muted)" }}>${fill.fee.toFixed(4)}</td>
+                  <td className="px-3 py-1.5 text-right" style={{ color: "var(--on-surface-disabled)" }}>
+                    {formatDistanceToNow(fill.timestamp)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      );
+    }
+
+    // Order History Tab
+    if (activeTab === "Order History") {
+      if (isLoadingOrderHistory) return <LoadingState />;
+      if (orderHistory.length === 0) {
+        return (
+          <div className="flex items-center justify-center h-16 text-[12px]" style={{ color: "var(--on-surface-disabled)" }}>
+            <span>No order history to display</span>
+          </div>
+        );
+      }
+
+      return (
+        <div className="overflow-x-auto">
+          <table className="w-full text-[11px] font-mono">
+            <thead>
+              <tr style={{ color: "var(--on-surface-disabled)", borderBottom: "1px solid rgba(66,70,84,0.3)" }}>
+                <th className="text-left px-3 py-1.5 font-normal">Symbol</th>
+                <th className="text-left px-3 py-1.5 font-normal">Side</th>
+                <th className="text-left px-3 py-1.5 font-normal">Status</th>
+                <th className="text-right px-3 py-1.5 font-normal">Trigger</th>
+                <th className="text-right px-3 py-1.5 font-normal">Size</th>
+                <th className="text-right px-3 py-1.5 font-normal">Time</th>
+              </tr>
+            </thead>
+            <tbody>
+              {orderHistory.slice(0, 50).map((order) => (
+                <tr 
+                  key={order.id} 
+                  style={{ borderBottom: "1px solid rgba(66,70,84,0.2)" }}
+                  onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = "var(--surface-container-low)")}
+                  onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = "transparent")}
+                >
                   <td className="px-3 py-1.5" style={{ color: "var(--on-surface)" }}>{order.symbol}</td>
                   <td className="px-3 py-1.5" style={{ color: order.side === "buy" ? "var(--buy)" : "var(--sell)" }}>
                     {order.side.toUpperCase()}
                   </td>
-                  <td className="px-3 py-1.5 text-right" style={{ color: "var(--on-surface)" }}>{order.price}</td>
-                  <td className="px-3 py-1.5 text-right" style={{ color: "var(--on-surface)" }}>{order.filled}</td>
-                  <td className="px-3 py-1.5 text-right" style={{ color: "var(--buy)" }}>Filled</td>
+                  <td className="px-3 py-1.5">
+                    <span 
+                      className="px-1.5 py-0.5 rounded text-[9px]"
+                      style={{
+                        background: order.status === "created" ? "rgba(99,179,255,0.1)" :
+                                   order.status === "cancelled" ? "rgba(255,77,79,0.1)" :
+                                   "rgba(0,192,118,0.1)",
+                        color: order.status === "created" ? "#63b3ff" :
+                               order.status === "cancelled" ? "var(--sell)" :
+                               "var(--buy)",
+                      }}
+                    >
+                      {order.status.toUpperCase()}
+                    </span>
+                  </td>
+                  <td className="px-3 py-1.5 text-right" style={{ color: "var(--on-surface)" }}>${order.triggerPrice.toFixed(2)}</td>
+                  <td className="px-3 py-1.5 text-right" style={{ color: "var(--on-surface)" }}>${order.sizeDelta.toFixed(2)}</td>
+                  <td className="px-3 py-1.5 text-right" style={{ color: "var(--on-surface-disabled)" }}>
+                    {formatDistanceToNow(order.timestamp)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      );
+    }
+
+    // Position History Tab
+    if (activeTab === "Position History") {
+      if (isLoadingPositionHistory) return <LoadingState />;
+      if (positionHistory.length === 0) {
+        return (
+          <div className="flex items-center justify-center h-16 text-[12px]" style={{ color: "var(--on-surface-disabled)" }}>
+            <span>No position history to display</span>
+          </div>
+        );
+      }
+
+      return (
+        <div className="overflow-x-auto">
+          <table className="w-full text-[11px] font-mono">
+            <thead>
+              <tr style={{ color: "var(--on-surface-disabled)", borderBottom: "1px solid rgba(66,70,84,0.3)" }}>
+                <th className="text-left px-3 py-1.5 font-normal">Symbol</th>
+                <th className="text-left px-3 py-1.5 font-normal">Action</th>
+                <th className="text-left px-3 py-1.5 font-normal">Side</th>
+                <th className="text-right px-3 py-1.5 font-normal">Price</th>
+                <th className="text-right px-3 py-1.5 font-normal">Size</th>
+                <th className="text-right px-3 py-1.5 font-normal">PnL</th>
+                <th className="text-right px-3 py-1.5 font-normal">Time</th>
+              </tr>
+            </thead>
+            <tbody>
+              {positionHistory.slice(0, 50).map((pos) => (
+                <tr 
+                  key={pos.id} 
+                  style={{ borderBottom: "1px solid rgba(66,70,84,0.2)" }}
+                  onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = "var(--surface-container-low)")}
+                  onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = "transparent")}
+                >
+                  <td className="px-3 py-1.5" style={{ color: "var(--on-surface)" }}>{pos.symbol}</td>
+                  <td className="px-3 py-1.5">
+                    <span 
+                      className="px-1.5 py-0.5 rounded text-[9px]"
+                      style={{
+                        background: pos.action === "increase" ? "rgba(0,192,118,0.1)" :
+                                   pos.action === "decrease" ? "rgba(255,171,0,0.1)" :
+                                   pos.action === "close" ? "rgba(158,158,158,0.1)" :
+                                   "rgba(255,77,79,0.1)",
+                        color: pos.action === "increase" ? "var(--buy)" :
+                               pos.action === "decrease" ? "#ffab00" :
+                               pos.action === "close" ? "var(--on-surface-muted)" :
+                               "var(--sell)",
+                      }}
+                    >
+                      {pos.action.toUpperCase()}
+                    </span>
+                  </td>
+                  <td className="px-3 py-1.5" style={{ color: pos.side === "long" ? "var(--buy)" : "var(--sell)" }}>
+                    {pos.side.toUpperCase()}
+                  </td>
+                  <td className="px-3 py-1.5 text-right" style={{ color: "var(--on-surface)" }}>${pos.entryPrice.toFixed(2)}</td>
+                  <td className="px-3 py-1.5 text-right" style={{ color: "var(--on-surface)" }}>${pos.sizeDelta.toFixed(2)}</td>
+                  <td className="px-3 py-1.5 text-right" style={{ color: pos.pnl && pos.pnl >= 0 ? "var(--buy)" : "var(--sell)" }}>
+                    {pos.pnl ? `${pos.pnl >= 0 ? "+" : ""}$${pos.pnl.toFixed(2)}` : "-"}
+                  </td>
+                  <td className="px-3 py-1.5 text-right" style={{ color: "var(--on-surface-disabled)" }}>
+                    {formatDistanceToNow(pos.timestamp)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      );
+    }
+
+    // Funding History Tab
+    if (activeTab === "Funding History") {
+      if (!fundingAvailable) {
+        return (
+          <div className="flex flex-col items-center justify-center h-16 text-[12px]" style={{ color: "var(--on-surface-disabled)" }}>
+            <span>Funding history not yet available</span>
+            <span className="text-[10px] mt-1">Coming soon</span>
+          </div>
+        );
+      }
+      if (isLoadingFundingHistory) return <LoadingState />;
+      if (fundingHistory.length === 0) {
+        return (
+          <div className="flex items-center justify-center h-16 text-[12px]" style={{ color: "var(--on-surface-disabled)" }}>
+            <span>No funding history to display</span>
+          </div>
+        );
+      }
+
+      return (
+        <div className="overflow-x-auto">
+          <table className="w-full text-[11px] font-mono">
+            <thead>
+              <tr style={{ color: "var(--on-surface-disabled)", borderBottom: "1px solid rgba(66,70,84,0.3)" }}>
+                <th className="text-left px-3 py-1.5 font-normal">Symbol</th>
+                <th className="text-left px-3 py-1.5 font-normal">Side</th>
+                <th className="text-right px-3 py-1.5 font-normal">Rate</th>
+                <th className="text-right px-3 py-1.5 font-normal">Fee</th>
+                <th className="text-right px-3 py-1.5 font-normal">Time</th>
+              </tr>
+            </thead>
+            <tbody>
+              {fundingHistory.slice(0, 50).map((funding) => (
+                <tr 
+                  key={funding.id} 
+                  style={{ borderBottom: "1px solid rgba(66,70,84,0.2)" }}
+                  onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = "var(--surface-container-low)")}
+                  onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = "transparent")}
+                >
+                  <td className="px-3 py-1.5" style={{ color: "var(--on-surface)" }}>{funding.symbol}</td>
+                  <td className="px-3 py-1.5" style={{ color: funding.side === "long" ? "var(--buy)" : "var(--sell)" }}>
+                    {funding.side.toUpperCase()}
+                  </td>
+                  <td className="px-3 py-1.5 text-right" style={{ color: funding.fundingRate >= 0 ? "var(--buy)" : "var(--sell)" }}>
+                    {(funding.fundingRate * 100).toFixed(4)}%
+                  </td>
+                  <td className="px-3 py-1.5 text-right" style={{ color: funding.fundingFee >= 0 ? "var(--sell)" : "var(--buy)" }}>
+                    {funding.fundingFee >= 0 ? "+" : ""}${Math.abs(funding.fundingFee).toFixed(4)}
+                  </td>
+                  <td className="px-3 py-1.5 text-right" style={{ color: "var(--on-surface-disabled)" }}>
+                    {formatDistanceToNow(funding.timestamp)}
+                  </td>
                 </tr>
               ))}
             </tbody>

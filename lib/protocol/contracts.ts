@@ -210,6 +210,29 @@ export const COLLATERAL_TOKENS: Record<string, `0x${string}`> = {
 /** Generic ERC-20 ABI for any token approval / balance reads */
 export { erc20Abi };
 
+// ─── Token address to symbol mapping ─────────────────────────────────────────
+const TOKEN_SYMBOLS: Record<string, string> = {
+  [requiredAddress("WETH")]: "ETH",
+  [requiredAddress("BTC")]: "BTC",
+  [requiredAddress("USDC")]: "USDC",
+  [requiredAddress("USDT")]: "USDT",
+  [requiredAddress("USDG")]: "USDG",
+  [requiredAddress("CYSE")]: "CYSE",
+  [requiredAddress("CYLP")]: "CYLP",
+  [requiredAddress("EsCYSE")]: "esCYSE",
+};
+
+/** Get token symbol from address (case-insensitive) */
+export function getTokenSymbol(address: `0x${string}`): string | null {
+  const normalized = address.toLowerCase();
+  for (const [addr, symbol] of Object.entries(TOKEN_SYMBOLS)) {
+    if (addr.toLowerCase() === normalized) {
+      return symbol;
+    }
+  }
+  return null;
+}
+
 export async function runProtocolStartupSanityCheck(publicClient: PublicClient) {
   const critical = {
     vault: requiredAddress("Vault"),

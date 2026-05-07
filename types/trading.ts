@@ -54,6 +54,67 @@ export interface Position {
   createdAt: number;
 }
 
+// Order history entry
+export interface OrderHistoryEntry {
+  id: string;
+  orderIndex: number;
+  symbol: string;
+  side: "buy" | "sell";
+  type: "limit" | "market" | "conditional";
+  triggerPrice: number;
+  sizeDelta: number;
+  collateralToken: string;
+  isLong: boolean;
+  status: "created" | "cancelled" | "executed";
+  txHash: string;
+  blockNumber: number;
+  timestamp: number;
+}
+
+// Position history entry
+export interface PositionHistoryEntry {
+  id: string;
+  symbol: string;
+  side: "long" | "short";
+  action: "increase" | "decrease" | "close" | "liquidated";
+  entryPrice: number;
+  exitPrice?: number;
+  sizeDelta: number;
+  collateralDelta: number;
+  pnl?: number;
+  txHash: string;
+  blockNumber: number;
+  timestamp: number;
+}
+
+// Fill history entry
+export interface FillHistoryEntry {
+  id: string;
+  orderIndex: number;
+  symbol: string;
+  side: "buy" | "sell";
+  type: "limit" | "market" | "conditional";
+  executionPrice: number;
+  sizeDelta: number;
+  collateralDelta: number;
+  fee: number;
+  txHash: string;
+  blockNumber: number;
+  timestamp: number;
+}
+
+// Funding history entry
+export interface FundingHistoryEntry {
+  id: string;
+  symbol: string;
+  side: "long" | "short";
+  fundingRate: number;
+  fundingFee: number;
+  timestamp: number;
+  blockNumber: number;
+  txHash: string;
+}
+
 export interface TradingUser {
   isAuthenticated: boolean;
   username: string;
