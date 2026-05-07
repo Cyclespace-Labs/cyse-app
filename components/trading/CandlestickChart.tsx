@@ -84,7 +84,7 @@ const CHART_COLORS = {
   dark: {
     bg:          "#1e293b",  /* slate-800 — overridden at runtime */
     text:        "#94a3b8",  /* slate-400 */
-    grid:        "#33415518", /* slate-700 + 10% alpha */
+    grid:        "#334155", /* slate-700 + 10% alpha */
     crosshair:   "#94a3b8",  /* slate-400 */
     scaleBorder: "#33415530", /* slate-700 + 19% alpha */
     buy:         "#00c076",
