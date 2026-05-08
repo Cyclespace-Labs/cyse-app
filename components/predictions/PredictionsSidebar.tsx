@@ -1,6 +1,6 @@
 "use client";
 
-import { predictionCategories } from "@/lib/predictionsData";
+import { PredictionCategory } from "@/types/predictions";
 import {
   Clock,
   Timer,
@@ -31,16 +31,18 @@ const categoryIcons: Record<string, React.ReactNode> = {
 interface PredictionsSidebarProps {
   activeCategory: string;
   onCategoryChange: (category: string) => void;
+  categories: PredictionCategory[];
 }
 
 export default function PredictionsSidebar({
   activeCategory,
   onCategoryChange,
+  categories,
 }: PredictionsSidebarProps) {
   return (
     <aside className="w-[200px] shrink-0 overflow-y-auto scrollbar-hide" style={{ background: "var(--surface-container-lowest)", borderRight: "1px solid rgba(66,70,84,0.4)" }}>
       <div className="py-2">
-        {predictionCategories.map((cat) => {
+        {categories.map((cat) => {
           const isActive = activeCategory === cat.label;
           return (
             <button

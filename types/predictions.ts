@@ -32,6 +32,13 @@ export interface PredictionMarket {
   status?: "live" | "closed" | "resolved";
   resolutionCriteria?: string;
   relatedMarketIds?: string[];
+  
+  // Polymarket-specific fields
+  conditionId?: string;
+  clobTokenIds?: string;
+  enableOrderBook?: boolean;
+  bestBid?: number;
+  bestAsk?: number;
 }
 
 export interface PredictionCategory {

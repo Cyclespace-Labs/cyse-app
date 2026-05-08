@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { PredictionMarketDetail, OrderBookLevel } from "@/types/predictions";
 import { ChevronDown, ChevronRight, Filter } from "lucide-react";
+import { usePolymarketOrderBook } from "@/hooks/usePolymarketRealtime";
 
 interface PredictionOrderBookProps {
   market: PredictionMarketDetail;
@@ -84,16 +85,18 @@ function PriceLevelRow({
 // ── Inline expanded order book panel (shown under an option row) ─────────────
 function InlineOrderBook({
   market,
+  orderBookData,
   onPriceClick,
 }: {
   market: PredictionMarketDetail;
+  orderBookData: any;
   onPriceClick: (price: number, side: "buy" | "sell") => void;
 }) {
   const [activeTab, setActiveTab] = useState("Order Book");
-  const ob = market.orderBookData;
+  const ob = orderBookData;
   const allShares = [
-    ...(ob?.asks ?? []).map((l) => l.shares),
-    ...(ob?.bids ?? []).map((l) => l.shares),
+    ...(ob?.asks ?? []).map((l: any) => l.shares),
+    ...(ob?.bids ?? []).map((l: any) => l.shares),
   ];
   const maxShares = Math.max(...allShares, 1);
 
@@ -129,7 +132,7 @@ function InlineOrderBook({
           </div>
 
           {/* Asks */}
-          {ob.asks.map((level, i) => (
+          {ob.asks.map((level: OrderBookLevel, i: number) => (
             <PriceLevelRow key={`ask-${i}`} level={level} side="ask" maxShares={maxShares} onPriceClick={onPriceClick} />
           ))}
 
@@ -144,7 +147,7 @@ function InlineOrderBook({
           </div>
 
           {/* Bids */}
-          {ob.bids.map((level, i) => (
+          {ob.bids.map((level: OrderBookLevel, i: number) => (
             <PriceLevelRow key={`bid-${i}`} level={level} side="bid" maxShares={maxShares} onPriceClick={onPriceClick} />
           ))}
         </>
@@ -165,6 +168,50 @@ export default function PredictionOrderBook({ market }: PredictionOrderBookProps
   const searchParams = useSearchParams();
   const [expandedOption, setExpandedOption] = useState<number | null>(null);
   const [activeInfoTab, setActiveInfoTab] = useState("Rules");
+  const [orderBookData, setOrderBookData] = useState(market.orderBookData);
+
+  // Use real-time order book updates if market has CLOB token IDs
+  const { orderBook: realtimeOrderBook, isConnected } = usePolymarketOrderBook(market.clobTokenIds || "");
+
+  // Update order book data when real-time data changes
+  useEffect(() => {
+    if (realtimeOrderBook) {
+      // Transform CLOB order book format to OrderBookData format
+      const transformedOrderBook = {
+        asks: (realtimeOrderBook.asks || []).slice(0, 5).map((ask: any) => ({
+          price: ask.price,
+          shares: parseFloat(ask.volume) || 0,
+          total: (ask.price * (parseFloat(ask.volume) || 0)) / 100,
+          orders: [
+            {
+              id: `ask-${ask.price}`,
+              price: ask.price,
+              shares: parseFloat(ask.volume) || 0,
+              maker: "Market",
+              timestamp: "now",
+            },
+          ],
+        })),
+        bids: (realtimeOrderBook.bids || []).slice(0, 5).map((bid: any) => ({
+          price: bid.price,
+          shares: parseFloat(bid.volume) || 0,
+          total: (bid.price * (parseFloat(bid.volume) || 0)) / 100,
+          orders: [
+            {
+              id: `bid-${bid.price}`,
+              price: bid.price,
+              shares: parseFloat(bid.volume) || 0,
+              maker: "Market",
+              timestamp: "now",
+            },
+          ],
+        })),
+        lastPrice: realtimeOrderBook.lastPrice || market.currentPrice || 0.5,
+        spread: realtimeOrderBook.spread || 0,
+      };
+      setOrderBookData(transformedOrderBook);
+    }
+  }, [realtimeOrderBook, market.currentPrice, market.clobTokenIds]);
 
   const isHitPrice = market.options.length > 2;
   const formattedVolume = market.totalVolume
@@ -273,7 +320,7 @@ export default function PredictionOrderBook({ market }: PredictionOrderBookProps
 
               {/* Inline order book (expanded) */}
               {expandedOption === i && (
-                <InlineOrderBook market={market} onPriceClick={handlePriceClick} />
+                <InlineOrderBook market={market} orderBookData={orderBookData} onPriceClick={handlePriceClick} />
               )}
             </div>
           ))}

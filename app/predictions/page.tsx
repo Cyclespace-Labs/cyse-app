@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import TopNavigation from "@/components/trading/TopNavigation";
 import BottomTicker from "@/components/trading/BottomTicker";
 import PredictionsSidebar from "@/components/predictions/PredictionsSidebar";
 import PredictionCard from "@/components/predictions/PredictionCard";
-import { predictionMarkets } from "@/lib/predictionsData";
+import { getPredictionMarkets, getPredictionCategories } from "@/lib/predictionsData";
+import { PredictionMarket, PredictionCategory } from "@/types/predictions";
 import { Search } from "lucide-react";
 
 const filterTabs = ["All", "Up / Down", "Above / Below", "Price Range", "Hit Price"];
@@ -14,12 +15,48 @@ export default function PredictionsPage() {
   const [activeCategory, setActiveCategory] = useState("All");
   const [activeFilter, setActiveFilter] = useState("All");
   const [search, setSearch] = useState("");
+  const [markets, setMarkets] = useState<PredictionMarket[]>([]);
+  const [categories, setCategories] = useState<PredictionCategory[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const filtered = predictionMarkets.filter((m) => {
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const [marketsData, categoriesData] = await Promise.all([
+          getPredictionMarkets(100),
+          getPredictionCategories(),
+        ]);
+        setMarkets(marketsData);
+        setCategories(categoriesData);
+      } catch (error) {
+        console.error('Error loading predictions data:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadData();
+  }, []);
+
+  const filtered = markets.filter((m) => {
     const matchesCategory = activeCategory === "All" || m.category === activeCategory || m.timeframe === activeCategory;
     const matchesSearch = search === "" || m.question.toLowerCase().includes(search.toLowerCase());
     return matchesCategory && matchesSearch;
   });
+
+  if (loading) {
+    return (
+      <div className="flex flex-col h-screen overflow-hidden" style={{ background: "var(--surface)", color: "var(--on-surface)" }}>
+        <TopNavigation />
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-sm" style={{ color: "var(--on-surface-disabled)" }}>
+            Loading markets...
+          </div>
+        </div>
+        <BottomTicker />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-screen overflow-hidden" style={{ background: "var(--surface)", color: "var(--on-surface)" }}>
@@ -32,6 +69,7 @@ export default function PredictionsPage() {
         <PredictionsSidebar
           activeCategory={activeCategory}
           onCategoryChange={setActiveCategory}
+          categories={categories}
         />
 
         {/* Main Area */}
@@ -63,7 +101,7 @@ export default function PredictionsPage() {
             </div>
 
             {/* Search */}
-            <div className="flex items-center gap-2 rounded px-3 py-1.5 w-[280px]" style={{ background: "var(--surface-container)", border: "1px solid rgba(66,70,84,0.4)" }}>
+            <div className="flex items-center gap-2 rounded px-3 py-1.5 w-[280px]" style={{ background: "var(--surface-container-low)", border: "1px solid rgba(66,70,84,0.4)" }}>
               <Search size={13} className="shrink-0" style={{ color: "var(--on-surface-disabled)" }} />
               <input
                 type="text"

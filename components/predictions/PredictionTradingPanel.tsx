@@ -50,6 +50,9 @@ export default function PredictionTradingPanel({ market }: PredictionTradingPane
   const [shares, setShares] = useState("");
   const [expiration, setExpiration] = useState(expirations[0]);
   const [showExpiration, setShowExpiration] = useState(false);
+  const [isTrading, setIsTrading] = useState(false);
+  const [tradeError, setTradeError] = useState<string | null>(null);
+  const [tradeSuccess, setTradeSuccess] = useState(false);
 
   const option = market.options[selectedOption];
   const isUpDown = option?.label === "Up" || option?.label === "Down";
@@ -67,6 +70,66 @@ export default function PredictionTradingPanel({ market }: PredictionTradingPane
   const sharesNum = parseFloat(shares) || 0;
   const limitTotal = (sharesNum * limitPriceNum) / 100;
   const limitToWin = sharesNum - limitTotal;
+
+  // Execute trade via Polymarket API
+  const handleTrade = async () => {
+    if (!market.clobTokenIds) {
+      setTradeError("Market does not support trading (no CLOB token ID)");
+      return;
+    }
+
+    setIsTrading(true);
+    setTradeError(null);
+    setTradeSuccess(false);
+
+    try {
+      // For market orders: convert amount to shares
+      // For limit orders: use shares directly
+      const tradeShares = orderType === "market" ? estimatedShares : sharesNum;
+      const tradePrice = orderType === "market" ? activePrice : limitPriceNum / 100;
+
+      if (tradeShares <= 0) {
+        setTradeError("Invalid trade size");
+        return;
+      }
+
+      const response = await fetch('/api/polymarket/trade', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          tokenID: market.clobTokenIds,
+          price: tradePrice,
+          size: tradeShares,
+          side: side.toUpperCase(),
+          tickSize: '0.01',
+          negRisk: false,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || data.error || 'Trade failed');
+      }
+
+      setTradeSuccess(true);
+      
+      // Reset form on success
+      setAmount("0");
+      setShares("");
+      setLimitPrice("");
+
+      // Hide success message after 3 seconds
+      setTimeout(() => setTradeSuccess(false), 3000);
+    } catch (error) {
+      console.error('Trade error:', error);
+      setTradeError(error instanceof Error ? error.message : 'Trade failed');
+    } finally {
+      setIsTrading(false);
+    }
+  };
 
   const handleLimitPriceStep = (delta: number) => {
     const current = limitPriceNum || (activePrice * 100);
@@ -380,15 +443,34 @@ export default function PredictionTradingPanel({ market }: PredictionTradingPane
       {/* Trade Button */}
       <div className="px-4 pb-4">
         <button
-          className="w-full py-3 rounded text-[14px] font-mono font-semibold transition-colors"
+          onClick={handleTrade}
+          disabled={isTrading || (orderType === "market" && estimatedShares <= 0) || (orderType === "limit" && sharesNum <= 0)}
+          className="w-full py-3 rounded text-[14px] font-mono font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           style={{
             background: side === "buy" ? "var(--buy)" : "var(--sell)",
             color: side === "buy" ? "#000" : "#fff",
           }}
         >
-          {orderType === "limit" ? "Place Limit Order" : "Trade"}
+          {isTrading ? "Processing..." : (orderType === "limit" ? "Place Limit Order" : "Trade")}
         </button>
       </div>
+
+      {/* Trade Status Messages */}
+      {tradeError && (
+        <div className="px-4 pb-3">
+          <div className="text-[11px] font-mono text-center p-2 rounded" style={{ background: "rgba(244, 67, 54, 0.1)", color: "#f44336" }}>
+            {tradeError}
+          </div>
+        </div>
+      )}
+
+      {tradeSuccess && (
+        <div className="px-4 pb-3">
+          <div className="text-[11px] font-mono text-center p-2 rounded" style={{ background: "rgba(76, 175, 80, 0.1)", color: "#4caf50" }}>
+            Order placed successfully!
+          </div>
+        </div>
+      )}
 
       {/* Terms */}
       <div className="px-4 pb-3 text-center">

@@ -1,250 +1,151 @@
 import { PredictionMarket, PredictionCategory } from "@/types/predictions";
 
+/**
+ * Fetch crypto events from Polymarket API
+ * Returns categories and their counts based on crypto events
+ */
+export async function fetchCryptoEvents(limit: number = 100, afterCursor?: string) {
+  try {
+    const params = new URLSearchParams();
+    params.append('limit', limit.toString());
+    if (afterCursor) {
+      params.append('after_cursor', afterCursor);
+    }
+
+    const response = await fetch(`/api/polymarket/events?${params.toString()}`);
+    if (!response.ok) {
+      throw new Error('Failed to fetch events');
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Error fetching crypto events:', error);
+    return { events: [], next_cursor: undefined };
+  }
+}
+
+/**
+ * Fetch crypto markets from Polymarket API
+ * Returns markets with pagination support
+ */
+export async function fetchCryptoMarkets(limit: number = 100, afterCursor?: string, closed: boolean = false) {
+  try {
+    const params = new URLSearchParams();
+    params.append('limit', limit.toString());
+    params.append('closed', closed.toString());
+    if (afterCursor) {
+      params.append('after_cursor', afterCursor);
+    }
+
+    const response = await fetch(`/api/polymarket/markets?${params.toString()}`);
+    if (!response.ok) {
+      throw new Error('Failed to fetch markets');
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Error fetching crypto markets:', error);
+    return { markets: [], next_cursor: undefined };
+  }
+}
+
+/**
+ * Fetch a single market by ID
+ */
+export async function fetchMarketById(id: string) {
+  try {
+    const response = await fetch(`/api/polymarket/markets/${id}`);
+    if (!response.ok) {
+      throw new Error('Failed to fetch market');
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Error fetching market by ID:', error);
+    return null;
+  }
+}
+
+/**
+ * Fetch order book for a market
+ */
+export async function fetchMarketOrderBook(tokenId: string) {
+  try {
+    const response = await fetch(`/api/polymarket/orderbook?token_id=${tokenId}`);
+    if (!response.ok) {
+      throw new Error('Failed to fetch order book');
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Error fetching order book:', error);
+    return null;
+  }
+}
+
+/**
+ * Get dynamic categories from crypto events
+ * This replaces the static predictionCategories with real data
+ */
+export async function getPredictionCategories(): Promise<PredictionCategory[]> {
+  try {
+    const data = await fetchCryptoEvents(100);
+    const events = data.events || [];
+
+    // Extract unique categories from events
+    const categoryMap = new Map<string, number>();
+    
+    events.forEach((event: any) => {
+      const category = event.category || 'Other';
+      categoryMap.set(category, (categoryMap.get(category) || 0) + 1);
+    });
+
+    // Convert to array and add "All" category
+    const categories: PredictionCategory[] = [
+      { label: 'All', count: events.length },
+      ...Array.from(categoryMap.entries()).map(([label, count]) => ({
+        label,
+        count,
+      })),
+    ];
+
+    return categories;
+  } catch (error) {
+    console.error('Error getting prediction categories:', error);
+    // Fallback to default categories
+    return [
+      { label: 'All', count: 0 },
+      { label: 'Bitcoin', count: 0 },
+      { label: 'Ethereum', count: 0 },
+      { label: 'Solana', count: 0 },
+    ];
+  }
+}
+
+/**
+ * Get prediction markets from Polymarket API
+ * This replaces the static predictionMarkets with real data
+ */
+export async function getPredictionMarkets(limit: number = 100, afterCursor?: string): Promise<PredictionMarket[]> {
+  try {
+    const data = await fetchCryptoMarkets(limit, afterCursor);
+    return data.markets || [];
+  } catch (error) {
+    console.error('Error getting prediction markets:', error);
+    return [];
+  }
+}
+
+// Keep exports for backward compatibility during transition
 export const predictionCategories: PredictionCategory[] = [
-  { label: "All", count: 249 },
-  { label: "5 Min", count: 7 },
-  { label: "15 Min", count: 7 },
-  { label: "1 Hour", count: 9 },
-  { label: "4 Hours", count: 7 },
-  { label: "Daily", count: 11 },
-  { label: "Weekly", count: 42 },
-  { label: "Monthly", count: 24 },
-  { label: "Yearly", count: 21 },
-  { label: "Pre-Market", count: 108 },
-  { label: "ETF", count: 2 },
-  { label: "Bitcoin", count: 33 },
-  { label: "Ethereum", count: 21 },
-  { label: "Solana", count: 12 },
-  { label: "XRP", count: 11 },
-  { label: "Dogecoin", count: 6 },
-  { label: "BNB", count: 6 },
-  { label: "MicroStrategy", count: 6 },
+  { label: "All", count: 0 }, // Will be replaced by dynamic data
+  { label: "Bitcoin", count: 0 },
+  { label: "Ethereum", count: 0 },
+  { label: "Solana", count: 0 },
 ];
 
-export const predictionMarkets: PredictionMarket[] = [
-  {
-    id: "1",
-    question: "BTC 5 Minute Up or Down",
-    tokenSymbol: "BTC",
-    tokenIcon: "₿",
-    iconColor: "#f7931a",
-    options: [
-      { label: "Up", percentage: 51, direction: "up" },
-      { label: "Down", percentage: 49, direction: "down" },
-    ],
-    volume: "$39M Vol.",
-    isLive: true,
-    category: "Bitcoin",
-    timeframe: "5 Min",
-  },
-  {
-    id: "2",
-    question: "What price will Bitcoin hit in March?",
-    tokenSymbol: "BTC",
-    tokenIcon: "₿",
-    iconColor: "#f7931a",
-    options: [
-      { label: "↓ 65,000", percentage: 53, direction: "down" },
-      { label: "↑ 60,000", percentage: 6, direction: "up" },
-    ],
-    volume: "$12M Vol.",
-    isLive: true,
-    category: "Bitcoin",
-    timeframe: "Monthly",
-  },
-  {
-    id: "3",
-    question: "Bitcoin above ___ on March 29?",
-    tokenSymbol: "BTC",
-    tokenIcon: "₿",
-    iconColor: "#f7931a",
-    options: [
-      { label: "58,000", percentage: 100, direction: "up" },
-      { label: "60,000", percentage: 100, direction: "up" },
-    ],
-    volume: "$3M Vol.",
-    isLive: true,
-    category: "Bitcoin",
-    timeframe: "Daily",
-  },
-  {
-    id: "4",
-    question: "What price will Ethereum hit in March?",
-    tokenSymbol: "ETH",
-    tokenIcon: "Ξ",
-    iconColor: "#627eea",
-    options: [
-      { label: "↓ 1,800", percentage: 8, direction: "down" },
-      { label: "↑ 2,400", percentage: 2, direction: "up" },
-    ],
-    volume: "$9M Vol.",
-    isLive: true,
-    category: "Ethereum",
-    timeframe: "Monthly",
-  },
-  {
-    id: "5",
-    question: "edgeX FDV above ___ one day after launch?",
-    tokenSymbol: "EDGX",
-    tokenIcon: "E",
-    iconColor: "#00c076",
-    options: [
-      { label: "$300M", percentage: 84, direction: "up" },
-      { label: "$400M", percentage: 65, direction: "up" },
-    ],
-    volume: "$5M Vol.",
-    isLive: true,
-    category: "Pre-Market",
-    timeframe: "Daily",
-  },
-  {
-    id: "6",
-    question: "Total commitments for the P2P Protocol public sale on MetaDAO",
-    tokenSymbol: "P2P",
-    tokenIcon: "P",
-    iconColor: "#ff4d4f",
-    options: [
-      { label: ">$8M", percentage: 91, direction: "up" },
-      { label: ">$10M", percentage: 80, direction: "up" },
-    ],
-    volume: "$3M Vol.",
-    isLive: true,
-    category: "Pre-Market",
-    timeframe: "Weekly",
-  },
-  {
-    id: "7",
-    question: "What price will Bitcoin hit March 23-29?",
-    tokenSymbol: "BTC",
-    tokenIcon: "₿",
-    iconColor: "#f7931a",
-    options: [
-      { label: "↓ 64,000", percentage: 12, direction: "down" },
-      { label: "↓ 62,000", percentage: 3, direction: "down" },
-    ],
-    volume: "$8M Vol.",
-    isLive: true,
-    category: "Bitcoin",
-    timeframe: "Weekly",
-  },
-  {
-    id: "8",
-    question: "What price will Solana hit in March?",
-    tokenSymbol: "SOL",
-    tokenIcon: "◎",
-    iconColor: "#9945ff",
-    options: [
-      { label: "↓ 80", percentage: 63, direction: "down" },
-      { label: "↓ 70", percentage: 6, direction: "down" },
-    ],
-    volume: "$6M Vol.",
-    isLive: true,
-    category: "Solana",
-    timeframe: "Monthly",
-  },
-  {
-    id: "9",
-    question: "Bitcoin price on March 29?",
-    tokenSymbol: "BTC",
-    tokenIcon: "₿",
-    iconColor: "#f7931a",
-    options: [
-      { label: "66,000-68,000", percentage: 64, direction: "up" },
-      { label: "64,000-66,000", percentage: 24, direction: "down" },
-    ],
-    volume: "$4M Vol.",
-    isLive: true,
-    category: "Bitcoin",
-    timeframe: "Daily",
-  },
-  {
-    id: "10",
-    question: "What price will Bitcoin hit on March 28?",
-    tokenSymbol: "BTC",
-    tokenIcon: "₿",
-    iconColor: "#f7931a",
-    options: [
-      { label: "↓ 66,000", percentage: 16, direction: "down" },
-      { label: "↑ 68,000", percentage: 4, direction: "up" },
-    ],
-    volume: "$7M Vol.",
-    isLive: true,
-    category: "Bitcoin",
-    timeframe: "Daily",
-  },
-  {
-    id: "11",
-    question: "Ethereum above ___ on March 29?",
-    tokenSymbol: "ETH",
-    tokenIcon: "Ξ",
-    iconColor: "#627eea",
-    options: [
-      { label: "1,600", percentage: 100, direction: "up" },
-      { label: "1,700", percentage: 100, direction: "up" },
-    ],
-    volume: "$2M Vol.",
-    isLive: true,
-    category: "Ethereum",
-    timeframe: "Daily",
-  },
-  {
-    id: "12",
-    question: "What price will XRP hit in March?",
-    tokenSymbol: "XRP",
-    tokenIcon: "✕",
-    iconColor: "#00aae4",
-    options: [
-      { label: "↓ 1.20", percentage: 13, direction: "down" },
-      { label: "↑ 1.00", percentage: 2, direction: "up" },
-    ],
-    volume: "$1.5M Vol.",
-    isLive: true,
-    category: "XRP",
-    timeframe: "Monthly",
-  },
-  {
-    id: "13",
-    question: "SOL price above $100 by end of Q2?",
-    tokenSymbol: "SOL",
-    tokenIcon: "◎",
-    iconColor: "#9945ff",
-    options: [
-      { label: "Yes", percentage: 72, direction: "up" },
-      { label: "No", percentage: 28, direction: "down" },
-    ],
-    volume: "$11M Vol.",
-    isLive: true,
-    category: "Solana",
-    timeframe: "Yearly",
-  },
-  {
-    id: "14",
-    question: "ETH/BTC ratio above 0.04 in April?",
-    tokenSymbol: "ETH",
-    tokenIcon: "Ξ",
-    iconColor: "#627eea",
-    options: [
-      { label: "Yes", percentage: 34, direction: "up" },
-      { label: "No", percentage: 66, direction: "down" },
-    ],
-    volume: "$3.2M Vol.",
-    isLive: true,
-    category: "Ethereum",
-    timeframe: "Monthly",
-  },
-  {
-    id: "15",
-    question: "DOGE above $0.15 by April?",
-    tokenSymbol: "DOGE",
-    tokenIcon: "Ð",
-    iconColor: "#c2a633",
-    options: [
-      { label: "Yes", percentage: 22, direction: "up" },
-      { label: "No", percentage: 78, direction: "down" },
-    ],
-    volume: "$2.1M Vol.",
-    isLive: true,
-    category: "Dogecoin",
-    timeframe: "Monthly",
-  },
-];
+export const predictionMarkets: PredictionMarket[] = []; // Will be replaced by API data

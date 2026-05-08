@@ -1,6 +1,7 @@
 "use client";
 
 import { use } from "react";
+import { useState, useEffect } from "react";
 import { notFound } from "next/navigation";
 import TopNavigation from "@/components/trading/TopNavigation";
 import BottomTicker from "@/components/trading/BottomTicker";
@@ -11,6 +12,7 @@ import PredictionTradingPanel from "@/components/predictions/PredictionTradingPa
 import RelatedMarkets from "@/components/predictions/RelatedMarkets";
 import MarketActivitySection from "@/components/predictions/MarketActivity";
 import { getPredictionById, getRelatedPredictions } from "@/lib/predictionsDetailData";
+import { PredictionMarketDetail } from "@/types/predictions";
 
 export default function PredictionDetailPage({
   params,
@@ -18,13 +20,49 @@ export default function PredictionDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
-  const market = getPredictionById(id);
+  const [market, setMarket] = useState<PredictionMarketDetail | null>(null);
+  const [relatedMarkets, setRelatedMarkets] = useState<PredictionMarketDetail[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const marketData = await getPredictionById(id);
+        if (!marketData) {
+          notFound();
+          return;
+        }
+        setMarket(marketData);
+
+        const relatedData = await getRelatedPredictions(id);
+        setRelatedMarkets(relatedData);
+      } catch (error) {
+        console.error('Error loading market data:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadData();
+  }, [id]);
+
+  if (loading) {
+    return (
+      <div className="flex flex-col h-screen overflow-hidden" style={{ background: "var(--surface)", color: "var(--on-surface)" }}>
+        <TopNavigation />
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-sm" style={{ color: "var(--on-surface-disabled)" }}>
+            Loading market data...
+          </div>
+        </div>
+        <BottomTicker />
+      </div>
+    );
+  }
 
   if (!market) {
     notFound();
   }
-
-  const relatedMarkets = getRelatedPredictions(id);
 
   return (
     <div className="flex flex-col h-screen overflow-hidden" style={{ background: "var(--surface)", color: "var(--on-surface)" }}>
