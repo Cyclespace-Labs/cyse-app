@@ -6,9 +6,12 @@
  * Hermes API:        https://hermes.pyth.network
  */
 
-// ── Hermes endpoint (free, no API key, 1 s updates via SSE) ─────────────────
+// ── Hermes endpoints (HTTP + WebSocket, real-time streaming) ────────────────
 export const HERMES_BASE_URL =
   process.env.NEXT_PUBLIC_PYTH_HERMES_URL ?? "https://hermes.pyth.network";
+
+export const HERMES_WS_URL =
+  process.env.NEXT_PUBLIC_PYTH_HERMES_WS_URL ?? "wss://hermes.pyth.network/ws";
 
 // ── Stable price-feed IDs ───────────────────────────────────────────────────
 // Each ID is a 32-byte hex string that uniquely identifies a Pyth price feed.

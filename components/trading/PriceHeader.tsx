@@ -20,9 +20,9 @@ interface PriceHeaderProps {
   onTokenPickerOpen?: () => void;
   selectedSymbol?: string;
   tokenPriceData?: TokenPriceData | null;
-  /** Live price from Pyth SSE / oracle (overrides tokenPriceData.price) */
+  /** Live price from the real-time Pyth stream (overrides tokenPriceData.price) */
   livePrice?: number;
-  /** Whether Pyth SSE is connected */
+  /** Whether the real-time Pyth stream is connected */
   pythConnected?: boolean;
   /** Oracle source label */
   oracleSource?: string;
@@ -79,7 +79,7 @@ export default function PriceHeader({ onTokenPickerOpen, selectedSymbol, tokenPr
         </div>
       </button>
 
-      {/* Price — live from Pyth SSE */}
+      {/* Price — live from Pyth stream */}
       <div className="flex flex-col mr-5 shrink-0">
         <div className="flex items-center gap-1.5">
           <span className="text-lg font-bold leading-tight" style={{ color: "var(--buy)" }}>
@@ -90,7 +90,11 @@ export default function PriceHeader({ onTokenPickerOpen, selectedSymbol, tokenPr
         {/*sub price indicator is hidden for now*/}
         <span className="text-[11px] hidden" style={{ color: "var(--on-surface-muted)" }}>
           {currentDisplayPrice > 0 ? formatPrice(currentDisplayPrice) : na}
-          {oracleSource && <span className="ml-1 opacity-60">{oracleSource === "pyth" ? "PYTH" : oracleSource.toUpperCase()}</span>}
+          {oracleSource && (
+            <span className="ml-1 opacity-60">
+              {oracleSource === "websocket" ? "PYTH" : oracleSource.toUpperCase()}
+            </span>
+          )}
         </span>
       </div>
 

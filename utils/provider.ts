@@ -2,7 +2,7 @@
 import { createPublicClient, createWalletClient, custom, http } from "viem";
 import { hardhat, sepolia, bscTestnet, arbitrumSepolia } from "viem/chains";
 
-const CHAIN_ID = Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? "11155111");
+const CHAIN_ID = Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? "31337");
 const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL;
 
 const CHAIN_MAP = {

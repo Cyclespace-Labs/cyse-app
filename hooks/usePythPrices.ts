@@ -1,33 +1,39 @@
 "use client";
 
 /**
- * Real-time Pyth price streaming via Hermes SSE.
+ * Real-time Pyth price streaming via Hermes WebSocket API.
  *
- * Connects to: GET https://hermes.pyth.network/v2/updates/price/stream?ids[]=<feedId>&...
- * Receives ~1 event/second per feed with parsed price data.
- *
- * Docs: https://docs.pyth.network/price-feeds/core/fetch-price-updates#streaming
+ * Connects to: wss://hermes.pyth.network/ws and subscribes to feed IDs.
+ * Receives incremental price updates as soon as they are published.
  */
 
-import { useState, useEffect, useRef, useCallback } from "react";
-import { HERMES_BASE_URL, PYTH_FEED_IDS, feedIdToPair } from "@/lib/pyth/config";
-import type { PythParsedFeed, PythResolvedPrice, PythStreamEvent } from "@/types/trading";
+import { useState, useEffect, useRef, useMemo } from "react";
+import { HERMES_WS_URL, PYTH_FEED_IDS, feedIdToPair } from "@/lib/pyth/config";
+import type {
+  PythResolvedPrice,
+  PythWebsocketMessage,
+  PythWebsocketPriceFeed,
+} from "@/types/trading";
 
-const MAX_RECONNECTS   = 10;
-const RECONNECT_BASE   = 1_000; // 1 s initial backoff
-const RECONNECT_MAX    = 30_000; // 30 s max
+const WS_MAX_RECONNECTS = 10;
+const WS_RECONNECT_BASE = 1_000;
+const WS_RECONNECT_MAX  = 30_000;
 
-/** Convert raw Pyth price fields to a human-readable number. */
-function parsePythPrice(raw: { price: string; conf: string; expo: number }): { price: number; confidence: number } {
-  const p = Number(raw.price);
-  const c = Number(raw.conf);
+const normaliseId = (id: string) => (id.startsWith("0x") ? id : `0x${id}`);
+
+function parsePythPrice(raw: { price: string; conf: string; expo: number }): {
+  price: number;
+  confidence: number;
+} {
   const factor = Math.pow(10, raw.expo);
-  return { price: p * factor, confidence: c * factor };
+  return {
+    price: Number(raw.price) * factor,
+    confidence: Number(raw.conf) * factor,
+  };
 }
 
-/** Resolve a PythParsedFeed into a PythResolvedPrice. */
-function resolvePrice(feed: PythParsedFeed, updateHex: string | null): PythResolvedPrice {
-  const id = feed.id.startsWith("0x") ? feed.id : `0x${feed.id}`;
+function resolvePrice(feed: PythWebsocketPriceFeed): PythResolvedPrice {
+  const id = normaliseId(feed.id);
   const { price, confidence } = parsePythPrice(feed.price);
   const { price: emaPrice } = parsePythPrice(feed.ema_price);
   const pair = feedIdToPair(id) ?? id.slice(0, 10);
@@ -41,14 +47,14 @@ function resolvePrice(feed: PythParsedFeed, updateHex: string | null): PythResol
     publishTime: feed.price.publish_time,
     priceRaw: feed.price.price,
     exponent: feed.price.expo,
-    updateData: updateHex,
+    updateData: null,
   };
 }
 
 export interface UsePythPricesReturn {
   /** Map of "ETH/USD" → PythResolvedPrice */
   prices: Record<string, PythResolvedPrice>;
-  /** Whether the SSE connection is currently open. */
+  /** Whether the WebSocket connection is currently open. */
   connected: boolean;
   /** Number of reconnection attempts so far. */
   reconnects: number;
@@ -59,7 +65,7 @@ export interface UsePythPricesReturn {
 }
 
 /**
- * Stream real-time prices from Pyth Hermes SSE.
+ * Stream real-time prices from the Hermes WebSocket API.
  *
  * @param feedIds - Array of 0x-prefixed feed IDs to subscribe to.
  *                  Defaults to all feeds in PYTH_FEED_IDS.
@@ -67,92 +73,141 @@ export interface UsePythPricesReturn {
 export function usePythPrices(feedIds?: string[]): UsePythPricesReturn {
   const ids = feedIds ?? Object.values(PYTH_FEED_IDS);
 
-  const [prices, setPrices]           = useState<Record<string, PythResolvedPrice>>({});
-  const [connected, setConnected]     = useState(false);
-  const [reconnects, setReconnects]   = useState(0);
-  const [error, setError]             = useState<string | null>(null);
-  const [lastUpdate, setLastUpdate]   = useState(0);
+  const [prices, setPrices]         = useState<Record<string, PythResolvedPrice>>({});
+  const [connected, setConnected]   = useState(false);
+  const [reconnects, setReconnects] = useState(0);
+  const [error, setError]           = useState<string | null>(null);
+  const [lastUpdate, setLastUpdate] = useState(0);
 
-  const esRef        = useRef<EventSource | null>(null);
+  const wsRef        = useRef<WebSocket | null>(null);
   const reconnectRef = useRef(0);
-  const mountedRef   = useRef(true);
+  const mountedRef   = useRef(false);
 
-  const connect = useCallback(() => {
-    if (!mountedRef.current) return;
+  const idsKey = useMemo(() => ids.map(normaliseId).sort().join(","), [ids]);
 
-    // Build SSE URL: /v2/updates/price/stream?ids[]=<id1>&ids[]=<id2>&parsed=true
-    const params = new URLSearchParams();
-    ids.forEach((id) => params.append("ids[]", id));
-    params.set("parsed", "true");
-    params.set("allow_unordered", "true");
-    params.set("benchmarks_only", "false");
+  useEffect(() => {
+    const subscriptionIds = ids.map(normaliseId);
+    if (!subscriptionIds.length) {
+      setPrices({});
+      setConnected(false);
+      setLastUpdate(0);
+      return () => undefined;
+    }
 
-    const url = `${HERMES_BASE_URL}/v2/updates/price/stream?${params.toString()}`;
-    console.log("[usePythPrices] connecting to SSE:", url);
+    mountedRef.current = true;
+    reconnectRef.current = 0;
+    setReconnects(0);
+    setError(null);
 
-    const es = new EventSource(url);
-    esRef.current = es;
-
-    es.onopen = () => {
+    const connect = () => {
       if (!mountedRef.current) return;
-      console.log("[usePythPrices] SSE connected");
-      setConnected(true);
-      setError(null);
-      reconnectRef.current = 0;
-      setReconnects(0);
-    };
 
-    es.onmessage = (event) => {
-      if (!mountedRef.current) return;
-      try {
-        const data: PythStreamEvent = JSON.parse(event.data);
-        if (!data.parsed?.length) return;
+      const ws = new WebSocket(HERMES_WS_URL);
+      wsRef.current = ws;
 
-        // First hex VAA (for on-chain submission if needed)
-        const updateHex = data.binary?.data?.[0] ?? null;
+      ws.onopen = () => {
+        if (!mountedRef.current) return;
+        setConnected(true);
+        setError(null);
+        reconnectRef.current = 0;
+        setReconnects(0);
+
+        ws.send(
+          JSON.stringify({
+            type: "subscribe",
+            ids: subscriptionIds,
+            parsed: true,
+          })
+        );
+      };
+
+      ws.onmessage = (event) => {
+        if (!mountedRef.current) return;
+        let message: PythWebsocketMessage | null = null;
+        try {
+          message = JSON.parse(event.data) as PythWebsocketMessage;
+        } catch {
+          return;
+        }
+
+        if (!message) return;
+
+        if (message.type === "ping") {
+          ws.send(JSON.stringify({ type: "pong" }));
+          return;
+        }
+
+        if (message.type === "error" || message.error || message.message === "error") {
+          const errMsg =
+            (typeof message.error === "string" && message.error) ||
+            (typeof message.message === "string" && message.message) ||
+            "Hermes websocket error";
+          setError(errMsg);
+          return;
+        }
+
+        const feeds: PythWebsocketPriceFeed[] = [];
+        if (message.price_feed) feeds.push(message.price_feed);
+        if (Array.isArray(message.price_feeds)) feeds.push(...message.price_feeds);
+
+        if (!feeds.length) return;
 
         setPrices((prev) => {
           const next = { ...prev };
-          for (const feed of data.parsed) {
-            const resolved = resolvePrice(feed, updateHex);
+          for (const feed of feeds) {
+            const resolved = resolvePrice(feed);
             next[resolved.pair] = resolved;
           }
           return next;
         });
         setLastUpdate(Date.now());
-      } catch {
-        // Ignore malformed events
-      }
+      };
+
+      const scheduleReconnect = () => {
+        if (!mountedRef.current) return;
+        setConnected(false);
+
+        if (reconnectRef.current < WS_MAX_RECONNECTS) {
+          reconnectRef.current += 1;
+          setReconnects(reconnectRef.current);
+          const delay = Math.min(
+            WS_RECONNECT_BASE * Math.pow(2, reconnectRef.current - 1),
+            WS_RECONNECT_MAX
+          );
+          setTimeout(connect, delay);
+        } else {
+          setError(`WebSocket disconnected after ${WS_MAX_RECONNECTS} attempts`);
+        }
+      };
+
+      ws.onerror = () => {
+        scheduleReconnect();
+        try {
+          ws.close();
+        } catch {
+          /* noop */
+        }
+      };
+
+      ws.onclose = () => {
+        scheduleReconnect();
+      };
     };
 
-    es.onerror = () => {
-      if (!mountedRef.current) return;
-      setConnected(false);
-      es.close();
-
-      if (reconnectRef.current < MAX_RECONNECTS) {
-        reconnectRef.current++;
-        setReconnects(reconnectRef.current);
-        const delay = Math.min(RECONNECT_BASE * Math.pow(2, reconnectRef.current - 1), RECONNECT_MAX);
-        console.log(`[usePythPrices] reconnecting in ${delay}ms (attempt ${reconnectRef.current})`);
-        setTimeout(connect, delay);
-      } else {
-        setError(`Failed after ${MAX_RECONNECTS} reconnection attempts`);
-        console.error("[usePythPrices] max reconnects reached");
-      }
-    };
-  }, [ids]);
-
-  useEffect(() => {
-    mountedRef.current = true;
     connect();
+
     return () => {
       mountedRef.current = false;
-      esRef.current?.close();
-      esRef.current = null;
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        try {
+          wsRef.current.close();
+        } catch {
+          /* noop */
+        }
+      }
+      wsRef.current = null;
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ids.join(",")]);
+  }, [idsKey, ids]);
 
   return { prices, connected, reconnects, error, lastUpdate };
 }

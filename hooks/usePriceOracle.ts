@@ -5,19 +5,19 @@ import { useReadContracts } from "wagmi";
 import { contracts } from "@/lib/protocol/contracts";
 import { formatUnits } from "viem";
 import type { Abi } from "viem";
-import { HERMES_BASE_URL, resolvePythFeed, PYTH_FEED_IDS, feedIdToPair } from "@/lib/pyth/config";
-import type { PythParsedFeed, PythStreamEvent, PythResolvedPrice } from "@/types/trading";
+import { HERMES_WS_URL, resolvePythFeed, PYTH_FEED_IDS, feedIdToPair } from "@/lib/pyth/config";
+import type { PythWebsocketMessage, PythWebsocketPriceFeed, PythResolvedPrice } from "@/types/trading";
 
 // ── Thresholds ──────────────────────────────────────────────────────────────
 const PYTH_STALE_MS       = 10_000;  // 10 s without Pyth update → warn
 const CHAIN_STALE_MS      = 60_000;  // 60 s without on-chain → warn
 const ERROR_THRESHOLD_MS  = 120_000; // 2 min → error
-const CHAIN_POLL_MS       = 5_000;   // on-chain poll (slower when Pyth SSE is active)
+const CHAIN_POLL_MS       = 5_000;   // on-chain poll (slower when WebSocket is healthy)
 const CHAIN_POLL_FAST_MS  = 2_000;   // on-chain poll fallback when Pyth is down
 
-const SSE_MAX_RECONNECTS  = 10;
-const SSE_RECONNECT_BASE  = 1_000;
-const SSE_RECONNECT_MAX   = 30_000;
+const WS_MAX_RECONNECTS  = 10;
+const WS_RECONNECT_BASE  = 1_000;
+const WS_RECONNECT_MAX   = 30_000;
 
 // ── Pyth price conversion ───────────────────────────────────────────────────
 function parsePythRaw(raw: { price: string; conf: string; expo: number }): {
@@ -52,15 +52,15 @@ export interface PriceValidationResult {
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-// usePriceOracle — Pyth SSE (1 s) as primary, VaultPriceFeed as on-chain
-// validation / fallback.  Replaces old WebSocket + FastPriceFeed logic.
+// usePriceOracle — Pyth WebSocket stream as primary, VaultPriceFeed as on-chain
+// validation / fallback. Replaces the old fast-price poller approach.
 // ═════════════════════════════════════════════════════════════════════════════
 export function usePriceOracle(indexToken: `0x${string}`, maximise = true) {
-  // ── Pyth SSE state ────────────────────────────────────────────────────────
+  // ── Pyth WebSocket state ─────────────────────────────────────────────────
   const [pythPrice, setPythPrice]          = useState<PythResolvedPrice | null>(null);
   const [pythConnected, setPythConnected]  = useState(false);
   const [pythLastUpdate, setPythLastUpdate] = useState(0);
-  const esRef         = useRef<EventSource | null>(null);
+  const wsRef         = useRef<WebSocket | null>(null);
   const reconnectRef  = useRef(0);
   const mountedRef    = useRef(true);
 
@@ -77,7 +77,7 @@ export function usePriceOracle(indexToken: `0x${string}`, maximise = true) {
 
   const pythFeedId = pythFeedPair ? PYTH_FEED_IDS[pythFeedPair] : null;
 
-  // ── Pyth Hermes SSE connection (1-second real-time updates) ───────────────
+  // ── Pyth Hermes WebSocket connection (real-time updates) ────────────────
   useEffect(() => {
     if (!pythFeedId) return;
     mountedRef.current = true;
@@ -85,43 +85,53 @@ export function usePriceOracle(indexToken: `0x${string}`, maximise = true) {
     const connect = () => {
       if (!mountedRef.current) return;
 
-      const params = new URLSearchParams();
-      params.append("ids[]", pythFeedId);
-      params.set("parsed", "true");
-      params.set("allow_unordered", "true");
-      params.set("benchmarks_only", "false");
+      const ws = new WebSocket(HERMES_WS_URL);
+      wsRef.current = ws;
 
-      const url = `${HERMES_BASE_URL}/v2/updates/price/stream?${params.toString()}`;
-      console.log("[usePriceOracle] Pyth SSE connecting:", url);
-
-      const es = new EventSource(url);
-      esRef.current = es;
-
-      es.onopen = () => {
+      ws.onopen = () => {
         if (!mountedRef.current) return;
+        ws.send(
+          JSON.stringify({
+            type: "subscribe",
+            ids: [pythFeedId],
+            parsed: true,
+          })
+        );
         setPythConnected(true);
         reconnectRef.current = 0;
-        console.log("[usePriceOracle] Pyth SSE connected for", pythFeedPair);
+        console.log("[usePriceOracle] Pyth WebSocket connected for", pythFeedPair);
       };
 
-      es.onmessage = (event) => {
+      ws.onmessage = (event) => {
         if (!mountedRef.current) return;
+        let payload: PythWebsocketMessage | null = null;
         try {
-          const data: PythStreamEvent = JSON.parse(event.data);
-          if (!data.parsed?.length) return;
+          payload = JSON.parse(event.data) as PythWebsocketMessage;
+        } catch {
+          return;
+        }
 
-          const updateHex = data.binary?.data?.[0] ?? null;
+        if (!payload) return;
 
-          for (const feed of data.parsed) {
-            const id = feed.id.startsWith("0x") ? feed.id : `0x${feed.id}`;
-            const pair = feedIdToPair(id);
-            if (pair !== pythFeedPair) continue;
+        if (payload.type === "ping") {
+          ws.send(JSON.stringify({ type: "pong" }));
+          return;
+        }
 
+        const feeds: PythWebsocketPriceFeed[] = [];
+        if (payload.price_feed) feeds.push(payload.price_feed);
+        if (Array.isArray(payload.price_feeds)) feeds.push(...payload.price_feeds);
+
+        if (!feeds.length) return;
+
+        for (const feed of feeds) {
+          const id = feed.id.startsWith("0x") ? feed.id : `0x${feed.id}`;
+          const pair = feedIdToPair(id);
+          if (pythFeedPair && pair === pythFeedPair) {
             const { price, confidence } = parsePythRaw(feed.price);
             const { price: emaPrice } = parsePythRaw(feed.ema_price);
-
             setPythPrice({
-              pair: pair ?? id,
+              pair: pythFeedPair,
               feedId: id,
               price,
               confidence,
@@ -129,39 +139,62 @@ export function usePriceOracle(indexToken: `0x${string}`, maximise = true) {
               publishTime: feed.price.publish_time,
               priceRaw: feed.price.price,
               exponent: feed.price.expo,
-              updateData: updateHex,
+              updateData: null,
             });
             setPythLastUpdate(Date.now());
           }
-        } catch { /* ignore malformed SSE */ }
+        }
       };
 
-      es.onerror = () => {
+      const scheduleReconnect = () => {
         if (!mountedRef.current) return;
         setPythConnected(false);
-        es.close();
 
-        if (reconnectRef.current < SSE_MAX_RECONNECTS) {
-          reconnectRef.current++;
-          const delay = Math.min(SSE_RECONNECT_BASE * Math.pow(2, reconnectRef.current - 1), SSE_RECONNECT_MAX);
-          console.log(`[usePriceOracle] Pyth SSE reconnecting in ${delay}ms (attempt ${reconnectRef.current})`);
+        if (reconnectRef.current < WS_MAX_RECONNECTS) {
+          reconnectRef.current += 1;
+          const delay = Math.min(
+            WS_RECONNECT_BASE * Math.pow(2, reconnectRef.current - 1),
+            WS_RECONNECT_MAX
+          );
+          console.log(
+            `[usePriceOracle] Pyth WebSocket reconnecting in ${delay}ms (attempt ${reconnectRef.current})`
+          );
           setTimeout(connect, delay);
         } else {
-          console.error("[usePriceOracle] Pyth SSE max reconnects reached — falling back to on-chain");
+          console.error("[usePriceOracle] Pyth WebSocket max reconnects reached — falling back to on-chain");
         }
+      };
+
+      ws.onerror = () => {
+        scheduleReconnect();
+        try {
+          ws.close();
+        } catch {
+          /* noop */
+        }
+      };
+
+      ws.onclose = () => {
+        scheduleReconnect();
       };
     };
 
     connect();
     return () => {
       mountedRef.current = false;
-      esRef.current?.close();
-      esRef.current = null;
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        try {
+          wsRef.current.close();
+        } catch {
+          /* noop */
+        }
+      }
+      wsRef.current = null;
     };
   }, [pythFeedId, pythFeedPair]);
 
   // ── On-chain price: VaultPriceFeed (max + min in one batch) ───────────────
-  // Slower polling when Pyth SSE is active (5 s); faster fallback (2 s).
+  // Slower polling when the WebSocket stream is healthy (5 s); faster fallback (2 s).
   const {
     data: priceResults,
     error: priceError,
@@ -220,7 +253,7 @@ export function usePriceOracle(indexToken: `0x${string}`, maximise = true) {
   const isError     = (hasRpcError && !pythPrice) || (now - lastUpdate > ERROR_THRESHOLD_MS);
   const isStale     = !isError && (pythStale || chainStale);
 
-  // ── Price resolution: Pyth SSE → VaultPriceFeed fallback ──────────────────
+  // ── Price resolution: WebSocket Pyth stream → VaultPriceFeed fallback ─────
   const displayPrice  = pythPrice?.price ?? vaultMidPrice;
   const priceRawTyped = (vaultPriceRaw ?? null) as bigint | null;
 
@@ -238,7 +271,7 @@ export function usePriceOracle(indexToken: `0x${string}`, maximise = true) {
     : isStale
     ? "stale"
     : pythConnected && pythPrice
-    ? "pyth"
+    ? "websocket"
     : "vault";
 
   const networkStatus: PriceOracleState["networkStatus"] =
@@ -319,7 +352,7 @@ export function usePriceOracle(indexToken: `0x${string}`, maximise = true) {
     deviation,
     error:               isError ? (priceError?.message ?? "Price data unavailable") : undefined,
     networkStatus,
-    websocketConnected:  pythConnected,  // Pyth SSE acts as the "websocket" layer
+    websocketConnected:  pythConnected,
     isLoading:           chainLoading && !displayPrice,
     // Functions
     validatePrice,

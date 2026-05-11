@@ -142,28 +142,29 @@ export interface TokenPriceData {
 
 // ── Pyth Network price types ────────────────────────────────────────────────
 
-/** Single Pyth price point (matches Hermes parsed response). */
+/** Single Pyth price point (matches Hermes WebSocket payload). */
 export interface PythPrice {
-  price: string;      // int price as string, e.g. "6163260000000"
-  conf: string;       // confidence interval as string
-  expo: number;       // exponent, e.g. -8
-  publish_time: number; // unix timestamp
+  price: string;
+  conf: string;
+  expo: number;
+  publish_time: number;
 }
 
-/** Parsed price update from Hermes SSE stream. */
-export interface PythParsedFeed {
-  id: string;         // 32-byte hex feed ID (no 0x prefix in SSE)
+/** WebSocket price feed payload from Hermes. */
+export interface PythWebsocketPriceFeed {
+  id: string;
   price: PythPrice;
   ema_price: PythPrice;
 }
 
-/** Full SSE event payload from Hermes /v2/updates/price/stream. */
-export interface PythStreamEvent {
-  binary: {
-    encoding: string;
-    data: string[];   // hex-encoded update bytes (for on-chain submission)
-  };
-  parsed: PythParsedFeed[];
+/** Hermes WebSocket message union. */
+export interface PythWebsocketMessage {
+  type?: string;
+  ids?: string[];
+  price_feed?: PythWebsocketPriceFeed;
+  price_feeds?: PythWebsocketPriceFeed[];
+  message?: string;
+  error?: string;
 }
 
 /** Resolved real-time price from a Pyth feed. */
