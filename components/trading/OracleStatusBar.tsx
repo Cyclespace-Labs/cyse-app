@@ -35,7 +35,7 @@ export default function OracleStatusBar({
           {websocketConnected ? " · 1s" : isOracleStale ? " · Stale" : ""}
         </span>
         {oracleSpread > 0 && (
-          <span className="font-mono text-[9px]" style={{ color: "var(--on-surface-disabled)", opacity: 0.7 }}>
+          <span className="font-mono text-[9px]" style={{ color: "var(--on-surface-disabled)", opacity: 1 }}>
             spread ${oracleSpread.toLocaleString("en-US", { maximumFractionDigits: 2 })}
           </span>
         )}
