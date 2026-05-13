@@ -17,6 +17,9 @@ import {
   Droplets,
   Loader2,
   RefreshCw,
+  Clock,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { useWallet } from "@/contexts/WalletContext";
 import { useStakingData } from "@/hooks/useStakingData";
@@ -41,10 +44,25 @@ export default function EarnPage() {
   const { totalTvlUsd } = useVaultPoolData();
 
   const [activeTab, setActiveTab] = useState("Portfolio");
+
+  // CYSE stake/unstake
   const [stakeInput, setStakeInput] = useState("");
   const [unstakeInput, setUnstakeInput] = useState("");
   const [stakeTab, setStakeTab] = useState<"stake" | "unstake">("stake");
   const [txStatus, setTxStatus] = useState<string | null>(null);
+
+  // esCYSE stake/unstake
+  const [esStakeInput, setEsStakeInput] = useState("");
+  const [esUnstakeInput, setEsUnstakeInput] = useState("");
+  const [esStakeTab, setEsStakeTab] = useState<"stake" | "unstake">("stake");
+  const [esTxStatus, setEsTxStatus] = useState<string | null>(null);
+
+  // Vesting state
+  const [cyseVestInput, setCyseVestInput] = useState("");
+  const [cylpVestInput, setCylpVestInput] = useState("");
+  const [vestTxStatus, setVestTxStatus] = useState<string | null>(null);
+  const [cyseVestOpen, setCyseVestOpen] = useState(true);
+  const [cylpVestOpen, setCylpVestOpen] = useState(true);
 
   const handleStake = async () => {
     if (!stakeInput || parseFloat(stakeInput) <= 0) return;
@@ -70,6 +88,30 @@ export default function EarnPage() {
     }
   };
 
+  const handleStakeEsCyse = async () => {
+    if (!esStakeInput || parseFloat(esStakeInput) <= 0) return;
+    setEsTxStatus("Staking esCYSE...");
+    try {
+      await actions.stakeEsCyse(esStakeInput);
+      setEsTxStatus("esCYSE staked successfully!");
+      setEsStakeInput("");
+    } catch (e: any) {
+      setEsTxStatus(`Error: ${e.shortMessage || e.message}`);
+    }
+  };
+
+  const handleUnstakeEsCyse = async () => {
+    if (!esUnstakeInput || parseFloat(esUnstakeInput) <= 0) return;
+    setEsTxStatus("Unstaking esCYSE...");
+    try {
+      await actions.unstakeEsCyse(esUnstakeInput);
+      setEsTxStatus("esCYSE unstaked successfully!");
+      setEsUnstakeInput("");
+    } catch (e: any) {
+      setEsTxStatus(`Error: ${e.shortMessage || e.message}`);
+    }
+  };
+
   const handleClaim = async () => {
     setTxStatus("Claiming rewards...");
     try {
@@ -87,6 +129,80 @@ export default function EarnPage() {
       setTxStatus("Compounded successfully!");
     } catch (e: any) {
       setTxStatus(`Error: ${e.shortMessage || e.message}`);
+    }
+  };
+
+  const handleClaimAndRestake = async () => {
+    setTxStatus("Claiming and restaking...");
+    try {
+      await actions.claimAndRestake();
+      setTxStatus("Claimed and restaked!");
+    } catch (e: any) {
+      setTxStatus(`Error: ${e.shortMessage || e.message}`);
+    }
+  };
+
+  const handleDepositVestCyse = async () => {
+    if (!cyseVestInput || parseFloat(cyseVestInput) <= 0) return;
+    setVestTxStatus("Depositing esCYSE into CyseVester...");
+    try {
+      await actions.depositVestingCyse(cyseVestInput);
+      setVestTxStatus("Deposited successfully!");
+      setCyseVestInput("");
+    } catch (e: any) {
+      setVestTxStatus(`Error: ${e.shortMessage || e.message}`);
+    }
+  };
+
+  const handleWithdrawVestCyse = async () => {
+    setVestTxStatus("Withdrawing from CyseVester...");
+    try {
+      await actions.withdrawVestingCyse();
+      setVestTxStatus("Withdrawn successfully!");
+    } catch (e: any) {
+      setVestTxStatus(`Error: ${e.shortMessage || e.message}`);
+    }
+  };
+
+  const handleClaimVestedCyse = async () => {
+    setVestTxStatus("Claiming vested CYSE...");
+    try {
+      await actions.claimVestedCyse();
+      setVestTxStatus("Vested CYSE claimed!");
+    } catch (e: any) {
+      setVestTxStatus(`Error: ${e.shortMessage || e.message}`);
+    }
+  };
+
+  const handleDepositVestCylp = async () => {
+    if (!cylpVestInput || parseFloat(cylpVestInput) <= 0) return;
+    setVestTxStatus("Depositing esCYSE into CylpVester...");
+    try {
+      await actions.depositVestingCylp(cylpVestInput);
+      setVestTxStatus("Deposited successfully!");
+      setCylpVestInput("");
+    } catch (e: any) {
+      setVestTxStatus(`Error: ${e.shortMessage || e.message}`);
+    }
+  };
+
+  const handleWithdrawVestCylp = async () => {
+    setVestTxStatus("Withdrawing from CylpVester...");
+    try {
+      await actions.withdrawVestingCylp();
+      setVestTxStatus("Withdrawn successfully!");
+    } catch (e: any) {
+      setVestTxStatus(`Error: ${e.shortMessage || e.message}`);
+    }
+  };
+
+  const handleClaimVestedCylp = async () => {
+    setVestTxStatus("Claiming vested CYSE from CylpVester...");
+    try {
+      await actions.claimVestedCylp();
+      setVestTxStatus("Vested CYSE claimed!");
+    } catch (e: any) {
+      setVestTxStatus(`Error: ${e.shortMessage || e.message}`);
     }
   };
 
@@ -129,6 +245,14 @@ export default function EarnPage() {
           <EarnStat label="Claimable esCYSE" value={wallet.connected ? fmtNum(staking.totalClaimableEsCyse, 2) : "-"} icon={<Gift size={12} />} />
           {wallet.connected && (staking.totalClaimableEth > 0 || staking.totalClaimableEsCyse > 0) && (
             <div className="ml-auto flex items-center gap-2">
+              <button
+                onClick={handleClaimAndRestake}
+                disabled={actions.isPending}
+                className="flex items-center gap-1 px-3 py-1.5 text-[11px] font-mono rounded transition-colors"
+                style={{ border: "1px solid rgba(66,70,84,0.4)", color: "var(--on-surface-muted)" }}
+              >
+                <RefreshCw size={11} /> Restake
+              </button>
               <button
                 onClick={handleCompound}
                 disabled={actions.isPending}
@@ -286,6 +410,135 @@ export default function EarnPage() {
                 </div>
               </div>
 
+              {/* esCYSE Stake / Unstake */}
+              <div className="px-5 pb-5">
+                <div className="rounded-lg overflow-hidden" style={{ background: "var(--surface-container-lowest)", border: "1px solid rgba(66,70,84,0.4)" }}>
+                  <div className="px-5 py-4 flex items-center justify-between" style={{ borderBottom: "1px solid rgba(66,70,84,0.4)" }}>
+                    <div>
+                      <h2 className="text-[16px] font-semibold" style={{ color: "var(--on-surface)" }}>esCYSE Staking</h2>
+                      <p className="text-[12px] font-mono mt-1" style={{ color: "var(--on-surface-disabled)" }}>
+                        Stake escrowed CYSE to earn multiplier points and fees
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => setEsStakeTab("stake")}
+                        className="px-3 py-1.5 text-[11px] font-mono rounded transition-colors"
+                        style={{
+                          background: esStakeTab === "stake" ? "var(--primary)" : "transparent",
+                          color: esStakeTab === "stake" ? "#fff" : "var(--on-surface-disabled)",
+                        }}
+                      >
+                        Stake
+                      </button>
+                      <button
+                        onClick={() => setEsStakeTab("unstake")}
+                        className="px-3 py-1.5 text-[11px] font-mono rounded transition-colors"
+                        style={{
+                          background: esStakeTab === "unstake" ? "var(--sell)" : "transparent",
+                          color: esStakeTab === "unstake" ? "#fff" : "var(--on-surface-disabled)",
+                        }}
+                      >
+                        Unstake
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="p-5">
+                    {!wallet.connected ? (
+                      <div className="text-center py-6 text-[13px] font-mono" style={{ color: "var(--on-surface-disabled)" }}>
+                        Connect wallet to manage esCYSE
+                      </div>
+                    ) : esStakeTab === "stake" ? (
+                      <div className="flex items-end gap-4">
+                        <div className="flex-1">
+                          <label className="text-[10px] font-mono uppercase tracking-wider mb-1 block" style={{ color: "var(--on-surface-disabled)" }}>
+                            esCYSE Amount
+                          </label>
+                          <div className="flex items-center rounded px-3 py-2" style={{ background: "var(--surface-container)", border: "1px solid rgba(66,70,84,0.4)" }}>
+                            <input
+                              type="number"
+                              step="0.0001"
+                              min="0"
+                              value={esStakeInput}
+                              onChange={(e) => setEsStakeInput(e.target.value)}
+                              placeholder="0"
+                              className="flex-1 bg-transparent text-[14px] font-mono outline-none"
+                              style={{ color: "var(--on-surface)" }}
+                            />
+                            <button
+                              onClick={() => setEsStakeInput(staking.esCyseBalance.toString())}
+                              className="text-[10px] font-mono px-2 py-0.5 rounded"
+                              style={{ color: "var(--primary)", background: "rgba(14,118,253,0.1)" }}
+                            >
+                              MAX
+                            </button>
+                          </div>
+                          <div className="text-[10px] font-mono mt-1" style={{ color: "var(--on-surface-disabled)" }}>
+                            Available: {fmtNum(staking.esCyseBalance, 4)} esCYSE
+                          </div>
+                        </div>
+                        <button
+                          onClick={handleStakeEsCyse}
+                          disabled={actions.isPending || !esStakeInput}
+                          className="px-5 py-2.5 text-[12px] font-mono font-semibold rounded transition-colors disabled:opacity-40"
+                          style={{ background: "#6366f1", color: "#fff" }}
+                        >
+                          {actions.isPending ? "Processing..." : "Stake esCYSE"}
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-end gap-4">
+                        <div className="flex-1">
+                          <label className="text-[10px] font-mono uppercase tracking-wider mb-1 block" style={{ color: "var(--on-surface-disabled)" }}>
+                            esCYSE Amount
+                          </label>
+                          <div className="flex items-center rounded px-3 py-2" style={{ background: "var(--surface-container)", border: "1px solid rgba(66,70,84,0.4)" }}>
+                            <input
+                              type="number"
+                              step="0.0001"
+                              min="0"
+                              value={esUnstakeInput}
+                              onChange={(e) => setEsUnstakeInput(e.target.value)}
+                              placeholder="0"
+                              className="flex-1 bg-transparent text-[14px] font-mono outline-none"
+                              style={{ color: "var(--on-surface)" }}
+                            />
+                            <button
+                              onClick={() => setEsUnstakeInput(staking.stakedEsCyseAmount.toString())}
+                              className="text-[10px] font-mono px-2 py-0.5 rounded"
+                              style={{ color: "var(--sell)", background: "rgba(255,77,79,0.1)" }}
+                            >
+                              MAX
+                            </button>
+                          </div>
+                          <div className="text-[10px] font-mono mt-1" style={{ color: "var(--on-surface-disabled)" }}>
+                            Staked esCYSE: {fmtNum(staking.stakedEsCyseAmount, 4)}
+                          </div>
+                        </div>
+                        <button
+                          onClick={handleUnstakeEsCyse}
+                          disabled={actions.isPending || !esUnstakeInput}
+                          className="px-5 py-2.5 text-[12px] font-mono font-semibold rounded transition-colors disabled:opacity-40"
+                          style={{ background: "var(--sell)", color: "#fff" }}
+                        >
+                          {actions.isPending ? "Processing..." : "Unstake esCYSE"}
+                        </button>
+                      </div>
+                    )}
+
+                    {esTxStatus && (
+                      <div className="mt-3 text-[11px] font-mono px-3 py-2 rounded" style={{
+                        background: esTxStatus.startsWith("Error") ? "rgba(255,77,79,0.1)" : "rgba(0,192,118,0.1)",
+                        color: esTxStatus.startsWith("Error") ? "var(--sell)" : "var(--buy)",
+                      }}>
+                        {esTxStatus}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
               {/* My Assets — Live */}
               <div className="px-5 pb-5">
                 <h2 className="text-[15px] font-semibold mb-4" style={{ color: "var(--on-surface)" }}>My Assets</h2>
@@ -312,7 +565,7 @@ export default function EarnPage() {
                       logo="C" color="var(--primary)" name="CYSE"
                       balance={fmtNum(staking.cyseBalance, 2)}
                       staked={fmtNum(staking.stakedCyseAmount, 2)}
-                      claimable={`${fmtNum(staking.totalClaimableEsCyse, 4)} esCYSE`}
+                      claimable={`${fmtNum(staking.feeCyseClaimable, 6)} ETH`}
                       status={staking.stakedCyseAmount > 0 ? "Earning" : "Not staked"}
                       statusColor={staking.stakedCyseAmount > 0 ? "var(--buy)" : "var(--on-surface-disabled)"}
                     />
@@ -320,11 +573,21 @@ export default function EarnPage() {
                     {/* esCYSE */}
                     <AssetRow
                       logo="E" color="#6366f1" name="esCYSE"
-                      balance={fmtNum(staking.esCyseClaimable, 4)}
-                      staked="-"
-                      claimable="-"
-                      status="Vesting"
-                      statusColor="#f59e0b"
+                      balance={fmtNum(staking.esCyseBalance, 4)}
+                      staked={fmtNum(staking.stakedEsCyseAmount, 4)}
+                      claimable={`${fmtNum(staking.cyseVesting.claimable, 4)} CYSE`}
+                      status={staking.cyseVesting.deposited > 0 ? "Vesting" : staking.stakedEsCyseAmount > 0 ? "Staked" : "-"}
+                      statusColor={staking.cyseVesting.deposited > 0 ? "#f59e0b" : staking.stakedEsCyseAmount > 0 ? "var(--buy)" : "var(--on-surface-disabled)"}
+                    />
+
+                    {/* bnCYSE — multiplier points */}
+                    <AssetRow
+                      logo="B" color="#10b981" name="bnCYSE"
+                      balance={fmtNum(staking.bonusCyseAmount, 4)}
+                      staked={fmtNum(staking.bonusCyseAmount, 4)}
+                      claimable={`${fmtNum(staking.bonusCyseClaimable, 4)} bnCYSE`}
+                      status={staking.bonusCyseAmount > 0 ? "Boosting" : "-"}
+                      statusColor={staking.bonusCyseAmount > 0 ? "#10b981" : "var(--on-surface-disabled)"}
                     />
 
                     {/* CYLP */}
@@ -353,17 +616,218 @@ export default function EarnPage() {
 
               {/* Reward Breakdown */}
               {wallet.connected && !staking.isLoading && (
-                <div className="px-5 pb-6">
+                <div className="px-5 pb-5">
                   <div className="rounded-lg p-5" style={{ background: "var(--surface-container-lowest)", border: "1px solid rgba(66,70,84,0.4)" }}>
                     <h3 className="text-[14px] font-semibold mb-3" style={{ color: "var(--on-surface)" }}>Reward Summary</h3>
                     <div className="grid grid-cols-2 gap-4">
                       <RewardItem label="ETH from CYSE staking" value={`${fmtNum(staking.feeCyseClaimable, 6)} ETH`} />
                       <RewardItem label="ETH from CYLP fees" value={`${fmtNum(staking.feeCylpClaimable, 6)} ETH`} />
                       <RewardItem label="esCYSE from staking" value={`${fmtNum(staking.totalClaimableEsCyse, 4)} esCYSE`} />
-                      <RewardItem label="Bonus CYSE tracker" value={`${fmtNum(staking.bonusCyseAmount, 4)}`} />
-                      <RewardItem label="CYLP total supply" value={fmtNum(staking.cylpSupply, 2)} />
+                      <RewardItem label="bnCYSE staked" value={fmtNum(staking.bonusCyseAmount, 4)} />
+                      <RewardItem label="bnCYSE claimable" value={fmtNum(staking.bonusCyseClaimable, 4)} /> 
+                      <RewardItem label="CYLP price (AUM/supply)" value={staking.cylpPrice > 0 ? `$${staking.cylpPrice.toFixed(4)}` : "-"} />
                       <RewardItem label="Total claimable ETH" value={`${fmtNum(staking.totalClaimableEth, 6)} ETH`} accent />
                     </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Vesting — CyseVester */}
+              {wallet.connected && (
+                <div className="px-5 pb-5">
+                  <div className="rounded-lg overflow-hidden" style={{ background: "var(--surface-container-lowest)", border: "1px solid rgba(66,70,84,0.4)" }}>
+                    <button
+                      className="w-full px-5 py-4 flex items-center justify-between"
+                      style={{ borderBottom: cyseVestOpen ? "1px solid rgba(66,70,84,0.4)" : "none" }}
+                      onClick={() => setCyseVestOpen((v) => !v)}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Clock size={15} style={{ color: "#f59e0b" }} />
+                        <div className="text-left">
+                          <h2 className="text-[15px] font-semibold" style={{ color: "var(--on-surface)" }}>CyseVester</h2>
+                          <p className="text-[11px] font-mono mt-0.5" style={{ color: "var(--on-surface-disabled)" }}>
+                            Vest esCYSE → CYSE over 1 year · locks feeCyse tokens as collateral
+                          </p>
+                        </div>
+                      </div>
+                      {cyseVestOpen ? <ChevronUp size={14} style={{ color: "var(--on-surface-disabled)" }} /> : <ChevronDown size={14} style={{ color: "var(--on-surface-disabled)" }} />}
+                    </button>
+
+                    {cyseVestOpen && (
+                      <div className="p-5 space-y-4">
+                        {/* Stats row */}
+                        <div className="grid grid-cols-3 gap-3">
+                          <VestStat label="Deposited" value={`${fmtNum(staking.cyseVesting.deposited, 4)} esCYSE`} />
+                          <VestStat label="Claimable (vested)" value={`${fmtNum(staking.cyseVesting.claimable, 4)} CYSE`} accent />
+                          <VestStat label="Max Vestable" value={`${fmtNum(staking.cyseVesting.maxVestable, 4)} esCYSE`} />
+                          <VestStat label="Pair Locked" value={`${fmtNum(staking.cyseVesting.pairAmount, 4)}`} />
+                          <VestStat label="Cumulative Claimed" value={`${fmtNum(staking.cyseVesting.cumulativeClaimed, 4)} CYSE`} />
+                          <VestStat label="esCYSE Balance" value={`${fmtNum(staking.esCyseBalance, 4)} esCYSE`} />
+                        </div>
+
+                        {/* Deposit input */}
+                        <div className="flex items-end gap-3">
+                          <div className="flex-1">
+                            <label className="text-[10px] font-mono uppercase tracking-wider mb-1 block" style={{ color: "var(--on-surface-disabled)" }}>
+                              Deposit esCYSE
+                            </label>
+                            <div className="flex items-center rounded px-3 py-2" style={{ background: "var(--surface-container)", border: "1px solid rgba(66,70,84,0.4)" }}>
+                              <input
+                                type="number"
+                                step="0.0001"
+                                min="0"
+                                value={cyseVestInput}
+                                onChange={(e) => setCyseVestInput(e.target.value)}
+                                placeholder="0"
+                                className="flex-1 bg-transparent text-[13px] font-mono outline-none"
+                                style={{ color: "var(--on-surface)" }}
+                              />
+                              <button
+                                onClick={() => setCyseVestInput(Math.min(staking.esCyseBalance, staking.cyseVesting.maxVestable - staking.cyseVesting.deposited).toFixed(6))}
+                                className="text-[10px] font-mono px-2 py-0.5 rounded"
+                                style={{ color: "#f59e0b", background: "rgba(245,158,11,0.1)" }}
+                              >
+                                MAX
+                              </button>
+                            </div>
+                            <div className="text-[9px] font-mono mt-0.5" style={{ color: "var(--on-surface-disabled)" }}>
+                              Remaining capacity: {fmtNum(Math.max(0, staking.cyseVesting.maxVestable - staking.cyseVesting.deposited), 4)} esCYSE
+                            </div>
+                          </div>
+                          <button
+                            onClick={handleDepositVestCyse}
+                            disabled={actions.isPending || !cyseVestInput}
+                            className="px-4 py-2.5 text-[12px] font-mono font-semibold rounded disabled:opacity-40"
+                            style={{ background: "#f59e0b", color: "#000" }}
+                          >
+                            {actions.isPending ? "..." : "Deposit"}
+                          </button>
+                        </div>
+
+                        {/* Claim / Withdraw buttons */}
+                        <div className="flex gap-2">
+                          <button
+                            onClick={handleClaimVestedCyse}
+                            disabled={actions.isPending || staking.cyseVesting.claimable <= 0}
+                            className="flex-1 py-2 text-[11px] font-mono font-semibold rounded disabled:opacity-40"
+                            style={{ background: "var(--buy)", color: "#fff" }}
+                          >
+                            Claim {fmtNum(staking.cyseVesting.claimable, 4)} CYSE
+                          </button>
+                          <button
+                            onClick={handleWithdrawVestCyse}
+                            disabled={actions.isPending || staking.cyseVesting.deposited <= 0}
+                            className="flex-1 py-2 text-[11px] font-mono font-semibold rounded disabled:opacity-40"
+                            style={{ border: "1px solid rgba(255,77,79,0.4)", color: "var(--sell)" }}
+                          >
+                            Withdraw &amp; Cancel Vesting
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Vesting — CylpVester */}
+              {wallet.connected && (
+                <div className="px-5 pb-6">
+                  <div className="rounded-lg overflow-hidden" style={{ background: "var(--surface-container-lowest)", border: "1px solid rgba(66,70,84,0.4)" }}>
+                    <button
+                      className="w-full px-5 py-4 flex items-center justify-between"
+                      style={{ borderBottom: cylpVestOpen ? "1px solid rgba(66,70,84,0.4)" : "none" }}
+                      onClick={() => setCylpVestOpen((v) => !v)}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Clock size={15} style={{ color: "#06b6d4" }} />
+                        <div className="text-left">
+                          <h2 className="text-[15px] font-semibold" style={{ color: "var(--on-surface)" }}>CylpVester</h2>
+                          <p className="text-[11px] font-mono mt-0.5" style={{ color: "var(--on-surface-disabled)" }}>
+                            Vest esCYSE → CYSE via CYLP staking history · locks stakedCylp tokens
+                          </p>
+                        </div>
+                      </div>
+                      {cylpVestOpen ? <ChevronUp size={14} style={{ color: "var(--on-surface-disabled)" }} /> : <ChevronDown size={14} style={{ color: "var(--on-surface-disabled)" }} />}
+                    </button>
+
+                    {cylpVestOpen && (
+                      <div className="p-5 space-y-4">
+                        <div className="grid grid-cols-3 gap-3">
+                          <VestStat label="Deposited" value={`${fmtNum(staking.cylpVesting.deposited, 4)} esCYSE`} />
+                          <VestStat label="Claimable (vested)" value={`${fmtNum(staking.cylpVesting.claimable, 4)} CYSE`} accent />
+                          <VestStat label="Max Vestable" value={`${fmtNum(staking.cylpVesting.maxVestable, 4)} esCYSE`} />
+                          <VestStat label="Pair Locked" value={`${fmtNum(staking.cylpVesting.pairAmount, 4)}`} />
+                          <VestStat label="Cumulative Claimed" value={`${fmtNum(staking.cylpVesting.cumulativeClaimed, 4)} CYSE`} />
+                          <VestStat label="CYLP Price" value={staking.cylpPrice > 0 ? `$${staking.cylpPrice.toFixed(4)}` : "-"} />
+                        </div>
+
+                        <div className="flex items-end gap-3">
+                          <div className="flex-1">
+                            <label className="text-[10px] font-mono uppercase tracking-wider mb-1 block" style={{ color: "var(--on-surface-disabled)" }}>
+                              Deposit esCYSE
+                            </label>
+                            <div className="flex items-center rounded px-3 py-2" style={{ background: "var(--surface-container)", border: "1px solid rgba(66,70,84,0.4)" }}>
+                              <input
+                                type="number"
+                                step="0.0001"
+                                min="0"
+                                value={cylpVestInput}
+                                onChange={(e) => setCylpVestInput(e.target.value)}
+                                placeholder="0"
+                                className="flex-1 bg-transparent text-[13px] font-mono outline-none"
+                                style={{ color: "var(--on-surface)" }}
+                              />
+                              <button
+                                onClick={() => setCylpVestInput(Math.min(staking.esCyseBalance, staking.cylpVesting.maxVestable - staking.cylpVesting.deposited).toFixed(6))}
+                                className="text-[10px] font-mono px-2 py-0.5 rounded"
+                                style={{ color: "#06b6d4", background: "rgba(6,182,212,0.1)" }}
+                              >
+                                MAX
+                              </button>
+                            </div>
+                            <div className="text-[9px] font-mono mt-0.5" style={{ color: "var(--on-surface-disabled)" }}>
+                              Remaining capacity: {fmtNum(Math.max(0, staking.cylpVesting.maxVestable - staking.cylpVesting.deposited), 4)} esCYSE
+                            </div>
+                          </div>
+                          <button
+                            onClick={handleDepositVestCylp}
+                            disabled={actions.isPending || !cylpVestInput}
+                            className="px-4 py-2.5 text-[12px] font-mono font-semibold rounded disabled:opacity-40"
+                            style={{ background: "#06b6d4", color: "#000" }}
+                          >
+                            {actions.isPending ? "..." : "Deposit"}
+                          </button>
+                        </div>
+
+                        <div className="flex gap-2">
+                          <button
+                            onClick={handleClaimVestedCylp}
+                            disabled={actions.isPending || staking.cylpVesting.claimable <= 0}
+                            className="flex-1 py-2 text-[11px] font-mono font-semibold rounded disabled:opacity-40"
+                            style={{ background: "var(--buy)", color: "#fff" }}
+                          >
+                            Claim {fmtNum(staking.cylpVesting.claimable, 4)} CYSE
+                          </button>
+                          <button
+                            onClick={handleWithdrawVestCylp}
+                            disabled={actions.isPending || staking.cylpVesting.deposited <= 0}
+                            className="flex-1 py-2 text-[11px] font-mono font-semibold rounded disabled:opacity-40"
+                            style={{ border: "1px solid rgba(255,77,79,0.4)", color: "var(--sell)" }}
+                          >
+                            Withdraw &amp; Cancel Vesting
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {vestTxStatus && (
+                      <div className="mx-5 mb-4 text-[11px] font-mono px-3 py-2 rounded" style={{
+                        background: vestTxStatus.startsWith("Error") ? "rgba(255,77,79,0.1)" : "rgba(0,192,118,0.1)",
+                        color: vestTxStatus.startsWith("Error") ? "var(--sell)" : "var(--buy)",
+                      }}>
+                        {vestTxStatus}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -431,6 +895,15 @@ function RewardItem({ label, value, accent }: { label: string; value: string; ac
     <div className="flex items-center justify-between py-1.5" style={{ borderBottom: "1px solid rgba(66,70,84,0.15)" }}>
       <span className="text-[11px] font-mono" style={{ color: "var(--on-surface-disabled)" }}>{label}</span>
       <span className="text-[12px] font-mono font-medium" style={{ color: accent ? "var(--buy)" : "var(--on-surface)" }}>{value}</span>
+    </div>
+  );
+}
+
+function VestStat({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
+  return (
+    <div className="rounded px-3 py-2" style={{ background: "var(--surface-container)", border: "1px solid rgba(66,70,84,0.3)" }}>
+      <div className="text-[9px] font-mono uppercase tracking-wider mb-0.5" style={{ color: "var(--on-surface-disabled)" }}>{label}</div>
+      <div className="text-[12px] font-mono font-semibold" style={{ color: accent ? "var(--buy)" : "var(--on-surface)" }}>{value}</div>
     </div>
   );
 }

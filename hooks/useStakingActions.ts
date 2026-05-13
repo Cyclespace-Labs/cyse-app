@@ -3,7 +3,7 @@
 import { useCallback } from "react";
 import { useAccount, useWriteContract } from "wagmi";
 import { parseUnits } from "viem";
-import { contracts } from "@/lib/protocol/contracts";
+import { contracts, erc20Abi } from "@/lib/protocol/contracts";
 
 export function useStakingActions() {
   const { address } = useAccount();
@@ -40,6 +40,45 @@ export function useStakingActions() {
       const hash = await writeContractAsync({
         ...contracts.rewardRouterV2,
         functionName: "unstakeCyse",
+        args: [value],
+      });
+      return hash;
+    },
+    [address, writeContractAsync]
+  );
+
+  // ── Stake esCYSE ───────────────────────────────────────────────
+  // esCYSE enters the same 4-tracker chain as CYSE via stakeEsCyse
+  const stakeEsCyse = useCallback(
+    async (amount: string) => {
+      if (!address) throw new Error("Wallet not connected");
+      const value = parseUnits(amount, 18);
+
+      // Approve StakedCyseTracker to spend esCYSE
+      await writeContractAsync({
+        ...contracts.escyse,
+        functionName: "approve",
+        args: [contracts.stakedCyseTracker.address, value],
+      });
+
+      const hash = await writeContractAsync({
+        ...contracts.rewardRouterV2,
+        functionName: "stakeEsCyse",
+        args: [value],
+      });
+      return hash;
+    },
+    [address, writeContractAsync]
+  );
+
+  // ── Unstake esCYSE ─────────────────────────────────────────────
+  const unstakeEsCyse = useCallback(
+    async (amount: string) => {
+      if (!address) throw new Error("Wallet not connected");
+      const value = parseUnits(amount, 18);
+      const hash = await writeContractAsync({
+        ...contracts.rewardRouterV2,
+        functionName: "unstakeEsCyse",
         args: [value],
       });
       return hash;
@@ -95,6 +134,109 @@ export function useStakingActions() {
     return hash;
   }, [address, writeContractAsync]);
 
+  // ── Deposit esCYSE into CyseVester ────────────────────────────
+  // Locks feeCyseTracker tokens as pair collateral. Approval for both
+  // esCYSE and feeCyseTracker (pair token) tokens is required.
+  const depositVestingCyse = useCallback(
+    async (amount: string) => {
+      if (!address) throw new Error("Wallet not connected");
+      const value = parseUnits(amount, 18);
+
+      // Approve esCYSE transfer to CyseVester
+      await writeContractAsync({
+        ...contracts.escyse,
+        functionName: "approve",
+        args: [contracts.cyseVester.address, value],
+      });
+
+      // Approve feeCyseTracker (pair token) to CyseVester — max approval
+      await writeContractAsync({
+        ...contracts.feeCyseTracker,
+        functionName: "approve",
+        args: [contracts.cyseVester.address, value],
+      });
+
+      const hash = await writeContractAsync({
+        ...contracts.cyseVester,
+        functionName: "deposit",
+        args: [value],
+      });
+      return hash;
+    },
+    [address, writeContractAsync]
+  );
+
+  // ── Withdraw from CyseVester (returns unvested esCYSE + any claimable CYSE) ─
+  const withdrawVestingCyse = useCallback(async () => {
+    if (!address) throw new Error("Wallet not connected");
+    const hash = await writeContractAsync({
+      ...contracts.cyseVester,
+      functionName: "withdraw",
+    });
+    return hash;
+  }, [address, writeContractAsync]);
+
+  // ── Claim vested CYSE from CyseVester ─────────────────────────
+  const claimVestedCyse = useCallback(async () => {
+    if (!address) throw new Error("Wallet not connected");
+    const hash = await writeContractAsync({
+      ...contracts.cyseVester,
+      functionName: "claim",
+    });
+    return hash;
+  }, [address, writeContractAsync]);
+
+  // ── Deposit esCYSE into CylpVester ────────────────────────────
+  // Locks stakedCylpTracker tokens as pair collateral.
+  const depositVestingCylp = useCallback(
+    async (amount: string) => {
+      if (!address) throw new Error("Wallet not connected");
+      const value = parseUnits(amount, 18);
+
+      // Approve esCYSE transfer to CylpVester
+      await writeContractAsync({
+        ...contracts.escyse,
+        functionName: "approve",
+        args: [contracts.cylpVester.address, value],
+      });
+
+      // Approve stakedCylpTracker (pair token) to CylpVester — max approval
+      await writeContractAsync({
+        ...contracts.stakedCylpTracker,
+        functionName: "approve",
+        args: [contracts.cylpVester.address, value],
+      });
+
+      const hash = await writeContractAsync({
+        ...contracts.cylpVester,
+        functionName: "deposit",
+        args: [value],
+      });
+      return hash;
+    },
+    [address, writeContractAsync]
+  );
+
+  // ── Withdraw from CylpVester ───────────────────────────────────
+  const withdrawVestingCylp = useCallback(async () => {
+    if (!address) throw new Error("Wallet not connected");
+    const hash = await writeContractAsync({
+      ...contracts.cylpVester,
+      functionName: "withdraw",
+    });
+    return hash;
+  }, [address, writeContractAsync]);
+
+  // ── Claim vested CYSE from CylpVester ─────────────────────────
+  const claimVestedCylp = useCallback(async () => {
+    if (!address) throw new Error("Wallet not connected");
+    const hash = await writeContractAsync({
+      ...contracts.cylpVester,
+      functionName: "claim",
+    });
+    return hash;
+  }, [address, writeContractAsync]);
+
   // ── Mint & Stake CYLP with ETH (add vault liquidity) ──────────
   const addLiquidityETH = useCallback(
     async (ethAmount: string) => {
@@ -117,10 +259,10 @@ export function useStakingActions() {
       if (!address) throw new Error("Wallet not connected");
       const value = parseUnits(amount, decimals);
 
-      // Approve CylpManager via RewardRouter
+      // Approve CylpManager to spend token
       await writeContractAsync({
         address: tokenAddress,
-        abi: contracts.cyse.abi, // generic ERC-20 approve
+        abi: erc20Abi,
         functionName: "approve",
         args: [contracts.cylpManager.address, value],
       });
@@ -168,9 +310,17 @@ export function useStakingActions() {
   return {
     stakeCyse,
     unstakeCyse,
+    stakeEsCyse,
+    unstakeEsCyse,
     compound,
     claimRewards,
     claimAndRestake,
+    depositVestingCyse,
+    withdrawVestingCyse,
+    claimVestedCyse,
+    depositVestingCylp,
+    withdrawVestingCylp,
+    claimVestedCylp,
     addLiquidityETH,
     addLiquidityToken,
     removeLiquidityETH,

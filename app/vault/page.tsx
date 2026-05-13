@@ -7,8 +7,10 @@ import { useVaultPoolData, VaultTokenPool } from "@/hooks/useVaultPoolData";
 import { useStakingData } from "@/hooks/useStakingData";
 import { useStakingActions } from "@/hooks/useStakingActions";
 import { useWallet } from "@/contexts/WalletContext";
-import { Loader2, Droplets, ShieldCheck, TrendingUp, Wallet, ArrowUpRight, ArrowDownLeft } from "lucide-react";
+import { contracts } from "@/lib/protocol/contracts";
+import { Loader2, Droplets, ShieldCheck, TrendingUp, Wallet, ArrowUpRight, ArrowDownLeft, Clock, ExternalLink } from "lucide-react";
 import { formatUnits } from "viem";
+import Link from "next/link";
 
 const fmt$ = (v: number) => {
   return `$${Math.floor(v).toLocaleString("en-US")}`;
@@ -23,6 +25,25 @@ const TOKEN_LOGOS: Record<string, string> = {
   ETH: "E", BTC: "₿", USDC: "$", USDT: "₮",
 };
 
+interface ERC20Token { symbol: string; address: `0x${string}`; decimals: number; }
+interface RedeemToken { symbol: string; address: `0x${string}`; }
+
+// Supported ERC-20 deposit tokens (add liquidity via token, not ETH)
+const ERC20_TOKENS: ERC20Token[] = [
+  { symbol: "WETH", address: contracts.weth.address, decimals: 18 },
+  { symbol: "BTC",  address: contracts.btc.address,  decimals: 18 },
+  { symbol: "USDC", address: contracts.usdc.address, decimals: 18 },
+  { symbol: "USDT", address: contracts.usdt.address, decimals: 18 },
+];
+
+// Supported ERC-20 redeem tokens (remove liquidity to token, not ETH)
+const REDEEM_TOKENS: RedeemToken[] = [
+  { symbol: "WETH", address: contracts.weth.address },
+  { symbol: "BTC",  address: contracts.btc.address  },
+  { symbol: "USDC", address: contracts.usdc.address },
+  { symbol: "USDT", address: contracts.usdt.address },
+];
+
 export default function VaultPage() {
   const { pools, totalTvlUsd, isLoading } = useVaultPoolData();
   const staking = useStakingData();
@@ -34,12 +55,24 @@ export default function VaultPage() {
   const [liqTab, setLiqTab] = useState<"add" | "remove">("add");
   const [txStatus, setTxStatus] = useState<string | null>(null);
 
+  // Add liquidity: ETH (native) vs ERC-20 token
+  const [addTokenMode, setAddTokenMode] = useState<"eth" | "token">("eth");
+  const [selectedAddToken, setSelectedAddToken] = useState<ERC20Token>(ERC20_TOKENS[0]);
+
+  // Remove liquidity: receive ETH vs ERC-20 token
+  const [removeTokenMode, setRemoveTokenMode] = useState<"eth" | "token">("eth");
+  const [selectedRemoveToken, setSelectedRemoveToken] = useState<RedeemToken>(REDEEM_TOKENS[0]);
+
   const handleAddLiquidity = async () => {
     if (!addLiqInput || parseFloat(addLiqInput) <= 0) return;
     setTxStatus("Adding liquidity...");
     try {
-      await actions.addLiquidityETH(addLiqInput);
-      setTxStatus("Liquidity added!");
+      if (addTokenMode === "eth") {
+        await actions.addLiquidityETH(addLiqInput);
+      } else {
+        await actions.addLiquidityToken(selectedAddToken.address, addLiqInput, selectedAddToken.decimals);
+      }
+      setTxStatus("Liquidity added! CYLP minted and staked.");
       setAddLiqInput("");
     } catch (e: any) {
       setTxStatus(`Error: ${e.shortMessage || e.message}`);
@@ -50,7 +83,11 @@ export default function VaultPage() {
     if (!removeLiqInput || parseFloat(removeLiqInput) <= 0) return;
     setTxStatus("Removing liquidity...");
     try {
-      await actions.removeLiquidityETH(removeLiqInput);
+      if (removeTokenMode === "eth") {
+        await actions.removeLiquidityETH(removeLiqInput);
+      } else {
+        await actions.removeLiquidityToken(selectedRemoveToken.address, removeLiqInput);
+      }
       setTxStatus("Liquidity removed!");
       setRemoveLiqInput("");
     } catch (e: any) {
@@ -79,9 +116,10 @@ export default function VaultPage() {
         </div>
 
         {/* Summary Stats */}
-        <div className="grid grid-cols-4 gap-4 px-5 pb-5">
+        <div className="grid grid-cols-5 gap-4 px-5 pb-5">
           <StatCard label="Whitelisted Tokens" value={`${pools.length}`} icon={<ShieldCheck size={14} />} />
           <StatCard label="CYLP Supply" value={fmtNum(staking.cylpSupply, 2)} icon={<Droplets size={14} />} />
+          <StatCard label="CYLP Price" value={staking.cylpPrice > 0 ? `$${staking.cylpPrice.toFixed(4)}` : "-"} icon={<TrendingUp size={14} />} />
           <StatCard label="Your CYLP" value={wallet.connected ? fmtNum(staking.cylpBalance + staking.stakedCylpAmount, 4) : "-"} icon={<Wallet size={14} />} />
           <StatCard label="Claimable ETH Fees" value={wallet.connected ? `${fmtNum(staking.totalClaimableEth, 6)} ETH` : "-"} icon={<TrendingUp size={14} />} accent />
         </div>
@@ -137,13 +175,13 @@ export default function VaultPage() {
         </div>
 
         {/* Add / Remove Liquidity */}
-        <div className="px-5 pb-6">
+        <div className="px-5 pb-5">
           <div className="rounded-lg overflow-hidden" style={{ background: "var(--surface-container-lowest)", border: "1px solid rgba(66,70,84,0.4)" }}>
             <div className="px-5 py-4 flex items-center justify-between" style={{ borderBottom: "1px solid rgba(66,70,84,0.4)" }}>
               <div>
                 <h2 className="text-[16px] font-semibold" style={{ color: "var(--on-surface)" }}>Vault Liquidity (CYLP)</h2>
                 <p className="text-[12px] font-mono mt-1" style={{ color: "var(--on-surface-disabled)" }}>
-                  Deposit ETH to mint CYLP and earn protocol fees
+                  Deposit tokens to mint &amp; auto-stake CYLP · earn ETH fees and esCYSE
                 </p>
               </div>
               <div className="flex items-center gap-1">
@@ -176,68 +214,175 @@ export default function VaultPage() {
                   Connect wallet to manage vault liquidity
                 </div>
               ) : liqTab === "add" ? (
-                <div className="flex items-end gap-4">
-                  <div className="flex-1">
-                    <label className="text-[10px] font-mono uppercase tracking-wider mb-1 block" style={{ color: "var(--on-surface-disabled)" }}>
-                      ETH Amount
-                    </label>
-                    <div className="flex items-center rounded px-3 py-2" style={{ background: "var(--surface-container)", border: "1px solid rgba(66,70,84,0.4)" }}>
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={addLiqInput}
-                        onChange={(e) => setAddLiqInput(e.target.value)}
-                        placeholder="0.0"
-                        className="flex-1 bg-transparent text-[14px] font-mono outline-none"
-                        style={{ color: "var(--on-surface)" }}
-                      />
-                      <span className="text-[12px] font-mono ml-2" style={{ color: "var(--on-surface-disabled)" }}>ETH</span>
-                    </div>
-                    <div className="text-[10px] font-mono mt-1" style={{ color: "var(--on-surface-disabled)" }}>
-                      Balance: {fmtNum(wallet.balance, 4)} ETH
-                    </div>
+                <div className="space-y-3">
+                  {/* Token mode selector */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-mono uppercase tracking-wider" style={{ color: "var(--on-surface-disabled)" }}>Deposit via</span>
+                    <button
+                      onClick={() => setAddTokenMode("eth")}
+                      className="px-2.5 py-1 text-[11px] font-mono rounded transition-colors"
+                      style={{
+                        background: addTokenMode === "eth" ? "var(--primary)" : "var(--surface-container)",
+                        color: addTokenMode === "eth" ? "#fff" : "var(--on-surface-muted)",
+                        border: "1px solid rgba(66,70,84,0.4)",
+                      }}
+                    >
+                      ETH (native)
+                    </button>
+                    <button
+                      onClick={() => setAddTokenMode("token")}
+                      className="px-2.5 py-1 text-[11px] font-mono rounded transition-colors"
+                      style={{
+                        background: addTokenMode === "token" ? "var(--primary)" : "var(--surface-container)",
+                        color: addTokenMode === "token" ? "#fff" : "var(--on-surface-muted)",
+                        border: "1px solid rgba(66,70,84,0.4)",
+                      }}
+                    >
+                      ERC-20 Token
+                    </button>
+                    {addTokenMode === "token" && (
+                      <select
+                        value={selectedAddToken.symbol}
+                        onChange={(e) => {
+                          const t = ERC20_TOKENS.find((x) => x.symbol === e.target.value);
+                          if (t) setSelectedAddToken(t);
+                        }}
+                        className="px-2 py-1 text-[11px] font-mono rounded"
+                        style={{ background: "var(--surface-container)", color: "var(--on-surface)", border: "1px solid rgba(66,70,84,0.4)" }}
+                      >
+                        {ERC20_TOKENS.map((t) => (
+                          <option key={t.symbol} value={t.symbol}>{t.symbol}</option>
+                        ))}
+                      </select>
+                    )}
                   </div>
-                  <button
-                    onClick={handleAddLiquidity}
-                    disabled={actions.isPending || !addLiqInput}
-                    className="px-5 py-2.5 text-[12px] font-mono font-semibold rounded transition-colors disabled:opacity-40"
-                    style={{ background: "var(--primary)", color: "#fff" }}
-                  >
-                    {actions.isPending ? "Processing..." : "Add Liquidity"}
-                  </button>
+
+                  <div className="flex items-end gap-4">
+                    <div className="flex-1">
+                      <label className="text-[10px] font-mono uppercase tracking-wider mb-1 block" style={{ color: "var(--on-surface-disabled)" }}>
+                        {addTokenMode === "eth" ? "ETH Amount" : `${selectedAddToken.symbol} Amount`}
+                      </label>
+                      <div className="flex items-center rounded px-3 py-2" style={{ background: "var(--surface-container)", border: "1px solid rgba(66,70,84,0.4)" }}>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={addLiqInput}
+                          onChange={(e) => setAddLiqInput(e.target.value)}
+                          placeholder="0.0"
+                          className="flex-1 bg-transparent text-[14px] font-mono outline-none"
+                          style={{ color: "var(--on-surface)" }}
+                        />
+                        <span className="text-[12px] font-mono ml-2" style={{ color: "var(--on-surface-disabled)" }}>
+                          {addTokenMode === "eth" ? "ETH" : selectedAddToken.symbol}
+                        </span>
+                      </div>
+                      {addTokenMode === "eth" && (
+                        <div className="text-[10px] font-mono mt-1" style={{ color: "var(--on-surface-disabled)" }}>
+                          Balance: {fmtNum(wallet.balance, 4)} ETH
+                        </div>
+                      )}
+                      {staking.cylpPrice > 0 && addLiqInput && parseFloat(addLiqInput) > 0 && (
+                        <div className="text-[10px] font-mono mt-1" style={{ color: "var(--on-surface-disabled)" }}>
+                          CYLP Price: ${staking.cylpPrice.toFixed(4)} per CYLP
+                        </div>
+                      )}
+                    </div>
+                    <button
+                      onClick={handleAddLiquidity}
+                      disabled={actions.isPending || !addLiqInput}
+                      className="px-5 py-2.5 text-[12px] font-mono font-semibold rounded transition-colors disabled:opacity-40"
+                      style={{ background: "var(--primary)", color: "#fff" }}
+                    >
+                      {actions.isPending ? "Processing..." : "Add Liquidity"}
+                    </button>
+                  </div>
                 </div>
               ) : (
-                <div className="flex items-end gap-4">
-                  <div className="flex-1">
-                    <label className="text-[10px] font-mono uppercase tracking-wider mb-1 block" style={{ color: "var(--on-surface-disabled)" }}>
-                      CYLP Amount
-                    </label>
-                    <div className="flex items-center rounded px-3 py-2" style={{ background: "var(--surface-container)", border: "1px solid rgba(66,70,84,0.4)" }}>
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={removeLiqInput}
-                        onChange={(e) => setRemoveLiqInput(e.target.value)}
-                        placeholder="0.0"
-                        className="flex-1 bg-transparent text-[14px] font-mono outline-none"
-                        style={{ color: "var(--on-surface)" }}
-                      />
-                      <span className="text-[12px] font-mono ml-2" style={{ color: "var(--on-surface-disabled)" }}>CYLP</span>
-                    </div>
-                    <div className="text-[10px] font-mono mt-1" style={{ color: "var(--on-surface-disabled)" }}>
-                      Your CYLP: {fmtNum(staking.stakedCylpAmount + staking.cylpBalance, 4)}
-                    </div>
+                <div className="space-y-3">
+                  {/* Receive mode selector */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-mono uppercase tracking-wider" style={{ color: "var(--on-surface-disabled)" }}>Receive as</span>
+                    <button
+                      onClick={() => setRemoveTokenMode("eth")}
+                      className="px-2.5 py-1 text-[11px] font-mono rounded transition-colors"
+                      style={{
+                        background: removeTokenMode === "eth" ? "var(--sell)" : "var(--surface-container)",
+                        color: removeTokenMode === "eth" ? "#fff" : "var(--on-surface-muted)",
+                        border: "1px solid rgba(66,70,84,0.4)",
+                      }}
+                    >
+                      ETH (native)
+                    </button>
+                    <button
+                      onClick={() => setRemoveTokenMode("token")}
+                      className="px-2.5 py-1 text-[11px] font-mono rounded transition-colors"
+                      style={{
+                        background: removeTokenMode === "token" ? "var(--sell)" : "var(--surface-container)",
+                        color: removeTokenMode === "token" ? "#fff" : "var(--on-surface-muted)",
+                        border: "1px solid rgba(66,70,84,0.4)",
+                      }}
+                    >
+                      ERC-20 Token
+                    </button>
+                    {removeTokenMode === "token" && (
+                      <select
+                        value={selectedRemoveToken.symbol}
+                        onChange={(e) => {
+                          const t = REDEEM_TOKENS.find((x) => x.symbol === e.target.value);
+                          if (t) setSelectedRemoveToken(t);
+                        }}
+                        className="px-2 py-1 text-[11px] font-mono rounded"
+                        style={{ background: "var(--surface-container)", color: "var(--on-surface)", border: "1px solid rgba(66,70,84,0.4)" }}
+                      >
+                        {REDEEM_TOKENS.map((t) => (
+                          <option key={t.symbol} value={t.symbol}>{t.symbol}</option>
+                        ))}
+                      </select>
+                    )}
                   </div>
-                  <button
-                    onClick={handleRemoveLiquidity}
-                    disabled={actions.isPending || !removeLiqInput}
-                    className="px-5 py-2.5 text-[12px] font-mono font-semibold rounded transition-colors disabled:opacity-40"
-                    style={{ background: "var(--sell)", color: "#fff" }}
-                  >
-                    {actions.isPending ? "Processing..." : "Remove Liquidity"}
-                  </button>
+
+                  <div className="flex items-end gap-4">
+                    <div className="flex-1">
+                      <label className="text-[10px] font-mono uppercase tracking-wider mb-1 block" style={{ color: "var(--on-surface-disabled)" }}>
+                        CYLP Amount
+                      </label>
+                      <div className="flex items-center rounded px-3 py-2" style={{ background: "var(--surface-container)", border: "1px solid rgba(66,70,84,0.4)" }}>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={removeLiqInput}
+                          onChange={(e) => setRemoveLiqInput(e.target.value)}
+                          placeholder="0.0"
+                          className="flex-1 bg-transparent text-[14px] font-mono outline-none"
+                          style={{ color: "var(--on-surface)" }}
+                        />
+                        <button
+                          onClick={() => setRemoveLiqInput((staking.stakedCylpAmount + staking.cylpBalance).toString())}
+                          className="text-[10px] font-mono px-2 py-0.5 rounded ml-1"
+                          style={{ color: "var(--sell)", background: "rgba(255,77,79,0.1)" }}
+                        >
+                          MAX
+                        </button>
+                        <span className="text-[12px] font-mono ml-2" style={{ color: "var(--on-surface-disabled)" }}>CYLP</span>
+                      </div>
+                      <div className="text-[10px] font-mono mt-1" style={{ color: "var(--on-surface-disabled)" }}>
+                        Your CYLP: {fmtNum(staking.stakedCylpAmount + staking.cylpBalance, 4)}
+                        {staking.cylpPrice > 0 && removeLiqInput && parseFloat(removeLiqInput) > 0
+                          ? ` · ≈ $${(parseFloat(removeLiqInput) * staking.cylpPrice).toFixed(2)}`
+                          : ""}
+                      </div>
+                    </div>
+                    <button
+                      onClick={handleRemoveLiquidity}
+                      disabled={actions.isPending || !removeLiqInput}
+                      className="px-5 py-2.5 text-[12px] font-mono font-semibold rounded transition-colors disabled:opacity-40"
+                      style={{ background: "var(--sell)", color: "#fff" }}
+                    >
+                      {actions.isPending ? "Processing..." : "Remove Liquidity"}
+                    </button>
+                  </div>
                 </div>
               )}
 
@@ -252,6 +397,29 @@ export default function VaultPage() {
             </div>
           </div>
         </div>
+
+        {/* CYLP Vesting Summary — links to Earn page */}
+        {wallet.connected && (
+          <div className="px-5 pb-6">
+            <div className="rounded-lg p-5" style={{ background: "var(--surface-container-lowest)", border: "1px solid rgba(66,70,84,0.4)" }}>
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Clock size={14} style={{ color: "#06b6d4" }} />
+                  <h3 className="text-[14px] font-semibold" style={{ color: "var(--on-surface)" }}>CYLP Vesting (CylpVester)</h3>
+                </div>
+                <Link href="/earn" className="flex items-center gap-1 text-[11px] font-mono" style={{ color: "var(--primary)" }}>
+                  Manage on Earn <ExternalLink size={11} />
+                </Link>
+              </div>
+              <div className="grid grid-cols-4 gap-3">
+                <VestMini label="esCYSE Deposited" value={`${fmtNum(staking.cylpVesting.deposited, 4)}`} />
+                <VestMini label="CYSE Claimable" value={`${fmtNum(staking.cylpVesting.claimable, 4)}`} accent />
+                <VestMini label="Max Vestable" value={`${fmtNum(staking.cylpVesting.maxVestable, 4)}`} />
+                <VestMini label="Pair Locked (sCylp)" value={`${fmtNum(staking.cylpVesting.pairAmount, 4)}`} />
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       <BottomTicker />
@@ -313,5 +481,14 @@ function PoolRow({ pool, totalTvl }: { pool: VaultTokenPool; totalTvl: number })
       </td>
       <td className="text-right px-4 py-3 text-[12px] font-mono" style={{ color: "var(--buy)" }}>{fmtNum(pool.availableLiquidity, 4)}</td>
     </tr>
+  );
+}
+
+function VestMini({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
+  return (
+    <div className="rounded px-3 py-2" style={{ background: "var(--surface-container)", border: "1px solid rgba(66,70,84,0.3)" }}>
+      <div className="text-[9px] font-mono uppercase tracking-wider mb-0.5" style={{ color: "var(--on-surface-disabled)" }}>{label}</div>
+      <div className="text-[13px] font-mono font-semibold" style={{ color: accent ? "var(--buy)" : "var(--on-surface)" }}>{value}</div>
+    </div>
   );
 }
