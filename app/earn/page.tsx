@@ -20,6 +20,7 @@ import {
   Clock,
   ChevronDown,
   ChevronUp,
+  ArrowRightLeft,
 } from "lucide-react";
 import { useWallet } from "@/contexts/WalletContext";
 import { useStakingData } from "@/hooks/useStakingData";
@@ -35,6 +36,20 @@ const fmt$ = (v: number) => {
   if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(2)}M`;
   if (v >= 1_000) return `$${(v / 1_000).toFixed(2)}K`;
   return `$${v.toFixed(2)}`;
+};
+
+const getErrorMessage = (error: unknown) => {
+  if (typeof error === "object" && error !== null) {
+    if ("shortMessage" in error && typeof error.shortMessage === "string") {
+      return error.shortMessage;
+    }
+
+    if ("message" in error && typeof error.message === "string") {
+      return error.message;
+    }
+  }
+
+  return "Unknown error";
 };
 
 export default function EarnPage() {
@@ -63,6 +78,10 @@ export default function EarnPage() {
   const [vestTxStatus, setVestTxStatus] = useState<string | null>(null);
   const [cyseVestOpen, setCyseVestOpen] = useState(true);
   const [cylpVestOpen, setCylpVestOpen] = useState(true);
+  const [transferOpen, setTransferOpen] = useState(false);
+  const [signalReceiver, setSignalReceiver] = useState("");
+  const [acceptSender, setAcceptSender] = useState("");
+  const [transferTxStatus, setTransferTxStatus] = useState<string | null>(null);
 
   const handleStake = async () => {
     if (!stakeInput || parseFloat(stakeInput) <= 0) return;
@@ -71,8 +90,8 @@ export default function EarnPage() {
       await actions.stakeCyse(stakeInput);
       setTxStatus("CYSE staked successfully!");
       setStakeInput("");
-    } catch (e: any) {
-      setTxStatus(`Error: ${e.shortMessage || e.message}`);
+    } catch (error: unknown) {
+      setTxStatus(`Error: ${getErrorMessage(error)}`);
     }
   };
 
@@ -83,8 +102,8 @@ export default function EarnPage() {
       await actions.unstakeCyse(unstakeInput);
       setTxStatus("CYSE unstaked successfully!");
       setUnstakeInput("");
-    } catch (e: any) {
-      setTxStatus(`Error: ${e.shortMessage || e.message}`);
+    } catch (error: unknown) {
+      setTxStatus(`Error: ${getErrorMessage(error)}`);
     }
   };
 
@@ -95,8 +114,8 @@ export default function EarnPage() {
       await actions.stakeEsCyse(esStakeInput);
       setEsTxStatus("esCYSE staked successfully!");
       setEsStakeInput("");
-    } catch (e: any) {
-      setEsTxStatus(`Error: ${e.shortMessage || e.message}`);
+    } catch (error: unknown) {
+      setEsTxStatus(`Error: ${getErrorMessage(error)}`);
     }
   };
 
@@ -107,8 +126,8 @@ export default function EarnPage() {
       await actions.unstakeEsCyse(esUnstakeInput);
       setEsTxStatus("esCYSE unstaked successfully!");
       setEsUnstakeInput("");
-    } catch (e: any) {
-      setEsTxStatus(`Error: ${e.shortMessage || e.message}`);
+    } catch (error: unknown) {
+      setEsTxStatus(`Error: ${getErrorMessage(error)}`);
     }
   };
 
@@ -117,8 +136,8 @@ export default function EarnPage() {
     try {
       await actions.claimRewards();
       setTxStatus("Rewards claimed!");
-    } catch (e: any) {
-      setTxStatus(`Error: ${e.shortMessage || e.message}`);
+    } catch (error: unknown) {
+      setTxStatus(`Error: ${getErrorMessage(error)}`);
     }
   };
 
@@ -127,8 +146,8 @@ export default function EarnPage() {
     try {
       await actions.compound();
       setTxStatus("Compounded successfully!");
-    } catch (e: any) {
-      setTxStatus(`Error: ${e.shortMessage || e.message}`);
+    } catch (error: unknown) {
+      setTxStatus(`Error: ${getErrorMessage(error)}`);
     }
   };
 
@@ -137,8 +156,8 @@ export default function EarnPage() {
     try {
       await actions.claimAndRestake();
       setTxStatus("Claimed and restaked!");
-    } catch (e: any) {
-      setTxStatus(`Error: ${e.shortMessage || e.message}`);
+    } catch (error: unknown) {
+      setTxStatus(`Error: ${getErrorMessage(error)}`);
     }
   };
 
@@ -149,8 +168,8 @@ export default function EarnPage() {
       await actions.depositVestingCyse(cyseVestInput);
       setVestTxStatus("Deposited successfully!");
       setCyseVestInput("");
-    } catch (e: any) {
-      setVestTxStatus(`Error: ${e.shortMessage || e.message}`);
+    } catch (error: unknown) {
+      setVestTxStatus(`Error: ${getErrorMessage(error)}`);
     }
   };
 
@@ -159,8 +178,8 @@ export default function EarnPage() {
     try {
       await actions.withdrawVestingCyse();
       setVestTxStatus("Withdrawn successfully!");
-    } catch (e: any) {
-      setVestTxStatus(`Error: ${e.shortMessage || e.message}`);
+    } catch (error: unknown) {
+      setVestTxStatus(`Error: ${getErrorMessage(error)}`);
     }
   };
 
@@ -169,8 +188,8 @@ export default function EarnPage() {
     try {
       await actions.claimVestedCyse();
       setVestTxStatus("Vested CYSE claimed!");
-    } catch (e: any) {
-      setVestTxStatus(`Error: ${e.shortMessage || e.message}`);
+    } catch (error: unknown) {
+      setVestTxStatus(`Error: ${getErrorMessage(error)}`);
     }
   };
 
@@ -181,8 +200,8 @@ export default function EarnPage() {
       await actions.depositVestingCylp(cylpVestInput);
       setVestTxStatus("Deposited successfully!");
       setCylpVestInput("");
-    } catch (e: any) {
-      setVestTxStatus(`Error: ${e.shortMessage || e.message}`);
+    } catch (error: unknown) {
+      setVestTxStatus(`Error: ${getErrorMessage(error)}`);
     }
   };
 
@@ -191,8 +210,8 @@ export default function EarnPage() {
     try {
       await actions.withdrawVestingCylp();
       setVestTxStatus("Withdrawn successfully!");
-    } catch (e: any) {
-      setVestTxStatus(`Error: ${e.shortMessage || e.message}`);
+    } catch (error: unknown) {
+      setVestTxStatus(`Error: ${getErrorMessage(error)}`);
     }
   };
 
@@ -201,8 +220,34 @@ export default function EarnPage() {
     try {
       await actions.claimVestedCylp();
       setVestTxStatus("Vested CYSE claimed!");
-    } catch (e: any) {
-      setVestTxStatus(`Error: ${e.shortMessage || e.message}`);
+    } catch (error: unknown) {
+      setVestTxStatus(`Error: ${getErrorMessage(error)}`);
+    }
+  };
+
+  const handleSignalTransfer = async () => {
+    if (!signalReceiver) return;
+    setTransferTxStatus("Signaling transfer...");
+
+    try {
+      await actions.signalTransfer(signalReceiver as `0x${string}`);
+      setTransferTxStatus("Transfer signaled successfully!");
+      setSignalReceiver("");
+    } catch (error: unknown) {
+      setTransferTxStatus(`Error: ${getErrorMessage(error)}`);
+    }
+  };
+
+  const handleAcceptTransfer = async () => {
+    if (!acceptSender) return;
+    setTransferTxStatus("Accepting transfer...");
+
+    try {
+      await actions.acceptTransfer(acceptSender as `0x${string}`);
+      setTransferTxStatus("Transfer accepted successfully!");
+      setAcceptSender("");
+    } catch (error: unknown) {
+      setTransferTxStatus(`Error: ${getErrorMessage(error)}`);
     }
   };
 
@@ -243,7 +288,8 @@ export default function EarnPage() {
           <EarnStat label="Staked CYSE" value={wallet.connected ? fmtNum(staking.stakedCyseAmount, 2) : "-"} icon={<Layers size={12} />} />
           <EarnStat label="Claimable ETH" value={wallet.connected ? `${fmtNum(staking.totalClaimableEth, 6)}` : "-"} icon={<TrendingUp size={12} />} accent />
           <EarnStat label="Claimable esCYSE" value={wallet.connected ? fmtNum(staking.totalClaimableEsCyse, 2) : "-"} icon={<Gift size={12} />} />
-          {wallet.connected && (staking.totalClaimableEth > 0 || staking.totalClaimableEsCyse > 0) && (
+          <EarnStat label="Claimable CYSE" value={wallet.connected ? fmtNum(staking.totalClaimableCyse, 2) : "-"} icon={<Gift size={12} />} />
+          {wallet.connected && (staking.totalClaimableEth > 0 || staking.totalClaimableEsCyse > 0 || staking.totalClaimableCyse > 0) && (
             <div className="ml-auto flex items-center gap-2">
               <button
                 onClick={handleClaimAndRestake}
@@ -583,7 +629,7 @@ export default function EarnPage() {
                     {/* bnCYSE — multiplier points */}
                     <AssetRow
                       logo="B" color="#10b981" name="bnCYSE"
-                      balance={fmtNum(staking.bonusCyseAmount, 4)}
+                      balance="-"
                       staked={fmtNum(staking.bonusCyseAmount, 4)}
                       claimable={`${fmtNum(staking.bonusCyseClaimable, 4)} bnCYSE`}
                       status={staking.bonusCyseAmount > 0 ? "Boosting" : "-"}
@@ -623,10 +669,13 @@ export default function EarnPage() {
                       <RewardItem label="ETH from CYSE staking" value={`${fmtNum(staking.feeCyseClaimable, 6)} ETH`} />
                       <RewardItem label="ETH from CYLP fees" value={`${fmtNum(staking.feeCylpClaimable, 6)} ETH`} />
                       <RewardItem label="esCYSE from staking" value={`${fmtNum(staking.totalClaimableEsCyse, 4)} esCYSE`} />
+                      <RewardItem label="CYSE from extended tracker" value={`${fmtNum(staking.claimableCyse, 4)} CYSE`} />
                       <RewardItem label="bnCYSE staked" value={fmtNum(staking.bonusCyseAmount, 4)} />
                       <RewardItem label="bnCYSE claimable" value={fmtNum(staking.bonusCyseClaimable, 4)} /> 
                       <RewardItem label="CYLP price (AUM/supply)" value={staking.cylpPrice > 0 ? `$${staking.cylpPrice.toFixed(4)}` : "-"} />
                       <RewardItem label="Total claimable ETH" value={`${fmtNum(staking.totalClaimableEth, 6)} ETH`} accent />
+                      <RewardItem label="Total claimable CYSE" value={`${fmtNum(staking.totalClaimableCyse, 4)} CYSE`} />
+                      <RewardItem label="Portfolio value" value={fmt$(staking.totalEarnPositionUsd)} />
                     </div>
                   </div>
                 </div>
@@ -683,7 +732,7 @@ export default function EarnPage() {
                                 style={{ color: "var(--on-surface)" }}
                               />
                               <button
-                                onClick={() => setCyseVestInput(Math.min(staking.esCyseBalance, staking.cyseVesting.maxVestable - staking.cyseVesting.deposited).toFixed(6))}
+                                onClick={() => setCyseVestInput(Math.min(staking.esCyseBalance, staking.cyseVesting.remainingCapacity).toFixed(6))}
                                 className="text-[10px] font-mono px-2 py-0.5 rounded"
                                 style={{ color: "#f59e0b", background: "rgba(245,158,11,0.1)" }}
                               >
@@ -691,7 +740,7 @@ export default function EarnPage() {
                               </button>
                             </div>
                             <div className="text-[9px] font-mono mt-0.5" style={{ color: "var(--on-surface-disabled)" }}>
-                              Remaining capacity: {fmtNum(Math.max(0, staking.cyseVesting.maxVestable - staking.cyseVesting.deposited), 4)} esCYSE
+                              Remaining capacity: {fmtNum(staking.cyseVesting.remainingCapacity, 4)} esCYSE
                             </div>
                           </div>
                           <button
@@ -778,7 +827,7 @@ export default function EarnPage() {
                                 style={{ color: "var(--on-surface)" }}
                               />
                               <button
-                                onClick={() => setCylpVestInput(Math.min(staking.esCyseBalance, staking.cylpVesting.maxVestable - staking.cylpVesting.deposited).toFixed(6))}
+                                onClick={() => setCylpVestInput(Math.min(staking.esCyseBalance, staking.cylpVesting.remainingCapacity).toFixed(6))}
                                 className="text-[10px] font-mono px-2 py-0.5 rounded"
                                 style={{ color: "#06b6d4", background: "rgba(6,182,212,0.1)" }}
                               >
@@ -786,7 +835,7 @@ export default function EarnPage() {
                               </button>
                             </div>
                             <div className="text-[9px] font-mono mt-0.5" style={{ color: "var(--on-surface-disabled)" }}>
-                              Remaining capacity: {fmtNum(Math.max(0, staking.cylpVesting.maxVestable - staking.cylpVesting.deposited), 4)} esCYSE
+                              Remaining capacity: {fmtNum(staking.cylpVesting.remainingCapacity, 4)} esCYSE
                             </div>
                           </div>
                           <button
@@ -826,6 +875,84 @@ export default function EarnPage() {
                         color: vestTxStatus.startsWith("Error") ? "var(--sell)" : "var(--buy)",
                       }}>
                         {vestTxStatus}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {wallet.connected && (
+                <div className="px-5 pb-6">
+                  <div className="rounded-lg overflow-hidden" style={{ background: "var(--surface-container-lowest)", border: "1px solid rgba(66,70,84,0.4)" }}>
+                    <button
+                      className="w-full px-5 py-4 flex items-center justify-between"
+                      style={{ borderBottom: transferOpen ? "1px solid rgba(66,70,84,0.4)" : "none" }}
+                      onClick={() => setTransferOpen((v) => !v)}
+                    >
+                      <div className="flex items-center gap-2">
+                        <ArrowRightLeft size={15} style={{ color: "var(--primary)" }} />
+                        <div className="text-left">
+                          <h2 className="text-[15px] font-semibold" style={{ color: "var(--on-surface)" }}>Transfer Signaling</h2>
+                          <p className="text-[11px] font-mono mt-0.5" style={{ color: "var(--on-surface-disabled)" }}>
+                            Signal and accept full staking-account transfers through the current RewardRouter flow
+                          </p>
+                        </div>
+                      </div>
+                      {transferOpen ? <ChevronUp size={14} style={{ color: "var(--on-surface-disabled)" }} /> : <ChevronDown size={14} style={{ color: "var(--on-surface-disabled)" }} />}
+                    </button>
+
+                    {transferOpen && (
+                      <div className="p-5 grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-mono uppercase tracking-wider block" style={{ color: "var(--on-surface-disabled)" }}>
+                            Signal receiver
+                          </label>
+                          <input
+                            value={signalReceiver}
+                            onChange={(e) => setSignalReceiver(e.target.value)}
+                            placeholder="0x..."
+                            className="w-full rounded px-3 py-2 text-[12px] font-mono outline-none"
+                            style={{ background: "var(--surface-container)", border: "1px solid rgba(66,70,84,0.4)", color: "var(--on-surface)" }}
+                          />
+                          <button
+                            onClick={handleSignalTransfer}
+                            disabled={actions.isPending || !signalReceiver}
+                            className="w-full py-2 text-[11px] font-mono font-semibold rounded disabled:opacity-40"
+                            style={{ background: "var(--primary)", color: "#fff" }}
+                          >
+                            Signal Transfer
+                          </button>
+                        </div>
+
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-mono uppercase tracking-wider block" style={{ color: "var(--on-surface-disabled)" }}>
+                            Accept sender
+                          </label>
+                          <input
+                            value={acceptSender}
+                            onChange={(e) => setAcceptSender(e.target.value)}
+                            placeholder="0x..."
+                            className="w-full rounded px-3 py-2 text-[12px] font-mono outline-none"
+                            style={{ background: "var(--surface-container)", border: "1px solid rgba(66,70,84,0.4)", color: "var(--on-surface)" }}
+                          />
+                          <button
+                            onClick={handleAcceptTransfer}
+                            disabled={actions.isPending || !acceptSender}
+                            className="w-full py-2 text-[11px] font-mono font-semibold rounded disabled:opacity-40"
+                            style={{ background: "var(--buy)", color: "#fff" }}
+                          >
+                            Accept Transfer
+                          </button>
+                        </div>
+
+                        {transferTxStatus && (
+                          <div className="col-span-2 text-[11px] font-mono px-3 py-2 rounded" style={{
+                            background: transferTxStatus.startsWith("Error") ? "rgba(255,77,79,0.1)" : "rgba(0,192,118,0.1)",
+                            color: transferTxStatus.startsWith("Error") ? "var(--sell)" : "var(--buy)",
+                          }}>
+                            {transferTxStatus}
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>

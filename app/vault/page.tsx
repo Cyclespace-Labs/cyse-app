@@ -18,6 +18,20 @@ const fmt$ = (v: number) => {
 
 const fmtNum = (v: number, d = 4) => v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: d });
 
+const getErrorMessage = (error: unknown) => {
+  if (typeof error === "object" && error !== null) {
+    if ("shortMessage" in error && typeof error.shortMessage === "string") {
+      return error.shortMessage;
+    }
+
+    if ("message" in error && typeof error.message === "string") {
+      return error.message;
+    }
+  }
+
+  return "Unknown error";
+};
+
 const TOKEN_COLORS: Record<string, string> = {
   ETH: "#627eea", BTC: "#f7931a", USDC: "#2775ca", USDT: "#26a17b",
 };
@@ -74,8 +88,8 @@ export default function VaultPage() {
       }
       setTxStatus("Liquidity added! CYLP minted and staked.");
       setAddLiqInput("");
-    } catch (e: any) {
-      setTxStatus(`Error: ${e.shortMessage || e.message}`);
+    } catch (error: unknown) {
+      setTxStatus(`Error: ${getErrorMessage(error)}`);
     }
   };
 
@@ -90,8 +104,8 @@ export default function VaultPage() {
       }
       setTxStatus("Liquidity removed!");
       setRemoveLiqInput("");
-    } catch (e: any) {
-      setTxStatus(`Error: ${e.shortMessage || e.message}`);
+    } catch (error: unknown) {
+      setTxStatus(`Error: ${getErrorMessage(error)}`);
     }
   };
 
@@ -123,6 +137,14 @@ export default function VaultPage() {
           <StatCard label="Your CYLP" value={wallet.connected ? fmtNum(staking.cylpBalance + staking.stakedCylpAmount, 4) : "-"} icon={<Wallet size={14} />} />
           <StatCard label="Claimable ETH Fees" value={wallet.connected ? `${fmtNum(staking.totalClaimableEth, 6)} ETH` : "-"} icon={<TrendingUp size={14} />} accent />
         </div>
+
+        {wallet.connected && (
+          <div className="grid grid-cols-3 gap-4 px-5 pb-5">
+            <StatCard label="Staked CYLP Value" value={fmt$(staking.cylpStakeValueUsd)} icon={<Droplets size={14} />} />
+            <StatCard label="Claimable CYSE" value={`${fmtNum(staking.totalClaimableCyse, 4)} CYSE`} icon={<TrendingUp size={14} />} />
+            <StatCard label="Claimable esCYSE" value={`${fmtNum(staking.totalClaimableEsCyse, 4)} esCYSE`} icon={<TrendingUp size={14} />} />
+          </div>
+        )}
 
         {/* Pool Breakdown */}
         <div className="px-5 pb-5">
@@ -461,7 +483,9 @@ function PoolRow({ pool, totalTvl }: { pool: VaultTokenPool; totalTvl: number })
             {TOKEN_LOGOS[pool.symbol] ?? "?"}
           </div>
           <div>
-            <span className="text-[13px] font-mono font-medium" style={{ color: "var(--on-surface)" }}>{pool.symbol}</span>
+            <Link href={`/vault/${pool.symbol.toLowerCase()}`} className="text-[13px] font-mono font-medium hover:underline" style={{ color: "var(--on-surface)" }}>
+              {pool.symbol}
+            </Link>
             <div className="flex items-center gap-1 mt-0.5">
               <div className="h-1 rounded-full" style={{ width: `${Math.max(pct, 4)}px`, maxWidth: 60, background: color }} />
               <span className="text-[9px] font-mono" style={{ color: "var(--on-surface-disabled)" }}>{pct.toFixed(1)}%</span>

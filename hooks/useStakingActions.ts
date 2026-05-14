@@ -1,311 +1,410 @@
 "use client";
 
-import { useCallback } from "react";
-import { useAccount, useWriteContract } from "wagmi";
-import { parseUnits } from "viem";
+import { useCallback, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useAccount, usePublicClient, useWriteContract } from "wagmi";
+import { maxUint256, parseUnits, type Abi, type Address, type Hash } from "viem";
 import { contracts, erc20Abi } from "@/lib/protocol/contracts";
+
+type ApprovalConfig = {
+  token: Address;
+  spender: Address;
+  amount: bigint;
+  abi?: Abi;
+  approveAmount?: bigint;
+};
+
+type LiquidityOptions = {
+  minUsdg?: bigint;
+  minCylp?: bigint;
+  minOut?: bigint;
+};
+
+type InternalWriteRequest = {
+  address: Address;
+  abi: Abi;
+  functionName: string;
+  args?: readonly unknown[];
+  value?: bigint;
+};
 
 export function useStakingActions() {
   const { address } = useAccount();
-  const { writeContractAsync, isPending } = useWriteContract();
+  const publicClient = usePublicClient();
+  const queryClient = useQueryClient();
+  const { writeContractAsync } = useWriteContract();
+  const [pendingLabel, setPendingLabel] = useState<string | null>(null);
+
+  const assertReady = useCallback(() => {
+    if (!address) throw new Error("Wallet not connected");
+    if (!publicClient) throw new Error("Public client unavailable");
+  }, [address, publicClient]);
+
+  const executeWrite = useCallback(
+    async (request: InternalWriteRequest): Promise<Hash> => {
+      assertReady();
+
+      const hash = await writeContractAsync(request as Parameters<typeof writeContractAsync>[0]);
+      await publicClient!.waitForTransactionReceipt({ hash });
+
+      return hash;
+    },
+    [assertReady, publicClient, writeContractAsync]
+  );
+
+  const ensureAllowance = useCallback(
+    async ({ token, spender, amount, abi = erc20Abi, approveAmount = maxUint256 }: ApprovalConfig) => {
+      assertReady();
+
+      const allowance = (await publicClient!.readContract({
+        address: token,
+        abi,
+        functionName: "allowance",
+        args: [address!, spender],
+      })) as bigint;
+
+      if (allowance >= amount) {
+        return;
+      }
+
+      await executeWrite({
+        address: token,
+        abi,
+        functionName: "approve",
+        args: [spender, approveAmount],
+      });
+    },
+    [address, assertReady, executeWrite, publicClient]
+  );
+
+  const runAction = useCallback(
+    async (label: string, runner: () => Promise<Hash>) => {
+      assertReady();
+      setPendingLabel(label);
+
+      try {
+        const hash = await runner();
+        await queryClient.invalidateQueries();
+        return hash;
+      } finally {
+        setPendingLabel(null);
+      }
+    },
+    [assertReady, queryClient]
+  );
+
+  const ensureCompoundApprovals = useCallback(async () => {
+    await ensureAllowance({
+      token: contracts.cyse.address,
+      spender: contracts.stakedCyseTracker.address,
+      amount: 1n,
+    });
+
+    await ensureAllowance({
+      token: contracts.escyse.address,
+      spender: contracts.stakedCyseTracker.address,
+      amount: 1n,
+    });
+  }, [ensureAllowance]);
 
   // ── Stake CYSE ─────────────────────────────────────────────────
   const stakeCyse = useCallback(
     async (amount: string) => {
-      if (!address) throw new Error("Wallet not connected");
       const value = parseUnits(amount, 18);
+      return runAction("stakeCyse", async () => {
+        await ensureAllowance({
+          token: contracts.cyse.address,
+          spender: contracts.stakedCyseTracker.address,
+          amount: value,
+        });
 
-      // Approve StakedCyseTracker to spend CYSE
-      await writeContractAsync({
-        ...contracts.cyse,
-        functionName: "approve",
-        args: [contracts.stakedCyseTracker.address, value],
+        return executeWrite({
+          ...contracts.rewardRouterV2,
+          functionName: "stakeCyse",
+          args: [value],
+        });
       });
-
-      const hash = await writeContractAsync({
-        ...contracts.rewardRouterV2,
-        functionName: "stakeCyse",
-        args: [value],
-      });
-      return hash;
     },
-    [address, writeContractAsync]
+    [ensureAllowance, executeWrite, runAction]
   );
 
   // ── Unstake CYSE ───────────────────────────────────────────────
   const unstakeCyse = useCallback(
     async (amount: string) => {
-      if (!address) throw new Error("Wallet not connected");
       const value = parseUnits(amount, 18);
-      const hash = await writeContractAsync({
+      return runAction("unstakeCyse", () => executeWrite({
         ...contracts.rewardRouterV2,
         functionName: "unstakeCyse",
         args: [value],
-      });
-      return hash;
+      }));
     },
-    [address, writeContractAsync]
+    [executeWrite, runAction]
   );
 
   // ── Stake esCYSE ───────────────────────────────────────────────
-  // esCYSE enters the same 4-tracker chain as CYSE via stakeEsCyse
   const stakeEsCyse = useCallback(
     async (amount: string) => {
-      if (!address) throw new Error("Wallet not connected");
       const value = parseUnits(amount, 18);
+      return runAction("stakeEsCyse", async () => {
+        await ensureAllowance({
+          token: contracts.escyse.address,
+          spender: contracts.stakedCyseTracker.address,
+          amount: value,
+        });
 
-      // Approve StakedCyseTracker to spend esCYSE
-      await writeContractAsync({
-        ...contracts.escyse,
-        functionName: "approve",
-        args: [contracts.stakedCyseTracker.address, value],
+        return executeWrite({
+          ...contracts.rewardRouterV2,
+          functionName: "stakeEsCyse",
+          args: [value],
+        });
       });
-
-      const hash = await writeContractAsync({
-        ...contracts.rewardRouterV2,
-        functionName: "stakeEsCyse",
-        args: [value],
-      });
-      return hash;
     },
-    [address, writeContractAsync]
+    [ensureAllowance, executeWrite, runAction]
   );
 
   // ── Unstake esCYSE ─────────────────────────────────────────────
   const unstakeEsCyse = useCallback(
     async (amount: string) => {
-      if (!address) throw new Error("Wallet not connected");
       const value = parseUnits(amount, 18);
-      const hash = await writeContractAsync({
+      return runAction("unstakeEsCyse", () => executeWrite({
         ...contracts.rewardRouterV2,
         functionName: "unstakeEsCyse",
         args: [value],
-      });
-      return hash;
+      }));
     },
-    [address, writeContractAsync]
+    [executeWrite, runAction]
   );
 
   // ── Compound all rewards ───────────────────────────────────────
   const compound = useCallback(async () => {
-    if (!address) throw new Error("Wallet not connected");
-    const hash = await writeContractAsync({
-      ...contracts.rewardRouterV2,
-      functionName: "compound",
-    });
-    return hash;
-  }, [address, writeContractAsync]);
+    return runAction("compound", async () => {
+      await ensureCompoundApprovals();
 
-  // ── Claim all rewards (ETH fees + esCYSE) ─────────────────────
-  const claimRewards = useCallback(async () => {
-    if (!address) throw new Error("Wallet not connected");
-    const hash = await writeContractAsync({
-      ...contracts.rewardRouterV2,
-      functionName: "handleRewards",
-      args: [
-        true,  // _shouldClaimCyse
-        false, // _shouldStakeCyse
-        true,  // _shouldClaimEsCyse
-        false, // _shouldStakeEsCyse
-        true,  // _shouldStakeMultiplierPoints
-        true,  // _shouldClaimWeth
-        true,  // _shouldConvertWethToEth
-      ],
+      return executeWrite({
+        ...contracts.rewardRouterV2,
+        functionName: "compound",
+      });
     });
-    return hash;
-  }, [address, writeContractAsync]);
+  }, [ensureCompoundApprovals, executeWrite, runAction]);
+
+  // ── Claim reward streams to wallet (CYSE + esCYSE + ETH) ──────
+  const claimRewards = useCallback(async () => {
+    return runAction("claimRewards", () => executeWrite({
+      ...contracts.rewardRouterV2,
+      functionName: "handleRewardsV2",
+      args: [
+        address!,
+        true,
+        false,
+        true,
+        false,
+        true,
+        true,
+        true,
+      ],
+    }));
+  }, [address, executeWrite, runAction]);
+
+  const claimFees = useCallback(async () => {
+    return runAction("claimFees", () => executeWrite({
+      ...contracts.rewardRouterV2,
+      functionName: "claimFees",
+    }));
+  }, [executeWrite, runAction]);
+
+  const claimEsCyse = useCallback(async () => {
+    return runAction("claimEsCyse", () => executeWrite({
+      ...contracts.rewardRouterV2,
+      functionName: "claimEsCyse",
+    }));
+  }, [executeWrite, runAction]);
 
   // ── Claim and restake (compound esCYSE + stake multiplier pts) ─
   const claimAndRestake = useCallback(async () => {
-    if (!address) throw new Error("Wallet not connected");
-    const hash = await writeContractAsync({
-      ...contracts.rewardRouterV2,
-      functionName: "handleRewards",
-      args: [
-        true,  // _shouldClaimCyse
-        true,  // _shouldStakeCyse
-        true,  // _shouldClaimEsCyse
-        true,  // _shouldStakeEsCyse
-        true,  // _shouldStakeMultiplierPoints
-        true,  // _shouldClaimWeth
-        true,  // _shouldConvertWethToEth
-      ],
+    return runAction("claimAndRestake", async () => {
+      await ensureCompoundApprovals();
+
+      return executeWrite({
+        ...contracts.rewardRouterV2,
+        functionName: "handleRewardsV2",
+        args: [
+          address!,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+        ],
+      });
     });
-    return hash;
-  }, [address, writeContractAsync]);
+  }, [address, ensureCompoundApprovals, executeWrite, runAction]);
 
   // ── Deposit esCYSE into CyseVester ────────────────────────────
-  // Locks feeCyseTracker tokens as pair collateral. Approval for both
-  // esCYSE and feeCyseTracker (pair token) tokens is required.
   const depositVestingCyse = useCallback(
     async (amount: string) => {
-      if (!address) throw new Error("Wallet not connected");
       const value = parseUnits(amount, 18);
+      return runAction("depositVestingCyse", async () => {
+        await ensureAllowance({
+          token: contracts.escyse.address,
+          spender: contracts.cyseVester.address,
+          amount: value,
+        });
 
-      // Approve esCYSE transfer to CyseVester
-      await writeContractAsync({
-        ...contracts.escyse,
-        functionName: "approve",
-        args: [contracts.cyseVester.address, value],
-      });
+        await ensureAllowance({
+          token: contracts.feeCyseTracker.address,
+          spender: contracts.cyseVester.address,
+          amount: 1n,
+          abi: contracts.feeCyseTracker.abi,
+        });
 
-      // Approve feeCyseTracker (pair token) to CyseVester — max approval
-      await writeContractAsync({
-        ...contracts.feeCyseTracker,
-        functionName: "approve",
-        args: [contracts.cyseVester.address, value],
+        return executeWrite({
+          ...contracts.cyseVester,
+          functionName: "deposit",
+          args: [value],
+        });
       });
-
-      const hash = await writeContractAsync({
-        ...contracts.cyseVester,
-        functionName: "deposit",
-        args: [value],
-      });
-      return hash;
     },
-    [address, writeContractAsync]
+    [ensureAllowance, executeWrite, runAction]
   );
 
   // ── Withdraw from CyseVester (returns unvested esCYSE + any claimable CYSE) ─
   const withdrawVestingCyse = useCallback(async () => {
-    if (!address) throw new Error("Wallet not connected");
-    const hash = await writeContractAsync({
+    return runAction("withdrawVestingCyse", () => executeWrite({
       ...contracts.cyseVester,
       functionName: "withdraw",
-    });
-    return hash;
-  }, [address, writeContractAsync]);
+    }));
+  }, [executeWrite, runAction]);
 
   // ── Claim vested CYSE from CyseVester ─────────────────────────
   const claimVestedCyse = useCallback(async () => {
-    if (!address) throw new Error("Wallet not connected");
-    const hash = await writeContractAsync({
+    return runAction("claimVestedCyse", () => executeWrite({
       ...contracts.cyseVester,
       functionName: "claim",
-    });
-    return hash;
-  }, [address, writeContractAsync]);
+    }));
+  }, [executeWrite, runAction]);
 
   // ── Deposit esCYSE into CylpVester ────────────────────────────
-  // Locks stakedCylpTracker tokens as pair collateral.
   const depositVestingCylp = useCallback(
     async (amount: string) => {
-      if (!address) throw new Error("Wallet not connected");
       const value = parseUnits(amount, 18);
+      return runAction("depositVestingCylp", async () => {
+        await ensureAllowance({
+          token: contracts.escyse.address,
+          spender: contracts.cylpVester.address,
+          amount: value,
+        });
 
-      // Approve esCYSE transfer to CylpVester
-      await writeContractAsync({
-        ...contracts.escyse,
-        functionName: "approve",
-        args: [contracts.cylpVester.address, value],
-      });
+        await ensureAllowance({
+          token: contracts.stakedCylpTracker.address,
+          spender: contracts.cylpVester.address,
+          amount: 1n,
+          abi: contracts.stakedCylpTracker.abi,
+        });
 
-      // Approve stakedCylpTracker (pair token) to CylpVester — max approval
-      await writeContractAsync({
-        ...contracts.stakedCylpTracker,
-        functionName: "approve",
-        args: [contracts.cylpVester.address, value],
+        return executeWrite({
+          ...contracts.cylpVester,
+          functionName: "deposit",
+          args: [value],
+        });
       });
-
-      const hash = await writeContractAsync({
-        ...contracts.cylpVester,
-        functionName: "deposit",
-        args: [value],
-      });
-      return hash;
     },
-    [address, writeContractAsync]
+    [ensureAllowance, executeWrite, runAction]
   );
 
   // ── Withdraw from CylpVester ───────────────────────────────────
   const withdrawVestingCylp = useCallback(async () => {
-    if (!address) throw new Error("Wallet not connected");
-    const hash = await writeContractAsync({
+    return runAction("withdrawVestingCylp", () => executeWrite({
       ...contracts.cylpVester,
       functionName: "withdraw",
-    });
-    return hash;
-  }, [address, writeContractAsync]);
+    }));
+  }, [executeWrite, runAction]);
 
   // ── Claim vested CYSE from CylpVester ─────────────────────────
   const claimVestedCylp = useCallback(async () => {
-    if (!address) throw new Error("Wallet not connected");
-    const hash = await writeContractAsync({
+    return runAction("claimVestedCylp", () => executeWrite({
       ...contracts.cylpVester,
       functionName: "claim",
-    });
-    return hash;
-  }, [address, writeContractAsync]);
+    }));
+  }, [executeWrite, runAction]);
 
   // ── Mint & Stake CYLP with ETH (add vault liquidity) ──────────
   const addLiquidityETH = useCallback(
-    async (ethAmount: string) => {
-      if (!address) throw new Error("Wallet not connected");
+    async (ethAmount: string, options?: LiquidityOptions) => {
       const value = parseUnits(ethAmount, 18);
-      const hash = await writeContractAsync({
+      return runAction("addLiquidityETH", () => executeWrite({
         ...contracts.rewardRouterV2,
         functionName: "mintAndStakeCylpETH",
-        args: [0n, 0n], // minUsdg, minCylp — accept any
+        args: [options?.minUsdg ?? 0n, options?.minCylp ?? 0n],
         value,
-      });
-      return hash;
+      }));
     },
-    [address, writeContractAsync]
+    [executeWrite, runAction]
   );
 
   // ── Mint & Stake CYLP with ERC-20 token ────────────────────────
   const addLiquidityToken = useCallback(
-    async (tokenAddress: `0x${string}`, amount: string, decimals = 18) => {
-      if (!address) throw new Error("Wallet not connected");
+    async (tokenAddress: `0x${string}`, amount: string, decimals = 18, options?: LiquidityOptions) => {
       const value = parseUnits(amount, decimals);
+      return runAction("addLiquidityToken", async () => {
+        await ensureAllowance({
+          token: tokenAddress,
+          spender: contracts.cylpManager.address,
+          amount: value,
+        });
 
-      // Approve CylpManager to spend token
-      await writeContractAsync({
-        address: tokenAddress,
-        abi: erc20Abi,
-        functionName: "approve",
-        args: [contracts.cylpManager.address, value],
+        return executeWrite({
+          ...contracts.rewardRouterV2,
+          functionName: "mintAndStakeCylp",
+          args: [tokenAddress, value, options?.minUsdg ?? 0n, options?.minCylp ?? 0n],
+        });
       });
-
-      const hash = await writeContractAsync({
-        ...contracts.rewardRouterV2,
-        functionName: "mintAndStakeCylp",
-        args: [tokenAddress, value, 0n, 0n],
-      });
-      return hash;
     },
-    [address, writeContractAsync]
+    [ensureAllowance, executeWrite, runAction]
   );
 
   // ── Unstake & Redeem CYLP → ETH ───────────────────────────────
   const removeLiquidityETH = useCallback(
-    async (cylpAmount: string) => {
-      if (!address) throw new Error("Wallet not connected");
+    async (cylpAmount: string, options?: LiquidityOptions) => {
       const value = parseUnits(cylpAmount, 18);
-      const hash = await writeContractAsync({
+      return runAction("removeLiquidityETH", () => executeWrite({
         ...contracts.rewardRouterV2,
         functionName: "unstakeAndRedeemCylpETH",
-        args: [value, 0n, address],
-      });
-      return hash;
+        args: [value, options?.minOut ?? 0n, address!],
+      }));
     },
-    [address, writeContractAsync]
+    [address, executeWrite, runAction]
   );
 
   // ── Unstake & Redeem CYLP → ERC-20 ────────────────────────────
   const removeLiquidityToken = useCallback(
-    async (tokenOut: `0x${string}`, cylpAmount: string) => {
-      if (!address) throw new Error("Wallet not connected");
+    async (tokenOut: `0x${string}`, cylpAmount: string, options?: LiquidityOptions) => {
       const value = parseUnits(cylpAmount, 18);
-      const hash = await writeContractAsync({
+      return runAction("removeLiquidityToken", () => executeWrite({
         ...contracts.rewardRouterV2,
         functionName: "unstakeAndRedeemCylp",
-        args: [tokenOut, value, 0n, address],
-      });
-      return hash;
+        args: [tokenOut, value, options?.minOut ?? 0n, address!],
+      }));
     },
-    [address, writeContractAsync]
+    [address, executeWrite, runAction]
   );
+
+  const signalTransfer = useCallback(async (receiver: Address) => {
+    return runAction("signalTransfer", () => executeWrite({
+      ...contracts.rewardRouterV2,
+      functionName: "signalTransfer",
+      args: [receiver],
+    }));
+  }, [executeWrite, runAction]);
+
+  const acceptTransfer = useCallback(async (sender: Address) => {
+    return runAction("acceptTransfer", () => executeWrite({
+      ...contracts.rewardRouterV2,
+      functionName: "acceptTransfer",
+      args: [sender],
+    }));
+  }, [executeWrite, runAction]);
 
   return {
     stakeCyse,
@@ -314,6 +413,8 @@ export function useStakingActions() {
     unstakeEsCyse,
     compound,
     claimRewards,
+    claimFees,
+    claimEsCyse,
     claimAndRestake,
     depositVestingCyse,
     withdrawVestingCyse,
@@ -325,6 +426,9 @@ export function useStakingActions() {
     addLiquidityToken,
     removeLiquidityETH,
     removeLiquidityToken,
-    isPending,
+    signalTransfer,
+    acceptTransfer,
+    pendingLabel,
+    isPending: pendingLabel !== null,
   };
 }

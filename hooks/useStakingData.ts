@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { useAccount, useReadContracts } from "wagmi";
+import { useAccount, useReadContract, useReadContracts } from "wagmi";
 import { formatUnits } from "viem";
 import { contracts } from "@/lib/protocol/contracts";
 
@@ -20,6 +20,9 @@ export interface VestingData {
   pairAmountRaw: bigint;
   // cumulative CYSE claimed from vester
   cumulativeClaimed: number;
+  cumulativeClaimedRaw: bigint;
+  remainingCapacity: number;
+  remainingCapacityRaw: bigint;
 }
 
 export interface StakingData {
@@ -35,9 +38,17 @@ export interface StakingData {
   stakedCyseAmount: number;
   stakedCyseAmountRaw: bigint;
 
-  // Bonus CYSE tracker (bnCYSE — multiplier points)
+  // Combined CYSE + esCYSE in the staked tracker
+  totalCyseStakedAmount: number;
+  totalCyseStakedAmountRaw: bigint;
+
+  // bnCYSE / multiplier points currently staked through ExtendedCyseTracker
   bonusCyseAmount: number;
   bonusCyseAmountRaw: bigint;
+
+  // CYSE reward stream from ExtendedCyseTracker
+  claimableCyse: number;
+  claimableCyseRaw: bigint;
 
   // Fee CYSE tracker (earns WETH fees)
   feeCyseStaked: number;
@@ -80,7 +91,10 @@ export interface StakingData {
   cylpVesting: VestingData;
 
   // Totals
+ totalClaimableCyse: number;
   totalStakedValueUsd: number;
+ totalEarnPositionUsd: number;
+ cylpStakeValueUsd: number;
   totalClaimableEth: number;
   totalClaimableEsCyse: number;
 
@@ -93,65 +107,86 @@ const fmt = (v: bigint | undefined, d = 18) =>
 
 export function useStakingData(): StakingData {
   const { address } = useAccount();
+  const { data: extendedCyseTrackerAddress, isLoading: isExtendedTrackerLoading } = useReadContract({
+    ...contracts.rewardRouterV2,
+    functionName: "extendedCyseTracker",
+    query: { staleTime: 30_000 },
+  });
+
+  const extendedCyseTracker = useMemo(() => {
+    if (!extendedCyseTrackerAddress) {
+      return null;
+    }
+
+    return {
+      address: extendedCyseTrackerAddress,
+      abi: contracts.stakedCyseTracker.abi,
+    };
+  }, [extendedCyseTrackerAddress]);
 
   // ── Batch read: balances, staked amounts, claimable, vesting ─────
   const calls = useMemo(() => {
-    if (!address) return [];
+    if (!address || !extendedCyseTracker) return [];
+
     return [
       // 0: CYSE balance
       { ...contracts.cyse, functionName: "balanceOf" as const, args: [address] as const },
       // 1: esCYSE wallet balance
       { ...contracts.escyse, functionName: "balanceOf" as const, args: [address] as const },
-      // 2: stakedCyseTracker.stakedAmounts(user)
+      // 2: stakedCyseTracker.stakedAmounts(user) — total CYSE + esCYSE in the tracker
       { ...contracts.stakedCyseTracker, functionName: "stakedAmounts" as const, args: [address] as const },
-      // 3: bonusCyseTracker.stakedAmounts(user) — bnCYSE / multiplier points
-      { ...contracts.bonusCyseTracker, functionName: "stakedAmounts" as const, args: [address] as const },
-      // 3b: bonusCyseTracker.claimable(user) — pending bnCYSE rewards
-      { ...contracts.bonusCyseTracker, functionName: "claimable" as const, args: [address] as const },
-      // 3c: stakedCyseTracker.depositBalances(user, esCYSE) — esCYSE staked separately
+      // 3: stakedCyseTracker.depositBalances(user, CYSE)
+      { ...contracts.stakedCyseTracker, functionName: "depositBalances" as const, args: [address, contracts.cyse.address] as const },
+      // 4: stakedCyseTracker.depositBalances(user, esCYSE)
       { ...contracts.stakedCyseTracker, functionName: "depositBalances" as const, args: [address, contracts.escyse.address] as const },
-      // 4: feeCyseTracker.stakedAmounts(user)
+      // 5: bonusCyseTracker.claimable(user) — pending bnCYSE rewards
+      { ...contracts.bonusCyseTracker, functionName: "claimable" as const, args: [address] as const },
+      // 6: extendedCyseTracker.depositBalances(user, bnCYSE)
+      { ...extendedCyseTracker, functionName: "depositBalances" as const, args: [address, contracts.bonusCyse.address] as const },
+      // 7: extendedCyseTracker.claimable(user) — CYSE rewards from the extended layer
+      { ...extendedCyseTracker, functionName: "claimable" as const, args: [address] as const },
+      // 8: feeCyseTracker.stakedAmounts(user)
       { ...contracts.feeCyseTracker, functionName: "stakedAmounts" as const, args: [address] as const },
-      // 5: feeCyseTracker.claimable(user) — WETH fees from CYSE staking
+      // 9: feeCyseTracker.claimable(user) — WETH fees from CYSE staking
       { ...contracts.feeCyseTracker, functionName: "claimable" as const, args: [address] as const },
-      // 6: stakedCyseTracker.claimable(user) — esCYSE from CYSE staking
+      // 10: stakedCyseTracker.claimable(user) — esCYSE from CYSE staking
       { ...contracts.stakedCyseTracker, functionName: "claimable" as const, args: [address] as const },
-      // 7: CYLP balance (unstaked)
+      // 11: CYLP balance (unstaked)
       { ...contracts.cylp, functionName: "balanceOf" as const, args: [address] as const },
-      // 8: stakedCylpTracker.stakedAmounts(user)
+      // 12: stakedCylpTracker.stakedAmounts(user)
       { ...contracts.stakedCylpTracker, functionName: "stakedAmounts" as const, args: [address] as const },
-      // 9: feeCylpTracker.claimable(user) — WETH fees from CYLP staking
+      // 13: feeCylpTracker.claimable(user) — WETH fees from CYLP staking
       { ...contracts.feeCylpTracker, functionName: "claimable" as const, args: [address] as const },
-      // 10: CYLP totalSupply
+      // 14: CYLP totalSupply
       { ...contracts.cylp, functionName: "totalSupply" as const },
-      // 11: stakedCylpTracker.claimable(user) — esCYSE from CYLP staking
+      // 15: stakedCylpTracker.claimable(user) — esCYSE from CYLP staking
       { ...contracts.stakedCylpTracker, functionName: "claimable" as const, args: [address] as const },
-      // 12: cylpManager.getAum(false) — min AUM for CYLP price calculation
+      // 16: cylpManager.getAum(false) — min AUM for CYLP price calculation
       { ...contracts.cylpManager, functionName: "getAum" as const, args: [false] as const },
       // ── CyseVester ──
-      // 13: cyseVester.balanceOf(user) — esTokens deposited
+      // 17: cyseVester.balanceOf(user) — esTokens deposited
       { ...contracts.cyseVester, functionName: "balanceOf" as const, args: [address] as const },
-      // 14: cyseVester.claimable(user) — CYSE claimable now
+      // 18: cyseVester.claimable(user) — CYSE claimable now
       { ...contracts.cyseVester, functionName: "claimable" as const, args: [address] as const },
-      // 15: cyseVester.getMaxVestableAmount(user) — max esCYSE user can deposit
+      // 19: cyseVester.getMaxVestableAmount(user) — max esCYSE user can deposit
       { ...contracts.cyseVester, functionName: "getMaxVestableAmount" as const, args: [address] as const },
-      // 16: cyseVester.pairAmounts(user) — feeCyseTracker tokens locked
+      // 20: cyseVester.pairAmounts(user) — feeCyseTracker tokens locked
       { ...contracts.cyseVester, functionName: "pairAmounts" as const, args: [address] as const },
-      // 17: cyseVester.claimedAmounts(user) — cumulative CYSE claimed
+      // 21: cyseVester.claimedAmounts(user) — cumulative CYSE claimed
       { ...contracts.cyseVester, functionName: "claimedAmounts" as const, args: [address] as const },
       // ── CylpVester ──
-      // 18: cylpVester.balanceOf(user) — esTokens deposited
+      // 22: cylpVester.balanceOf(user) — esTokens deposited
       { ...contracts.cylpVester, functionName: "balanceOf" as const, args: [address] as const },
-      // 19: cylpVester.claimable(user) — CYSE claimable now
+      // 23: cylpVester.claimable(user) — CYSE claimable now
       { ...contracts.cylpVester, functionName: "claimable" as const, args: [address] as const },
-      // 20: cylpVester.getMaxVestableAmount(user)
+      // 24: cylpVester.getMaxVestableAmount(user)
       { ...contracts.cylpVester, functionName: "getMaxVestableAmount" as const, args: [address] as const },
-      // 21: cylpVester.pairAmounts(user) — stakedCylpTracker tokens locked
+      // 25: cylpVester.pairAmounts(user) — stakedCylpTracker tokens locked
       { ...contracts.cylpVester, functionName: "pairAmounts" as const, args: [address] as const },
-      // 22: cylpVester.claimedAmounts(user)
+      // 26: cylpVester.claimedAmounts(user)
       { ...contracts.cylpVester, functionName: "claimedAmounts" as const, args: [address] as const },
     ];
-  }, [address]);
+  }, [address, extendedCyseTracker]);
 
   const { data, isLoading } = useReadContracts({
     contracts: calls,
@@ -162,67 +197,84 @@ export function useStakingData(): StakingData {
     const get = (i: number): bigint =>
       data && data[i]?.status === "success" ? (data[i].result as bigint) : ZERO;
 
-    const cyseBalanceRaw       = get(0);
-    const esCyseBalanceRaw     = get(1);
-    const stakedCyseAmountRaw  = get(2);
-    const bonusCyseAmountRaw   = get(3);
-    const bonusCyseClaimableRaw = get(4);
-    const stakedEsCyseAmountRaw = get(5);
-    const feeCyseStakedRaw     = get(6);
-    const feeCyseClaimableRaw  = get(7);
-    const esCyseClaimableRaw   = get(8);
-    const cylpBalanceRaw       = get(9);
-    const stakedCylpAmountRaw  = get(10);
-    const feeCylpClaimableRaw  = get(11);
-    const cylpSupplyRaw        = get(12);
-    const esCyseFromCylpRaw    = get(13);
-    const aumRaw               = get(14);
+    const cyseBalanceRaw            = get(0);
+    const esCyseBalanceRaw          = get(1);
+    const totalCyseStakedAmountRaw  = get(2);
+    const stakedCyseAmountRaw       = get(3);
+    const stakedEsCyseAmountRaw     = get(4);
+    const bonusCyseClaimableRaw     = get(5);
+    const bonusCyseAmountRaw        = get(6);
+    const claimableCyseRaw          = get(7);
+    const feeCyseStakedRaw          = get(8);
+    const feeCyseClaimableRaw       = get(9);
+    const esCyseClaimableRaw        = get(10);
+    const cylpBalanceRaw            = get(11);
+    const stakedCylpAmountRaw       = get(12);
+    const feeCylpClaimableRaw       = get(13);
+    const cylpSupplyRaw             = get(14);
+    const esCyseFromCylpRaw         = get(15);
+    const aumRaw                    = get(16);
 
     // CyseVester
-    const cyseVestDepositedRaw  = get(15);
-    const cyseVestClaimableRaw  = get(16);
-    const cyseVestMaxRaw        = get(17);
-    const cyseVestPairRaw       = get(18);
-    const cyseVestClaimedRaw    = get(19);
+    const cyseVestDepositedRaw       = get(17);
+    const cyseVestClaimableRaw       = get(18);
+    const cyseVestMaxRaw             = get(19);
+    const cyseVestPairRaw            = get(20);
+    const cyseVestClaimedRaw         = get(21);
 
     // CylpVester
-    const cylpVestDepositedRaw  = get(20);
-    const cylpVestClaimableRaw  = get(21);
-    const cylpVestMaxRaw        = get(22);
-    const cylpVestPairRaw       = get(23);
-    const cylpVestClaimedRaw    = get(24);
+    const cylpVestDepositedRaw       = get(22);
+    const cylpVestClaimableRaw       = get(23);
+    const cylpVestMaxRaw             = get(24);
+    const cylpVestPairRaw            = get(25);
+    const cylpVestClaimedRaw         = get(26);
 
-    const feeCyseClaimable  = fmt(feeCyseClaimableRaw);
-    const feeCylpClaimable  = fmt(feeCylpClaimableRaw);
-    const esCyseClaimable   = fmt(esCyseClaimableRaw) + fmt(esCyseFromCylpRaw);
+    const feeCyseClaimable = fmt(feeCyseClaimableRaw);
+    const feeCylpClaimable = fmt(feeCylpClaimableRaw);
+    const claimableCyse = fmt(claimableCyseRaw);
+    const esCyseClaimable = fmt(esCyseClaimableRaw) + fmt(esCyseFromCylpRaw);
 
     // CYLP price = AUM (USD, 30-dec) / supply (18-dec) → USD per CYLP (18-dec)
     const cylpSupply = fmt(cylpSupplyRaw);
     const aum = aumRaw > 0n ? parseFloat(formatUnits(aumRaw, 30)) : 0;
     const cylpPrice = cylpSupply > 0 ? aum / cylpSupply : 0;
+    const cylpStakeValueUsd = fmt(stakedCylpAmountRaw) * cylpPrice;
+
+    const cyseVestRemainingCapacityRaw = cyseVestMaxRaw > cyseVestDepositedRaw
+      ? cyseVestMaxRaw - cyseVestDepositedRaw
+      : ZERO;
+    const cylpVestRemainingCapacityRaw = cylpVestMaxRaw > cylpVestDepositedRaw
+      ? cylpVestMaxRaw - cylpVestDepositedRaw
+      : ZERO;
 
     const cyseVesting: VestingData = {
-      deposited:        fmt(cyseVestDepositedRaw),
-      depositedRaw:     cyseVestDepositedRaw,
-      claimable:        fmt(cyseVestClaimableRaw),
-      claimableRaw:     cyseVestClaimableRaw,
-      maxVestable:      fmt(cyseVestMaxRaw),
-      maxVestableRaw:   cyseVestMaxRaw,
-      pairAmount:       fmt(cyseVestPairRaw),
-      pairAmountRaw:    cyseVestPairRaw,
+      deposited: fmt(cyseVestDepositedRaw),
+      depositedRaw: cyseVestDepositedRaw,
+      claimable: fmt(cyseVestClaimableRaw),
+      claimableRaw: cyseVestClaimableRaw,
+      maxVestable: fmt(cyseVestMaxRaw),
+      maxVestableRaw: cyseVestMaxRaw,
+      pairAmount: fmt(cyseVestPairRaw),
+      pairAmountRaw: cyseVestPairRaw,
       cumulativeClaimed: fmt(cyseVestClaimedRaw),
+      cumulativeClaimedRaw: cyseVestClaimedRaw,
+      remainingCapacity: fmt(cyseVestRemainingCapacityRaw),
+      remainingCapacityRaw: cyseVestRemainingCapacityRaw,
     };
 
     const cylpVesting: VestingData = {
-      deposited:        fmt(cylpVestDepositedRaw),
-      depositedRaw:     cylpVestDepositedRaw,
-      claimable:        fmt(cylpVestClaimableRaw),
-      claimableRaw:     cylpVestClaimableRaw,
-      maxVestable:      fmt(cylpVestMaxRaw),
-      maxVestableRaw:   cylpVestMaxRaw,
-      pairAmount:       fmt(cylpVestPairRaw),
-      pairAmountRaw:    cylpVestPairRaw,
+      deposited: fmt(cylpVestDepositedRaw),
+      depositedRaw: cylpVestDepositedRaw,
+      claimable: fmt(cylpVestClaimableRaw),
+      claimableRaw: cylpVestClaimableRaw,
+      maxVestable: fmt(cylpVestMaxRaw),
+      maxVestableRaw: cylpVestMaxRaw,
+      pairAmount: fmt(cylpVestPairRaw),
+      pairAmountRaw: cylpVestPairRaw,
       cumulativeClaimed: fmt(cylpVestClaimedRaw),
+      cumulativeClaimedRaw: cylpVestClaimedRaw,
+      remainingCapacity: fmt(cylpVestRemainingCapacityRaw),
+      remainingCapacityRaw: cylpVestRemainingCapacityRaw,
     };
 
     return {
@@ -232,10 +284,14 @@ export function useStakingData(): StakingData {
       esCyseBalanceRaw,
       stakedCyseAmount: fmt(stakedCyseAmountRaw),
       stakedCyseAmountRaw,
+      totalCyseStakedAmount: fmt(totalCyseStakedAmountRaw),
+      totalCyseStakedAmountRaw,
       bonusCyseAmount: fmt(bonusCyseAmountRaw),
       bonusCyseAmountRaw,
       bonusCyseClaimable: fmt(bonusCyseClaimableRaw),
       bonusCyseClaimableRaw,
+      claimableCyse,
+      claimableCyseRaw,
       stakedEsCyseAmount: fmt(stakedEsCyseAmountRaw),
       stakedEsCyseAmountRaw,
       feeCyseStaked: fmt(feeCyseStakedRaw),
@@ -255,10 +311,13 @@ export function useStakingData(): StakingData {
       cylpPrice,
       cyseVesting,
       cylpVesting,
-      totalStakedValueUsd: 0, // computed in UI with price feed
+      totalClaimableCyse: claimableCyse + cyseVesting.claimable + cylpVesting.claimable,
+      totalStakedValueUsd: cylpStakeValueUsd,
+      totalEarnPositionUsd: cylpStakeValueUsd,
+      cylpStakeValueUsd,
       totalClaimableEth: feeCyseClaimable + feeCylpClaimable,
       totalClaimableEsCyse: esCyseClaimable,
-      isLoading,
+      isLoading: isLoading || isExtendedTrackerLoading,
     };
-  }, [data, isLoading]);
+  }, [data, isExtendedTrackerLoading, isLoading]);
 }
