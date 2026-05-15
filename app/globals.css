@@ -281,7 +281,7 @@
    ============================================================ */
 
 .btn-primary-gradient {
-  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-container) 100%);
+  background: linear-gradient(135deg, var(--primary) 100%, var(--primary) 100%);
   color: var(--on-primary);
   position: relative;
   overflow: hidden;

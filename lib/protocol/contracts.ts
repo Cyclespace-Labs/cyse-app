@@ -133,7 +133,7 @@ export const contracts = {
   cylpBalance:      { address: requiredAddress("CylpBalance"),      abi: cylpBalanceAbi },
 
   // Staking & Rewards
-  rewardRouterV2:   { address: requiredAddress("RewardRouterV2"),   abi: rewardRouterAbi },
+  rewardRouter:     { address: requiredAddress("RewardRouter"),     abi: rewardRouterAbi },
   stakeManager:     { address: requiredAddress("StakeManager"),     abi: stakeManagerAbi },
   stakedCyseTracker: { address: requiredAddress("StakedCyseTracker"), abi: rewardTrackerAbi },
   stakedCyseDistributor: { address: requiredAddress("StakedCyseDistributor"), abi: stakedCyseDistributorAbi },

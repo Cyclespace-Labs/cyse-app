@@ -4,6 +4,8 @@ import { formatPrice, formatVolume } from "@/lib/formatters";
 import { ChevronDown } from "lucide-react";
 import { TokenPriceData } from "@/types/trading";
 
+//Hidden components need to be updated for future use in V2 
+
 // Token icon mapping: symbol -> filename in /tokens/
 const TOKEN_ICONS: Record<string, string> = {
   BTC: "/tokens/Bitcoin.svg",
@@ -118,7 +120,7 @@ export default function PriceHeader({ onTokenPickerOpen, selectedSymbol, tokenPr
       </div>
 
       {/* 1h Funding / Countdown */}
-      <div className="flex flex-col mr-5 shrink-0">
+      <div className="flex flex-col mr-5 shrink-0 hidden">
         <span className="text-[10px] uppercase tracking-wide" style={{ color: "var(--on-surface-disabled)" }}>1h Funding / Countdown</span>
         <span className="text-xs" style={{ color: "var(--on-surface)" }}>
           {d ? `${d.funding} / ${d.countdown}` : na}

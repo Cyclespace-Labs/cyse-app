@@ -18,7 +18,7 @@ const tourney = Tourney({
 });
 
 const navItems = [
-  { label: "Perpetuals", href: "/trading" },
+  { label: "Perpetuals", href: "/" },
   { label: "Predictions", href: "/predictions" },
   { label: "Earn", href: "/earn" },
   { label: "Vault", href: "/vault" },

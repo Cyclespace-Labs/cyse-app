@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { getTickSize } from "@/lib/tradingData";
 
 const pctButtons = [25, 50, 75, 100];
@@ -45,6 +45,11 @@ export default function OrderFormInputs({
   priceImpact,
 }: OrderFormInputsProps) {
   const priceNum = parseFloat(price) || 0;
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   return (
     <>
@@ -90,7 +95,7 @@ export default function OrderFormInputs({
           />
           <span className="text-[11px] ml-2" style={{ color: "var(--on-surface-disabled)" }}>{symbol}</span>
         </div>
-        {walletConnected && (
+        {mounted && walletConnected && (
           <div className="flex items-center gap-1 mt-1.5">
             {pctButtons.map((pct) => (
               <button
