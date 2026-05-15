@@ -4,8 +4,6 @@ import { formatPrice, formatVolume } from "@/lib/formatters";
 import { ChevronDown } from "lucide-react";
 import { TokenPriceData } from "@/types/trading";
 
-//Hidden components need to be updated for future use in V2 
-
 // Token icon mapping: symbol -> filename in /tokens/
 const TOKEN_ICONS: Record<string, string> = {
   BTC: "/tokens/Bitcoin.svg",
@@ -28,9 +26,38 @@ interface PriceHeaderProps {
   pythConnected?: boolean;
   /** Oracle source label */
   oracleSource?: string;
+  /** Real Open Interest from Vault contract (USD) */
+  openInterest?: number;
+  /** Real Funding Rate from Vault contract (percentage) */
+  fundingRate?: number;
+  /** Whether vault data is loading */
+  isLoadingVaultData?: boolean;
+  /** 24h data from Binance API */
+  binance24hChange?: number;
+  binance24hChangePercent?: number;
+  binance24hHigh?: number;
+  binance24hLow?: number;
+  binance24hVolume?: number;
+  isLoadingBinanceData?: boolean;
 }
 
-export default function PriceHeader({ onTokenPickerOpen, selectedSymbol, tokenPriceData, livePrice, pythConnected, oracleSource }: PriceHeaderProps) {
+export default function PriceHeader({
+  onTokenPickerOpen,
+  selectedSymbol,
+  tokenPriceData,
+  livePrice,
+  pythConnected,
+  oracleSource,
+  openInterest,
+  fundingRate,
+  isLoadingVaultData,
+  binance24hChange,
+  binance24hChangePercent,
+  binance24hHigh,
+  binance24hLow,
+  binance24hVolume,
+  isLoadingBinanceData,
+}: PriceHeaderProps) {
   const d = tokenPriceData ?? null;
   const displaySymbol = selectedSymbol || d?.symbol || "—";
   const baseSymbol = displaySymbol.replace(/-PERP$/, "");
@@ -39,7 +66,19 @@ export default function PriceHeader({ onTokenPickerOpen, selectedSymbol, tokenPr
   // Use livePrice (from Pyth/oracle) if available, otherwise fall back to tokenPriceData
   const currentDisplayPrice = livePrice && livePrice > 0 ? livePrice : d?.price ?? 0;
 
-  const changeColor = d && d.changePct24h >= 0 ? "var(--buy)" : "var(--sell)";
+  // Use real Open Interest from Vault contract
+  const displayOpenInterest: number | undefined = openInterest;
+  // Use real Funding Rate from Vault contract
+  const displayFundingRate: number | undefined = fundingRate;
+
+  // Use real Binance 24h data - no fallback to mock data
+  const display24hChange = binance24hChange;
+  const display24hChangePercent = binance24hChangePercent;
+  const display24hHigh = binance24hHigh;
+  const display24hLow = binance24hLow;
+  const display24hVolume = binance24hVolume;
+
+  const changeColor = (display24hChangePercent ?? 0) >= 0 ? "var(--buy)" : "var(--sell)";
 
   return (
     <div
@@ -111,50 +150,54 @@ export default function PriceHeader({ onTokenPickerOpen, selectedSymbol, tokenPr
         </span>
       </div>
 
-      {/* 24h Change */}
+      {/* 24h Change - From Binance API */}
       <div className="flex flex-col mr-5 shrink-0">
         <span className="text-[10px] uppercase tracking-wide" style={{ color: "var(--on-surface-disabled)" }}>24h Change</span>
         <span className="text-xs" style={{ color: changeColor }}>
-          {d ? `${d.change24h.toFixed(2)} / ${d.changePct24h.toFixed(2)}%` : na}
+          {isLoadingBinanceData ? "..." : display24hChange !== undefined && display24hChangePercent !== undefined
+            ? `${display24hChange.toFixed(2)} / ${display24hChangePercent.toFixed(2)}%`
+            : na}
         </span>
       </div>
 
-      {/* 1h Funding / Countdown */}
-      <div className="flex flex-col mr-5 shrink-0 hidden">
-        <span className="text-[10px] uppercase tracking-wide" style={{ color: "var(--on-surface-disabled)" }}>1h Funding / Countdown</span>
-        <span className="text-xs" style={{ color: "var(--on-surface)" }}>
-          {d ? `${d.funding} / ${d.countdown}` : na}
-        </span>
-      </div>
-
-      {/* 24h High */}
+      {/* 24h High - From Binance API */}
       <div className="flex flex-col mr-5 shrink-0">
         <span className="text-[10px] uppercase tracking-wide" style={{ color: "var(--on-surface-disabled)" }}>24H High</span>
-        <span className="text-xs" style={{ color: "var(--on-surface)" }}>{d ? formatPrice(d.high24h) : na}</span>
+        <span className="text-xs" style={{ color: "var(--on-surface)" }}>
+          {isLoadingBinanceData ? "..." : display24hHigh !== undefined ? formatPrice(display24hHigh) : na}
+        </span>
       </div>
 
-      {/* 24h Low */}
+      {/* 24h Low - From Binance API */}
       <div className="flex flex-col mr-5 shrink-0">
         <span className="text-[10px] uppercase tracking-wide" style={{ color: "var(--on-surface-disabled)" }}>24H Low</span>
-        <span className="text-xs" style={{ color: "var(--on-surface)" }}>{d ? formatPrice(d.low24h) : na}</span>
+        <span className="text-xs" style={{ color: "var(--on-surface)" }}>
+          {isLoadingBinanceData ? "..." : display24hLow !== undefined ? formatPrice(display24hLow) : na}
+        </span>
       </div>
 
-      {/* 24h Volume */}
+      {/* 24h Volume - From Binance API */}
       <div className="flex flex-col mr-5 shrink-0">
         <span className="text-[10px] uppercase tracking-wide" style={{ color: "var(--on-surface-disabled)" }}>24H Volume (USD)</span>
-        <span className="text-xs" style={{ color: "var(--on-surface)" }}>{d ? formatVolume(d.volume24h) : na}</span>
+        <span className="text-xs" style={{ color: "var(--on-surface)" }}>
+          {isLoadingBinanceData ? "..." : display24hVolume !== undefined ? formatVolume(display24hVolume) : na}
+        </span>
       </div>
 
-      {/* Open Interest */}
+      {/* Open Interest - Real from Vault contract */}
       <div className="flex flex-col mr-5 shrink-0">
         <span className="text-[10px] uppercase tracking-wide" style={{ color: "var(--on-surface-disabled)" }}>Open Interest</span>
-        <span className="text-xs" style={{ color: "var(--on-surface)" }}>{d ? formatVolume(d.openInterest) : na}</span>
+        <span className="text-xs" style={{ color: "var(--on-surface)" }}>
+          {isLoadingVaultData ? "..." : displayOpenInterest !== undefined ? formatVolume(displayOpenInterest) : na}
+        </span>
       </div>
 
-      {/* Profit APY */}
+      {/* Funding Rate - Real from Vault contract */}
       <div className="flex flex-col shrink-0">
-        <span className="text-[10px] uppercase tracking-wide" style={{ color: "var(--on-surface-disabled)" }}>Profit APY</span>
-        <span className="text-xs" style={{ color: "var(--buy)" }}>{d?.profitApy ?? na} {d ? "↑" : ""}</span>
+        <span className="text-[10px] uppercase tracking-wide" style={{ color: "var(--on-surface-disabled)" }}>Funding Rate</span>
+        <span className="text-xs" style={{ color: displayFundingRate !== undefined && displayFundingRate >= 0 ? "var(--buy)" : "var(--sell)" }}>
+          {isLoadingVaultData ? "..." : displayFundingRate !== undefined ? `${displayFundingRate.toFixed(4)}%` : na}
+        </span>
       </div>
     </div>
   );

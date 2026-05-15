@@ -21,6 +21,8 @@ import { useOrderHistory } from "@/hooks/useOrderHistory";
 import { usePositionHistory } from "@/hooks/usePositionHistory";
 import { useFillHistory } from "@/hooks/useFillHistory";
 import { useFundingHistory } from "@/hooks/useFundingHistory";
+import { useVaultMarketData } from "@/hooks/useVaultMarketData";
+import { useBinance24hData } from "@/hooks/useBinance24hData";
 import { contracts } from "@/lib/protocol/contracts";
 import { formatUnits, parseUnits } from "viem";
 import { OnChainIncreaseOrder, OnChainDecreaseOrder } from "@/types/protocol";
@@ -113,6 +115,19 @@ export default function Home() {
   } = usePriceOracle(indexToken);
   const currentPrice = livePrice ?? tokenPriceData?.price ?? 0;
 
+  // Real market data from Vault contract
+  const { openInterest, fundingRate, isLoading: isLoadingVaultData } = useVaultMarketData(indexToken);
+
+  // 24h data from Binance API
+  const {
+    priceChange: binance24hChange,
+    priceChangePercent: binance24hChangePercent,
+    highPrice: binance24hHigh,
+    lowPrice: binance24hLow,
+    quoteVolume: binance24hVolume,
+    isLoading: isLoadingBinanceData,
+  } = useBinance24hData(symbol);
+
   const orders = onChainOrdersToUI(increaseOrders, decreaseOrders);
 
   const handleClosePosition = async (positionId: string) => {
@@ -163,6 +178,15 @@ export default function Home() {
         livePrice={currentPrice}
         pythConnected={pythConnected}
         oracleSource={oracleSource}
+        openInterest={openInterest}
+        fundingRate={fundingRate}
+        isLoadingVaultData={isLoadingVaultData}
+        binance24hChange={binance24hChange}
+        binance24hChangePercent={binance24hChangePercent}
+        binance24hHigh={binance24hHigh}
+        binance24hLow={binance24hLow}
+        binance24hVolume={binance24hVolume}
+        isLoadingBinanceData={isLoadingBinanceData}
       />
 
       <TokenPickerDialog

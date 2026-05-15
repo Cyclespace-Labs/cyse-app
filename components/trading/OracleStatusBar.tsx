@@ -50,7 +50,7 @@ export default function OracleStatusBar({
           className="font-mono text-[10px]"
           style={{ color: isOracleValid ? "var(--on-surface-muted)" : "var(--sell)" }}
         >
-          {currentPrice > 0 ? `$${currentPrice.toLocaleString("en-US", { maximumFractionDigits: 4 })}` : "—"}
+          {currentPrice > 0 ? `$${currentPrice.toLocaleString("en-US", { maximumFractionDigits: 2 })}` : "—"}
         </span>
       </div>
     </div>
