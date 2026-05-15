@@ -35,6 +35,45 @@ const BTC         = addr["BTC"]            as `0x${string}`;
 const BASIS_POINTS = 10_000n;
 const PRICE_DECIMALS = 30;
 
+// Helper to determine swap path and effective collateral token
+function getShortPathAndCollateral(
+  collateralToken: string,
+  indexToken: string,
+  isLong: boolean
+): { path: string[]; collateralToken: string } {
+  const isStable =
+    collateralToken.toLowerCase() === USDC.toLowerCase() ||
+    collateralToken.toLowerCase() === USDT.toLowerCase();
+
+  if (isLong) {
+    // For longs: if collateral is not stable and doesn't match index, swap to index token
+    if (!isStable && collateralToken.toLowerCase() !== indexToken.toLowerCase()) {
+      if (collateralToken.toLowerCase() === WETH.toLowerCase()) {
+        // WETH collateral with different index token: swap WETH -> indexToken
+        return {
+          path: [WETH, indexToken],
+          collateralToken: indexToken,
+        };
+      }
+      // For other non-stable tokens, swap directly to index token
+      return {
+        path: [collateralToken, indexToken],
+        collateralToken: indexToken,
+      };
+    }
+    return { path: [collateralToken], collateralToken };
+  }
+
+  // Shorts require stable collateral
+  if (collateralToken.toLowerCase() === WETH.toLowerCase()) {
+    return {
+      path: [WETH, USDC],
+      collateralToken: USDC,
+    };
+  }
+  return { path: [collateralToken], collateralToken };
+}
+
 // Token decimals mapping
 const TOKEN_DECIMALS: Record<string, number> = {
   [WETH.toLowerCase()]: 18,
@@ -194,6 +233,13 @@ export async function POST(req: NextRequest) {
     const sizeUsd = collateralUsd * levNum; // Position size in USD
     const sizeDelta = parseUnits(sizeUsd.toFixed(8), PRICE_DECIMALS);
 
+    // Determine swap path for token conversions
+    const { path: swapPath, collateralToken: effectiveCollateral } = getShortPathAndCollateral(
+      collateralToken,
+      indexToken,
+      isLong
+    );
+
     // acceptablePrice: for market orders apply slippage to oracle price
     const acceptablePrice = orderType === "market"
       ? applySlippage(oraclePriceRaw, isLong, slippageBps)
@@ -248,7 +294,7 @@ export async function POST(req: NextRequest) {
             functionName: "increasePositionETH",
             // args: path[], indexToken, minOut, sizeDelta, isLong, acceptablePrice
             args: [
-              [collateralToken],
+              swapPath,
               indexToken,
               "0",
               sizeDelta.toString(),
@@ -262,7 +308,7 @@ export async function POST(req: NextRequest) {
             functionName: "increasePosition",
             // args: path[], indexToken, amountIn, minOut, sizeDelta, isLong, acceptablePrice
             args: [
-              [collateralToken],
+              swapPath,
               indexToken,
               collateralAmountRaw.toString(),
               "0",
@@ -279,12 +325,12 @@ export async function POST(req: NextRequest) {
         contract:     "OrderBook",
         functionName: "createIncreaseOrder",
         args: [
-          [collateralToken],
+          swapPath,
           collateralAmountRaw.toString(),
           indexToken,
           "0",
           sizeDelta.toString(),
-          collateralToken,
+          effectiveCollateral,
           isLong,
           (limitPriceRaw ?? 0n).toString(),
           triggerAboveThreshold,

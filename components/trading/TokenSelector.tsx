@@ -2,12 +2,13 @@
 
 import { useRef, useEffect, useState } from "react";
 import { ChevronDown } from "lucide-react";
+import { contracts } from "@/lib/protocol/contracts";
 
 const TOKEN_CONFIG = {
-  WETH: { address: "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1" as `0x${string}`, decimals: 18, symbol: "WETH", name: "Wrapped Ether" },
-  USDC: { address: "0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8" as `0x${string}`, decimals: 6, symbol: "USDC", name: "USD Coin" },
-  USDT: { address: "0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9" as `0x${string}`, decimals: 6, symbol: "USDT", name: "Tether" },
-  BTC: { address: "0x47935b77083E2115f391F5cb3A471f0B5a141f42" as `0x${string}`, decimals: 8, symbol: "BTC", name: "Bitcoin" },
+  WETH: { address: contracts.weth.address, decimals: 18, symbol: "WETH", name: "Wrapped Ether" },
+  USDC: { address: contracts.usdc.address, decimals: 6, symbol: "USDC", name: "USD Coin" },
+  USDT: { address: contracts.usdt.address, decimals: 6, symbol: "USDT", name: "Tether" },
+  BTC: { address: contracts.btc.address, decimals: 8, symbol: "BTC", name: "Bitcoin" },
 };
 
 const COLLATERAL_TOKENS = ["WETH", "USDC", "USDT"];

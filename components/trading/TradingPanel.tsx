@@ -10,6 +10,7 @@ import { useAllVaultPositions, VaultPositionEntry } from "@/hooks/useAllVaultPos
 import { useOrderKeeper } from "@/hooks/useOrderKeeper";
 import { usePriceOracle } from "@/hooks/usePriceOracle";
 import { usePositionHealth } from "@/hooks/usePositionHealth";
+import { useVaultConfig } from "@/hooks/useVaultConfig";
 import { validateOrder, validateTPSL, formatValidationErrors, validatePositionHealth } from "@/lib/validation/trading";
 import { computeLivePnl } from "@/lib/formatters";
 import { getTickSize } from "@/lib/tradingData";
@@ -46,6 +47,7 @@ interface TradingPanelProps {
   indexToken?: `0x${string}`;
   collateralToken?: `0x${string}`;
   onTradeConfirmed?: () => void;
+  onIndexTokenChange?: (indexToken: `0x${string}`) => void;
 }
 
 export default function TradingPanel({
@@ -54,6 +56,7 @@ export default function TradingPanel({
   indexToken = contracts.weth.address,
   collateralToken = contracts.weth.address,
   onTradeConfirmed,
+  onIndexTokenChange,
 }: TradingPanelProps) {
   const { wallet, CustomConnectButton } = useWallet();
 
@@ -123,6 +126,32 @@ export default function TradingPanel({
   const priceNum = parseFloat(price) || 0;
   const qtyNum = parseFloat(quantity) || 0;
   const isLong = side === "buy";
+
+  // Read Vault configuration for max leverage and liquidation fee
+  const { maxLeverage: vaultMaxLeverage, liquidationFeeUsd } = useVaultConfig();
+
+  // Sync internal state with parent's indexToken prop
+  useEffect(() => {
+    // Map address to token key
+    const addressToKey: Record<string, IndexTokenKey> = {
+      [contracts.weth.address.toLowerCase()]: "WETH",
+      [contracts.btc.address.toLowerCase()]: "BTC",
+    };
+    const key = addressToKey[indexToken.toLowerCase()];
+    if (key && key !== selectedIndexTokenKey) {
+      setSelectedIndexTokenKey(key);
+    }
+  }, [indexToken]);
+
+  // Handle index token change from TokenSelector
+  const handleIndexTokenChange = useCallback((tokenKey: IndexTokenKey) => {
+    setSelectedIndexTokenKey(tokenKey);
+    // Notify parent of the change
+    if (onIndexTokenChange) {
+      const address = TOKEN_CONFIG[tokenKey].address;
+      onIndexTokenChange(address);
+    }
+  }, [onIndexTokenChange]);
 
   // Calculate collateral token balance in USD for display
   const collateralTokenBalanceNum = collateralTokenBalance?.value !== undefined
@@ -215,8 +244,9 @@ export default function TradingPanel({
       availableBalance: reduceOnly ? Infinity : collateralTokenBalanceUsd,
       oraclePrice: currentPrice,
       slippageBps,
+      maxLeverage: vaultMaxLeverage,
     });
-  }, [wallet.connected, collateralTokenBalanceUsd, priceNum, qtyNum, leverage, side, activeType, currentPrice, slippageBps, reduceOnly]);
+  }, [wallet.connected, collateralTokenBalanceUsd, priceNum, qtyNum, leverage, side, activeType, currentPrice, slippageBps, reduceOnly, vaultMaxLeverage]);
 
   const reduceOnlyError = useMemo(() => {
     if (!reduceOnly) return null;
@@ -346,9 +376,22 @@ export default function TradingPanel({
     const indexPrice = activeType === "Market" ? currentPrice : priceNum;
     const positionSizeUsd = qtyNum * indexPrice;
     const collateralUsd = positionSizeUsd / leverage;
-    const collateralTokenPrice = selectedCollateralTokenKey === "WETH" ? currentPrice : 1;
+
+    // For WETH collateral being swapped to index token, use index token price for collateral calculation
+    // The Vault calculates collateral based on post-swap token value
+    const collateralTokenPrice = selectedCollateralTokenKey === "WETH" ? indexPrice : 1;
     const collateralAmount = parseUnits((collateralUsd / collateralTokenPrice).toFixed(8), collateralDecimals);
     const sizeDelta = parseUnits(positionSizeUsd.toFixed(8), 30);
+
+    console.log("[handlePlaceOrder] Collateral calculation:", {
+      positionSizeUsd,
+      leverage,
+      collateralUsd,
+      selectedCollateralTokenKey,
+      collateralTokenPrice,
+      collateralAmount: collateralAmount.toString(),
+      sizeDelta: sizeDelta.toString(),
+    });
 
     // Reduce-only logic
     const opposingPosition = isLong ? shortPosition : longPosition;
@@ -370,6 +413,17 @@ export default function TradingPanel({
 
     // Validate position health before submitting (only for new positions)
     if (!isReduceOnly) {
+      console.log("[handlePlaceOrder] Validating position health:", {
+        collateralUsd,
+        sizeUsd: positionSizeUsd,
+        entryPrice: currentPrice,
+        isLong,
+        maxPrice: oracleMaxPrice,
+        minPrice: oracleMinPrice,
+        maxLeverage: vaultMaxLeverage,
+        liquidationFeeUsd,
+      });
+
       const health = validatePositionHealth({
         collateralUsd,
         sizeUsd: positionSizeUsd,
@@ -377,7 +431,11 @@ export default function TradingPanel({
         isLong,
         maxPrice: oracleMaxPrice,
         minPrice: oracleMinPrice,
+        maxLeverage: vaultMaxLeverage,
+        liquidationFeeUsd,
       });
+
+      console.log("[handlePlaceOrder] Position health result:", health);
 
       if (!health.isHealthy) {
         console.error("[handlePlaceOrder] Position health check failed:", health.error);
@@ -564,7 +622,7 @@ export default function TradingPanel({
           selectedCollateralTokenKey={selectedCollateralTokenKey}
           onCollateralTokenChange={setSelectedCollateralTokenKey}
           selectedIndexTokenKey={selectedIndexTokenKey}
-          onIndexTokenChange={setSelectedIndexTokenKey}
+          onIndexTokenChange={handleIndexTokenChange}
         />
 
         <OrderFormInputs

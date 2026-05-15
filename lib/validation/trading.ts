@@ -264,6 +264,7 @@ export interface PositionHealthInput {
   maxPrice: number;           // Oracle max price (unused — kept for API compat)
   minPrice: number;           // Oracle min price (unused — kept for API compat)
   maxLeverage?: number;        // Vault maxLeverage / 10000 (default 50x)
+  liquidationFeeUsd?: number; // Vault liquidation fee in USD (default 5)
 }
 
 export interface PositionHealthResult {
@@ -285,18 +286,42 @@ export function validatePositionHealth(
     entryPrice,
     isLong,
     maxLeverage = 50,          // Vault default: 50 * 10000 / 10000 = 50x
+    liquidationFeeUsd = 5,     // Vault default liquidation fee in USD
   } = input;
 
   const leverage = sizeUsd / collateralUsd;
+
+  // Hard check: collateral must exceed liquidation fee with swap buffer
+  // When collateral is swapped (e.g., WETH -> BTC), the post-swap amount may be less
+  // Apply 10% buffer to account for swap slippage and price differences
+  const swapBufferForFee = 0.90; // 10% buffer (increased from 5%)
+  const effectiveCollateralForFee = collateralUsd * swapBufferForFee;
+
+  if (effectiveCollateralForFee <= liquidationFeeUsd) {
+    return {
+      isHealthy: false,
+      error: `Collateral ($${collateralUsd.toFixed(2)}) must exceed liquidation fee ($${liquidationFeeUsd.toFixed(2)}) accounting for swap slippage. Increase position size or use more collateral.`,
+      liquidationPrice: 0,
+      distanceToLiquidation: 0,
+      effectiveCollateral: collateralUsd,
+      initialLoss: 0,
+    };
+  }
+
+  // Apply 10% buffer for swap slippage when collateral != index token
+  // The Vault calculates leverage based on post-swap collateral, which may be less
+  // than the pre-swap value used in frontend calculation
+  const swapBuffer = 0.90; // 10% buffer (increased from 5%)
+  const effectiveLeverage = leverage / swapBuffer;
 
   // Hard check: must not exceed vault maxLeverage.
   // VaultUtils.validateLiquidation:
   //   if (remainingCollateral * maxLeverage < size * BASIS_POINTS_DIVISOR)
   // Which is equivalent to: leverage > maxLeverage / 10000
-  if (leverage > maxLeverage) {
+  if (effectiveLeverage > maxLeverage) {
     return {
       isHealthy: false,
-      error: `Leverage ${leverage.toFixed(1)}x exceeds vault maximum of ${maxLeverage}x.`,
+      error: `Leverage ${leverage.toFixed(1)}x exceeds vault maximum of ${maxLeverage}x (accounting for swap slippage).`,
       liquidationPrice: 0,
       distanceToLiquidation: 0,
       effectiveCollateral: collateralUsd,

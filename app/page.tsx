@@ -101,6 +101,17 @@ export default function Home() {
     refetchOrders();
   }, [refetchPositions, refetchOrders]);
 
+  // Handle index token change from TradingPanel
+  const handleIndexTokenChange = useCallback((indexTokenAddress: `0x${string}`) => {
+    // Find the TokenMarket that matches the index token address
+    const matchingToken = tokenMarkets.find(
+      (t) => t.indexAddress?.toLowerCase() === indexTokenAddress.toLowerCase()
+    );
+    if (matchingToken) {
+      setSelectedToken(matchingToken);
+    }
+  }, []);
+
   const symbol = selectedToken.symbol;
   const indexToken: `0x${string}` = (selectedToken.indexAddress ?? contracts.weth.address) as `0x${string}`;
   const collateralToken: `0x${string}` = indexToken;
@@ -239,6 +250,7 @@ export default function Home() {
             indexToken={indexToken}
             collateralToken={collateralToken}
             onTradeConfirmed={handleTradeConfirmed}
+            onIndexTokenChange={handleIndexTokenChange}
           />
         </div>
       </div>

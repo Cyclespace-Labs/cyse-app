@@ -123,14 +123,6 @@ export function useTradingActions() {
     query: { enabled: !!address },
   });
 
-  const { data: maxLeverageRaw } = useReadContract({
-    ...contracts.vault,
-    functionName: "maxLeverage",
-    query: { staleTime: 60_000 },
-  });
-
-  const maxLeverage = maxLeverageRaw ? Number(maxLeverageRaw) / 10000 : 50; // Vault stores as 10000 * leverage
-
   const approvePlugin = useCallback(async () => {
     setTxStatus({ state: "pending" });
     try {
@@ -259,31 +251,13 @@ export function useTradingActions() {
       setTxStatus({ state: "pending" });
       try {
         const slippedPrice = applySlippage(acceptablePrice, isLong, slippageBps);
-        const isEth = collateralToken.toLowerCase() === contracts.weth.address.toLowerCase();
-        const { path, collateralToken: effectiveCollateral } = getShortPathAndCollateral(
-          collateralToken,
-          indexToken,
-          isLong
-        );
+        const isWeth = collateralToken.toLowerCase() === contracts.weth.address.toLowerCase();
+        const { path } = getShortPathAndCollateral(collateralToken, indexToken, isLong);
 
-        // Calculate leverage check
-        // Leverage = sizeDelta / (collateralAmount * price / PRICE_PRECISION)
-        // For swaps, we need to estimate the collateral after swap
-        const collateralUsd = (collateralAmount * acceptablePrice) / PRICE_PRECISION;
-        const sizeUsd = (sizeDelta * acceptablePrice) / PRICE_PRECISION;
-        const leverage = collateralUsd > 0 ? sizeUsd / collateralUsd : 0;
-
-        if (leverage > maxLeverage) {
-          const message = `Leverage ${Number(leverage).toFixed(2)}x exceeds vault maximum of ${maxLeverage}x. Reduce position size or increase collateral.`;
-          console.error("[placeMarketOrder] Leverage exceeded:", message);
-          setTxStatus({ state: "failed", error: message });
-          return null;
-        }
-
-        // ETH collateral (longs OR shorts where WETH is swapped to USDC).
-        // For shorts with WETH we still use increasePositionETH because the
-        // Router wraps native ETH → WETH → swaps to USDC via the path.
-        const hash = isEth
+        // Use increasePositionETH for native ETH (msg.value), increasePosition for ERC20 tokens.
+        // When user has native ETH, Router wraps it to WETH and handles swaps via path.
+        // When user has ERC20 tokens (including WETH), Router transfers them and handles swaps.
+        const hash = isWeth
           ? await writeContractAsync({
               ...contracts.router,
               functionName: "increasePositionETH",
