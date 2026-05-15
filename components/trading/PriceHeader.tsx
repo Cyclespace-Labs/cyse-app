@@ -185,7 +185,7 @@ export default function PriceHeader({
       </div>
 
       {/* Open Interest - Real from Vault contract */}
-      <div className="flex flex-col mr-5 shrink-0">
+      <div className="flex flex-col mr-5 shrink-0 hidden">
         <span className="text-[10px] uppercase tracking-wide" style={{ color: "var(--on-surface-disabled)" }}>Open Interest</span>
         <span className="text-xs" style={{ color: "var(--on-surface)" }}>
           {isLoadingVaultData ? "..." : displayOpenInterest !== undefined ? formatVolume(displayOpenInterest) : na}
@@ -193,7 +193,7 @@ export default function PriceHeader({
       </div>
 
       {/* Funding Rate - Real from Vault contract */}
-      <div className="flex flex-col shrink-0">
+      <div className="flex flex-col shrink-0 hidden">
         <span className="text-[10px] uppercase tracking-wide" style={{ color: "var(--on-surface-disabled)" }}>Funding Rate</span>
         <span className="text-xs" style={{ color: displayFundingRate !== undefined && displayFundingRate >= 0 ? "var(--buy)" : "var(--sell)" }}>
           {isLoadingVaultData ? "..." : displayFundingRate !== undefined ? `${displayFundingRate.toFixed(4)}%` : na}

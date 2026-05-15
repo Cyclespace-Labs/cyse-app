@@ -60,6 +60,8 @@ export function useBinance24hData(symbol: string): Binance24hData {
   });
 
   const wsRef = useRef<WebSocket | null>(null);
+  const mountedRef = useRef(true);
+  const currentSymbolRef = useRef(symbol);
 
   useEffect(() => {
     // Map symbol to Binance format (ETH -> ethusdt, BTC -> btcusdt) - lowercase for WebSocket
@@ -67,19 +69,36 @@ export function useBinance24hData(symbol: string): Binance24hData {
     const wsUrl = `wss://stream.binance.com:9443/ws/${binanceSymbol}@ticker`;
 
     console.log(`[Binance WS] Connecting to ${wsUrl}`);
+    mountedRef.current = true;
+    currentSymbolRef.current = symbol;
+
+    // Reset state when symbol changes
+    setData({
+      priceChange: 0,
+      priceChangePercent: 0,
+      highPrice: 0,
+      lowPrice: 0,
+      volume: 0,
+      quoteVolume: 0,
+      isLoading: true,
+      error: null,
+    });
 
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 
     ws.onopen = () => {
+      if (!mountedRef.current) return;
       console.log(`[Binance WS] Connected for ${symbol}`);
     };
 
     ws.onmessage = (event) => {
+      if (!mountedRef.current) return;
       try {
         const message: BinanceTickerMessage = JSON.parse(event.data);
 
-        if (message.e === "24hrTicker") {
+        // Only process messages for the current symbol (Binance returns uppercase e.g., "ETHUSDT")
+        if (message.e === "24hrTicker" && message.s === binanceSymbol.toUpperCase()) {
           const parsedData = {
             priceChange: parseFloat(message.p),
             priceChangePercent: parseFloat(message.P),
@@ -98,8 +117,9 @@ export function useBinance24hData(symbol: string): Binance24hData {
       }
     };
 
-    ws.onerror = (error) => {
-      console.error("[Binance WS] Error:", error);
+    ws.onerror = (event) => {
+      if (!mountedRef.current) return;
+      console.error("[Binance WS] WebSocket error event:", event);
       setData((prev) => ({
         ...prev,
         isLoading: false,
@@ -107,14 +127,17 @@ export function useBinance24hData(symbol: string): Binance24hData {
       }));
     };
 
-    ws.onclose = () => {
-      console.log(`[Binance WS] Disconnected for ${symbol}`);
+    ws.onclose = (event) => {
+      if (!mountedRef.current) return;
+      console.log(`[Binance WS] Disconnected for ${symbol}, code: ${event.code}, reason: ${event.reason}`);
     };
 
     return () => {
+      mountedRef.current = false;
       if (wsRef.current) {
         wsRef.current.close();
       }
+      wsRef.current = null;
     };
   }, [symbol]);
 

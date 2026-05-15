@@ -599,20 +599,20 @@ export default function CandlestickChart({
     if (!series || !volSeries || !chart || candleData.length === 0) return;
 
     const c = getColors();
-    const key = `${candleData[0]?.time ?? 0}:${candleData.length}`;
+    const lastCandle = candleData[candleData.length - 1];
+    const dataKey = `${candleData[0]?.time ?? 0}:${candleData.length}`;
+    const lastCloseKey = lastCandle?.close ?? 0;
 
-    // Skip if data hasn't changed from what Effect 1 already set
-    if (key === prevDataKeyRef.current) return;
-
-    const firstTime = candleData[0]?.time ?? 0;
+    // Check if this is a new data fetch vs live price update
     const prevParts = prevDataKeyRef.current.split(":");
     const prevFirst = Number(prevParts[0] || 0);
     const prevLen = Number(prevParts[1] || 0);
-    const isNewFetch = prevFirst !== firstTime || Math.abs(candleData.length - prevLen) > 5;
+    const isNewFetch = prevFirst !== (candleData[0]?.time ?? 0) || Math.abs(candleData.length - prevLen) > 5;
 
     const usesOHLC = chartType === "Candlestick" || chartType === "Bar";
 
     if (isNewFetch) {
+      // Full data refresh - use setData
       if (usesOHLC) {
         series.setData(candleData.map((d) => ({
           time: d.time as unknown as string, open: d.open, high: d.high, low: d.low, close: d.close,
@@ -627,23 +627,25 @@ export default function CandlestickChart({
         color: d.close >= d.open ? c.buy + "30" : c.sell + "30",
       })));
       chart.timeScale().fitContent();
+      prevDataKeyRef.current = dataKey;
     } else {
-      const last = candleData[candleData.length - 1];
-      if (last) {
+      // Live price update - only update last candle if close changed
+      const prevLastClose = Number(prevParts[2] || 0);
+      if (lastCandle && lastCloseKey !== prevLastClose) {
         try {
           if (usesOHLC) {
-            series.update({ time: last.time as unknown as string, open: last.open, high: last.high, low: last.low, close: last.close });
+            series.update({ time: lastCandle.time as unknown as string, open: lastCandle.open, high: lastCandle.high, low: lastCandle.low, close: lastCandle.close });
           } else {
-            series.update({ time: last.time as unknown as string, value: last.close });
+            series.update({ time: lastCandle.time as unknown as string, value: lastCandle.close });
           }
           volSeries.update({
-            time: last.time as unknown as string, value: last.volume,
-            color: last.close >= last.open ? c.buy + "30" : c.sell + "30",
+            time: lastCandle.time as unknown as string, value: lastCandle.volume,
+            color: lastCandle.close >= lastCandle.open ? c.buy + "30" : c.sell + "30",
           });
         } catch { /* series not ready */ }
+        prevDataKeyRef.current = `${dataKey}:${lastCloseKey}`;
       }
     }
-    prevDataKeyRef.current = key;
   }, [candleData, getColors, chartType]);
 
   // ── Effect 3 — Current price line ─────────────────────────────────────────

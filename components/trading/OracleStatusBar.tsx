@@ -35,14 +35,14 @@ export default function OracleStatusBar({
           {websocketConnected ? " · 1s" : isOracleStale ? " · Stale" : ""}
         </span>
         {oracleSpread > 0 && (
-          <span className="font-mono text-[9px]" style={{ color: "var(--on-surface-disabled)", opacity: 1 }}>
+          <span className="font-mono text-[9px] hidden" style={{ color: "var(--on-surface-disabled)", opacity: 1 }}>
             spread ${oracleSpread.toLocaleString("en-US", { maximumFractionDigits: 2 })}
           </span>
         )}
       </div>
       <div className="flex items-center gap-1.5">
         {oracleMinPrice !== null && oracleMaxPrice !== null && (
-          <span className="font-mono text-[9px]" style={{ color: "var(--on-surface-disabled)", opacity: 0.6 }}>
+          <span className="font-mono text-[9px] hidden" style={{ color: "var(--on-surface-disabled)", opacity: 0.6 }}>
             {oracleMinPrice.toLocaleString("en-US", { maximumFractionDigits: 2 })}–{oracleMaxPrice.toLocaleString("en-US", { maximumFractionDigits: 2 })}
           </span>
         )}

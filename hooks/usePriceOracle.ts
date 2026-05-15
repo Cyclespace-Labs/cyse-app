@@ -63,6 +63,7 @@ export function usePriceOracle(indexToken: `0x${string}`, maximise = true) {
   const wsRef         = useRef<WebSocket | null>(null);
   const reconnectRef  = useRef(0);
   const mountedRef    = useRef(true);
+  const currentFeedRef = useRef<string | null>(null);
 
   // Resolve which Pyth feed ID this indexToken maps to
   const pythFeedPair = useMemo(() => {
@@ -81,6 +82,12 @@ export function usePriceOracle(indexToken: `0x${string}`, maximise = true) {
   useEffect(() => {
     if (!pythFeedId) return;
     mountedRef.current = true;
+    currentFeedRef.current = pythFeedId;
+
+    // Reset state when feed changes
+    setPythPrice(null);
+    setPythConnected(false);
+    setPythLastUpdate(0);
 
     const connect = () => {
       if (!mountedRef.current) return;
@@ -127,7 +134,8 @@ export function usePriceOracle(indexToken: `0x${string}`, maximise = true) {
         for (const feed of feeds) {
           const id = feed.id.startsWith("0x") ? feed.id : `0x${feed.id}`;
           const pair = feedIdToPair(id);
-          if (pythFeedPair && pair === pythFeedPair) {
+          // Only process messages for the current feed
+          if (currentFeedRef.current === pythFeedId && pythFeedPair && pair === pythFeedPair) {
             const { price, confidence } = parsePythRaw(feed.price);
             const { price: emaPrice } = parsePythRaw(feed.ema_price);
             setPythPrice({
@@ -182,6 +190,7 @@ export function usePriceOracle(indexToken: `0x${string}`, maximise = true) {
     connect();
     return () => {
       mountedRef.current = false;
+      currentFeedRef.current = null;
       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
         try {
           wsRef.current.close();
