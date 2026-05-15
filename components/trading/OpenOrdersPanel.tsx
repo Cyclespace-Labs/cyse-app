@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { X } from "lucide-react";
 import { formatUnits } from "viem";
 
@@ -34,7 +35,13 @@ export default function OpenOrdersPanel({
   onCancelIncreaseOrder,
   onCancelDecreaseOrder,
 }: OpenOrdersPanelProps) {
-  if (!walletConnected || (increaseOrders.length === 0 && decreaseOrders.length === 0)) return null;
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted || !walletConnected || (increaseOrders.length === 0 && decreaseOrders.length === 0)) return null;
 
   return (
     <div className="pt-2" style={{ borderTop: "1px solid rgba(66,70,84,0.4)" }}>

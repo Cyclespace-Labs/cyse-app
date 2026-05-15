@@ -1,3 +1,7 @@
+// in mainet add the real chain IDs in "SUPPORTED_CHAIN_IDS[]"
+//
+
+
 "use client";
 
 import {

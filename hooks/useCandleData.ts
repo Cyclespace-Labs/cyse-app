@@ -90,12 +90,6 @@ export function useCandleData(
     fetchCandles();
   }, [fetchCandles]);
 
-  // Auto-refresh every 60s to pick up new closed candles
-  useEffect(() => {
-    const id = setInterval(fetchCandles, 60_000);
-    return () => clearInterval(id);
-  }, [fetchCandles]);
-
   // ── Live price → update/create the latest candle ──────────────────────────
   useEffect(() => {
     if (!livePrice || livePrice <= 0 || !readyRef.current) return;

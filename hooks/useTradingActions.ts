@@ -123,6 +123,14 @@ export function useTradingActions() {
     query: { enabled: !!address },
   });
 
+  const { data: maxLeverageRaw } = useReadContract({
+    ...contracts.vault,
+    functionName: "maxLeverage",
+    query: { staleTime: 60_000 },
+  });
+
+  const maxLeverage = maxLeverageRaw ? Number(maxLeverageRaw) / 10000 : 50; // Vault stores as 10000 * leverage
+
   const approvePlugin = useCallback(async () => {
     setTxStatus({ state: "pending" });
     try {
@@ -195,15 +203,38 @@ export function useTradingActions() {
     [writeContractAsync]
   );
 
-  // Short positions require stable collateral (USDC). When user selects WETH for a
-  // short, the Router must swap wrapped ETH to USDC via a multi-hop path.
+  // For long positions: collateral must match index token OR be a stablecoin.
+  // For short positions: collateral must be a stablecoin.
+  // When user selects WETH for a position that doesn't match, swap via the path.
   function getShortPathAndCollateral(
     collateralToken: `0x${string}`,
+    indexToken: `0x${string}`,
     isLong: boolean
   ): { path: `0x${string}`[]; collateralToken: `0x${string}` } {
+    const isStable =
+      collateralToken.toLowerCase() === contracts.usdc.address.toLowerCase() ||
+      collateralToken.toLowerCase() === contracts.usdt.address.toLowerCase() ||
+      collateralToken.toLowerCase() === contracts.usdg.address.toLowerCase();
+
     if (isLong) {
+      // For longs: if collateral is not stable and doesn't match index, swap to index token
+      if (!isStable && collateralToken.toLowerCase() !== indexToken.toLowerCase()) {
+        if (collateralToken.toLowerCase() === contracts.weth.address.toLowerCase()) {
+          // WETH collateral with different index token: swap WETH -> indexToken
+          return {
+            path: [contracts.weth.address, indexToken],
+            collateralToken: indexToken,
+          };
+        }
+        // For other non-stable tokens, swap directly to index token
+        return {
+          path: [collateralToken, indexToken],
+          collateralToken: indexToken,
+        };
+      }
       return { path: [collateralToken], collateralToken };
     }
+
     // Shorts require stable collateral
     if (collateralToken.toLowerCase() === contracts.weth.address.toLowerCase()) {
       return {
@@ -229,7 +260,25 @@ export function useTradingActions() {
       try {
         const slippedPrice = applySlippage(acceptablePrice, isLong, slippageBps);
         const isEth = collateralToken.toLowerCase() === contracts.weth.address.toLowerCase();
-        const { path } = getShortPathAndCollateral(collateralToken, isLong);
+        const { path, collateralToken: effectiveCollateral } = getShortPathAndCollateral(
+          collateralToken,
+          indexToken,
+          isLong
+        );
+
+        // Calculate leverage check
+        // Leverage = sizeDelta / (collateralAmount * price / PRICE_PRECISION)
+        // For swaps, we need to estimate the collateral after swap
+        const collateralUsd = (collateralAmount * acceptablePrice) / PRICE_PRECISION;
+        const sizeUsd = (sizeDelta * acceptablePrice) / PRICE_PRECISION;
+        const leverage = collateralUsd > 0 ? sizeUsd / collateralUsd : 0;
+
+        if (leverage > maxLeverage) {
+          const message = `Leverage ${Number(leverage).toFixed(2)}x exceeds vault maximum of ${maxLeverage}x. Reduce position size or increase collateral.`;
+          console.error("[placeMarketOrder] Leverage exceeded:", message);
+          setTxStatus({ state: "failed", error: message });
+          return null;
+        }
 
         // ETH collateral (longs OR shorts where WETH is swapped to USDC).
         // For shorts with WETH we still use increasePositionETH because the
@@ -285,6 +334,7 @@ export function useTradingActions() {
       try {
         const { collateralToken: effectiveCollateral } = getShortPathAndCollateral(
           collateralToken,
+          indexToken,
           isLong
         );
         const slippedPrice = applySlippage(acceptablePrice, !isLong, slippageBps);
@@ -324,6 +374,7 @@ export function useTradingActions() {
       try {
         const { path, collateralToken: effectiveCollateral } = getShortPathAndCollateral(
           collateralToken,
+          indexToken,
           isLong
         );
         // For native ETH collateral the OrderBook needs to wrap the incoming ETH value to WETH.
@@ -418,6 +469,7 @@ export function useTradingActions() {
       try {
         const { collateralToken: effectiveCollateral } = getShortPathAndCollateral(
           collateralToken,
+          indexToken,
           isLong
         );
         console.log("[placeDecreaseOrder] submitting", {

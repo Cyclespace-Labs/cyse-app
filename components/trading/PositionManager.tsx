@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { formatUnits } from "viem";
 import LiquidationGauge from "./LiquidationGauge";
 import type { VaultPositionEntry } from "@/hooks/useAllVaultPositions";
@@ -48,12 +48,17 @@ export default function PositionManager({
   onCancelDecreaseOrder,
   onAddTPSL,
 }: PositionManagerProps) {
+  const [mounted, setMounted] = useState(false);
   const [closePercentage, setClosePercentage] = useState(100);
   const [tpslPositionKey, setTpslPositionKey] = useState<string | null>(null);
   const [tpslTpPrice, setTpslTpPrice] = useState("");
   const [tpslSlPrice, setTpslSlPrice] = useState("");
 
-  if (!walletConnected || positions.length === 0) return null;
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted || !walletConnected || positions.length === 0) return null;
 
   return (
     <div className="pt-2" style={{ borderTop: "1px solid rgba(66,70,84,0.4)" }}>

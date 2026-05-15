@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { AlertTriangle } from "lucide-react";
 import SlippageSelector from "./SlippageSelector";
 
@@ -36,7 +37,13 @@ export default function OrderOptionsPanel({
   tpslErrorMessages,
   validationWarnings,
 }: OrderOptionsPanelProps) {
-  if (!walletConnected) return null;
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted || !walletConnected) return null;
 
   return (
     <>
