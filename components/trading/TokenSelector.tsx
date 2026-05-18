@@ -11,7 +11,7 @@ const TOKEN_CONFIG = {
   BTC: { address: contracts.btc.address, decimals: 8, symbol: "BTC", name: "Bitcoin" },
 };
 
-const COLLATERAL_TOKENS = ["WETH", "USDC", "USDT"];
+const COLLATERAL_TOKENS = ["WETH", "USDC", "USDT", "BTC"];
 const INDEX_TOKENS = ["WETH", "BTC"];
 
 const TOKEN_ICONS: Record<string, string> = {
@@ -21,7 +21,7 @@ const TOKEN_ICONS: Record<string, string> = {
   BTC: "/tokens/Bitcoin.svg",
 };
 
-type CollateralTokenKey = "WETH" | "USDC" | "USDT";
+type CollateralTokenKey = "WETH" | "USDC" | "USDT" | "BTC";
 type IndexTokenKey = "WETH" | "BTC";
 
 interface TokenSelectorProps {

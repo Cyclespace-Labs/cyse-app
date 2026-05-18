@@ -205,6 +205,7 @@ export const COLLATERAL_TOKENS: Record<string, `0x${string}`> = {
   USDG: requiredAddress("USDG"),
   USDC: requiredAddress("USDC"),
   USDT: requiredAddress("USDT"),
+  BTC:  requiredAddress("BTC"),
 };
 
 /** Generic ERC-20 ABI for any token approval / balance reads */

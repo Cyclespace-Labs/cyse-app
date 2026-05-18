@@ -16,14 +16,10 @@ const COMBOS = [
   { collateral: contracts.weth.address, index: contracts.weth.address, symbol: "ETH", isLong: true },
   { collateral: contracts.usdc.address, index: contracts.weth.address, symbol: "ETH", isLong: true },
   { collateral: contracts.usdt.address, index: contracts.weth.address, symbol: "ETH", isLong: true },
-  { collateral: contracts.usdc.address, index: contracts.weth.address, symbol: "ETH", isLong: false },
-  { collateral: contracts.usdt.address, index: contracts.weth.address, symbol: "ETH", isLong: false },
   { collateral: contracts.btc.address,  index: contracts.btc.address,  symbol: "BTC", isLong: true },
   { collateral: contracts.weth.address, index: contracts.btc.address,  symbol: "BTC", isLong: true },
   { collateral: contracts.usdc.address, index: contracts.btc.address,  symbol: "BTC", isLong: true },
   { collateral: contracts.usdt.address, index: contracts.btc.address,  symbol: "BTC", isLong: true },
-  { collateral: contracts.usdc.address, index: contracts.btc.address,  symbol: "BTC", isLong: false },
-  { collateral: contracts.usdt.address, index: contracts.btc.address,  symbol: "BTC", isLong: false },
 ];
 
 export function useAllPositions() {

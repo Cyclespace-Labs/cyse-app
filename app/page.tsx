@@ -81,7 +81,7 @@ export default function Home() {
   const { wallet } = useWallet();
   const { positions, refetch: refetchPositions } = useAllPositions();
   const { increaseOrders, decreaseOrders, refetch: refetchOrders } = useOpenOrders();
-  const { closeMarketPosition, cancelDecreaseOrder } = useTradingActions();
+  const { closeMarketPosition, cancelDecreaseOrder, cancelIncreaseOrder } = useTradingActions();
 
   // History hooks for BottomTabs
   const { orderHistory, isLoading: isLoadingOrderHistory, refresh: refreshOrderHistory } = useOrderHistory();
@@ -95,6 +95,16 @@ export default function Home() {
     refreshFillHistory();
     refreshFundingHistory();
   }, [refreshOrderHistory, refreshPositionHistory, refreshFillHistory, refreshFundingHistory]);
+
+  const handleCancelOrder = useCallback((orderId: string) => {
+    if (orderId.startsWith("dec-")) {
+      const idx = parseInt(orderId.slice(4), 10);
+      if (!isNaN(idx)) cancelDecreaseOrder(idx);
+    } else if (orderId.startsWith("inc-")) {
+      const idx = parseInt(orderId.slice(4), 10);
+      if (!isNaN(idx)) cancelIncreaseOrder(idx);
+    }
+  }, [cancelDecreaseOrder, cancelIncreaseOrder]);
 
   const handleTradeConfirmed = useCallback(() => {
     refetchPositions();
@@ -237,7 +247,7 @@ export default function Home() {
             isLoadingPositionHistory={isLoadingPositionHistory}
             isLoadingFillHistory={isLoadingFillHistory}
             isLoadingFundingHistory={isLoadingFundingHistory}
-            onCancelOrder={() => {}}
+            onCancelOrder={handleCancelOrder}
             onClosePosition={handleClosePosition}
             onRefreshHistory={handleRefreshHistory}
           />

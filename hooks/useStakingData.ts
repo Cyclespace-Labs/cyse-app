@@ -108,7 +108,7 @@ const fmt = (v: bigint | undefined, d = 18) =>
 export function useStakingData(): StakingData {
   const { address } = useAccount();
   const { data: extendedCyseTrackerAddress, isLoading: isExtendedTrackerLoading } = useReadContract({
-    ...contracts.rewardRouterV2,
+    ...contracts.rewardRouter,
     functionName: "extendedCyseTracker",
     query: { staleTime: 30_000 },
   });

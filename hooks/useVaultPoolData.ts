@@ -24,7 +24,7 @@ export interface VaultTokenPool {
 
 const TOKEN_META: Record<string, { symbol: string; decimals: number; color: string }> = {
   [contracts.weth.address.toLowerCase()]: { symbol: "ETH", decimals: 18, color: "#627eea" },
-  [contracts.btc.address.toLowerCase()]:  { symbol: "BTC", decimals: 18, color: "#f7931a" },
+  [contracts.btc.address.toLowerCase()]:  { symbol: "BTC", decimals: 8, color: "#f7931a" },
   [contracts.usdc.address.toLowerCase()]: { symbol: "USDC", decimals: 18, color: "#2775ca" },
   [contracts.usdt.address.toLowerCase()]: { symbol: "USDT", decimals: 18, color: "#26a17b" },
 };

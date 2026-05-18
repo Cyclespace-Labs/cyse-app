@@ -174,8 +174,14 @@ export default function BottomTabs({
                   <td className="px-3 py-1.5" style={{ color: order.side === "buy" ? "var(--buy)" : "var(--sell)" }}>
                     {order.side.toUpperCase()}
                   </td>
-                  <td className="px-3 py-1.5" style={{ color: "var(--on-surface-muted)" }}>{order.type}</td>
-                  <td className="px-3 py-1.5 text-right" style={{ color: "var(--on-surface)" }}>{order.price}</td>
+                  <td className="px-3 py-1.5" style={{ color: "var(--on-surface-muted)" }}>
+                    {order.type === "conditional" ? (order.tp ? "TP" : "SL") : order.type}
+                  </td>
+                  <td className="px-3 py-1.5 text-right" style={{ color: "var(--on-surface)" }}>
+                    {order.type === "conditional"
+                      ? (order.tp ?? order.sl ?? order.price).toLocaleString()
+                      : order.price}
+                  </td>
                   <td className="px-3 py-1.5 text-right" style={{ color: "var(--on-surface)" }}>{order.quantity}</td>
                   <td className="px-3 py-1.5 text-right">
                     <button

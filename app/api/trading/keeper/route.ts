@@ -18,9 +18,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { createWalletClient, http, isAddress } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { chain, publicClient, addr } from "@/lib/protocol/client";
-import { positionManagerAbi } from "@/lib/protocol/abis/positionManager.abi";
+import { orderBookAbi } from "@/lib/protocol/abis/orderBook.abi";
 
-const POSITION_MANAGER = addr["PositionManager"] as `0x${string}`;
+const ORDER_BOOK = addr["OrderBook"] as `0x${string}`;
 
 export async function POST(req: NextRequest) {
   const KEEPER_KEY = process.env.KEEPER_PRIVATE_KEY;
@@ -68,14 +68,14 @@ export async function POST(req: NextRequest) {
     const execArgs = [account as `0x${string}`, BigInt(orderIndex), keeperAccount.address] as const;
 
     console.log(
-      `[Keeper] execute${orderType === "decrease" ? "Decrease" : "Increase"}Order — account=${account} index=${orderIndex} keeper=${keeperAccount.address}`
+      `[Keeper] execute${orderType === "decrease" ? "Decrease" : "Increase"}Order (OrderBook) — account=${account} index=${orderIndex} keeper=${keeperAccount.address}`
     );
 
     let hash: `0x${string}`;
     if (orderType === "decrease") {
       const { request } = await publicClient.simulateContract({
-        address: POSITION_MANAGER,
-        abi: positionManagerAbi,
+        address: ORDER_BOOK,
+        abi: orderBookAbi,
         functionName: "executeDecreaseOrder",
         args: execArgs,
         account: keeperAccount,
@@ -83,8 +83,8 @@ export async function POST(req: NextRequest) {
       hash = await walletClient.writeContract(request);
     } else {
       const { request } = await publicClient.simulateContract({
-        address: POSITION_MANAGER,
-        abi: positionManagerAbi,
+        address: ORDER_BOOK,
+        abi: orderBookAbi,
         functionName: "executeIncreaseOrder",
         args: execArgs,
         account: keeperAccount,

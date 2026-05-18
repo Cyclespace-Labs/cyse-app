@@ -38,7 +38,7 @@ const TOKEN_CONFIG = {
   BTC: { address: contracts.btc.address, decimals: 8, symbol: "BTC", name: "Bitcoin" },
 };
 
-type CollateralTokenKey = "WETH" | "USDC" | "USDT";
+type CollateralTokenKey = "WETH" | "USDC" | "USDT" | "BTC";
 type IndexTokenKey = "WETH" | "BTC";
 
 interface TradingPanelProps {
@@ -182,12 +182,15 @@ export default function TradingPanel({
 
   const { increaseOrders, decreaseOrders, refetch: refetchOrders } = useOpenOrders(activeIndexToken);
 
+  const keeperMode = process.env.NEXT_PUBLIC_KEEPER_MODE ?? "external";
+  const isClientKeeper = keeperMode === "client";
+
   useOrderKeeper({
     decreaseOrders,
     increaseOrders,
     minPrice: oracleMinPrice,
     maxPrice: oracleMaxPrice,
-    enabled: wallet.connected && isOracleValid,
+    enabled: wallet.connected && isOracleValid && isClientKeeper,
   });
 
   // Short positions require stable collateral (USDC)

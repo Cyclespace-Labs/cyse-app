@@ -54,9 +54,6 @@ const POSITION_COMBOS: Array<{
   { collateralToken: contracts.weth.address, collateralKey: "WETH", indexToken: contracts.btc.address,  indexKey: "BTC",  isLong: true },
   { collateralToken: contracts.usdc.address, collateralKey: "USDC", indexToken: contracts.btc.address,  indexKey: "BTC",  isLong: true },
   { collateralToken: contracts.usdt.address, collateralKey: "USDT", indexToken: contracts.btc.address,  indexKey: "BTC",  isLong: true },
-  // BTC index — shorts (stable collateral only)
-  { collateralToken: contracts.usdc.address, collateralKey: "USDC", indexToken: contracts.btc.address,  indexKey: "BTC",  isLong: false },
-  { collateralToken: contracts.usdt.address, collateralKey: "USDT", indexToken: contracts.btc.address,  indexKey: "BTC",  isLong: false },
 ];
 
 export function useAllVaultPositions(filterIndexToken?: `0x${string}`) {

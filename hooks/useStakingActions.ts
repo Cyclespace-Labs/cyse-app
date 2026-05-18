@@ -119,7 +119,7 @@ export function useStakingActions() {
         });
 
         return executeWrite({
-          ...contracts.rewardRouterV2,
+          ...contracts.rewardRouter,
           functionName: "stakeCyse",
           args: [value],
         });
@@ -133,7 +133,7 @@ export function useStakingActions() {
     async (amount: string) => {
       const value = parseUnits(amount, 18);
       return runAction("unstakeCyse", () => executeWrite({
-        ...contracts.rewardRouterV2,
+        ...contracts.rewardRouter,
         functionName: "unstakeCyse",
         args: [value],
       }));
@@ -153,7 +153,7 @@ export function useStakingActions() {
         });
 
         return executeWrite({
-          ...contracts.rewardRouterV2,
+          ...contracts.rewardRouter,
           functionName: "stakeEsCyse",
           args: [value],
         });
@@ -167,7 +167,7 @@ export function useStakingActions() {
     async (amount: string) => {
       const value = parseUnits(amount, 18);
       return runAction("unstakeEsCyse", () => executeWrite({
-        ...contracts.rewardRouterV2,
+        ...contracts.rewardRouter,
         functionName: "unstakeEsCyse",
         args: [value],
       }));
@@ -181,7 +181,7 @@ export function useStakingActions() {
       await ensureCompoundApprovals();
 
       return executeWrite({
-        ...contracts.rewardRouterV2,
+        ...contracts.rewardRouter,
         functionName: "compound",
       });
     });
@@ -190,7 +190,7 @@ export function useStakingActions() {
   // ── Claim reward streams to wallet (CYSE + esCYSE + ETH) ──────
   const claimRewards = useCallback(async () => {
     return runAction("claimRewards", () => executeWrite({
-      ...contracts.rewardRouterV2,
+      ...contracts.rewardRouter,
       functionName: "handleRewardsV2",
       args: [
         address!,
@@ -207,14 +207,14 @@ export function useStakingActions() {
 
   const claimFees = useCallback(async () => {
     return runAction("claimFees", () => executeWrite({
-      ...contracts.rewardRouterV2,
+      ...contracts.rewardRouter,
       functionName: "claimFees",
     }));
   }, [executeWrite, runAction]);
 
   const claimEsCyse = useCallback(async () => {
     return runAction("claimEsCyse", () => executeWrite({
-      ...contracts.rewardRouterV2,
+      ...contracts.rewardRouter,
       functionName: "claimEsCyse",
     }));
   }, [executeWrite, runAction]);
@@ -225,7 +225,7 @@ export function useStakingActions() {
       await ensureCompoundApprovals();
 
       return executeWrite({
-        ...contracts.rewardRouterV2,
+        ...contracts.rewardRouter,
         functionName: "handleRewardsV2",
         args: [
           address!,
@@ -334,7 +334,7 @@ export function useStakingActions() {
     async (ethAmount: string, options?: LiquidityOptions) => {
       const value = parseUnits(ethAmount, 18);
       return runAction("addLiquidityETH", () => executeWrite({
-        ...contracts.rewardRouterV2,
+        ...contracts.rewardRouter,
         functionName: "mintAndStakeCylpETH",
         args: [options?.minUsdg ?? 0n, options?.minCylp ?? 0n],
         value,
@@ -355,7 +355,7 @@ export function useStakingActions() {
         });
 
         return executeWrite({
-          ...contracts.rewardRouterV2,
+          ...contracts.rewardRouter,
           functionName: "mintAndStakeCylp",
           args: [tokenAddress, value, options?.minUsdg ?? 0n, options?.minCylp ?? 0n],
         });
@@ -369,7 +369,7 @@ export function useStakingActions() {
     async (cylpAmount: string, options?: LiquidityOptions) => {
       const value = parseUnits(cylpAmount, 18);
       return runAction("removeLiquidityETH", () => executeWrite({
-        ...contracts.rewardRouterV2,
+        ...contracts.rewardRouter,
         functionName: "unstakeAndRedeemCylpETH",
         args: [value, options?.minOut ?? 0n, address!],
       }));
@@ -382,7 +382,7 @@ export function useStakingActions() {
     async (tokenOut: `0x${string}`, cylpAmount: string, options?: LiquidityOptions) => {
       const value = parseUnits(cylpAmount, 18);
       return runAction("removeLiquidityToken", () => executeWrite({
-        ...contracts.rewardRouterV2,
+        ...contracts.rewardRouter,
         functionName: "unstakeAndRedeemCylp",
         args: [tokenOut, value, options?.minOut ?? 0n, address!],
       }));
@@ -392,7 +392,7 @@ export function useStakingActions() {
 
   const signalTransfer = useCallback(async (receiver: Address) => {
     return runAction("signalTransfer", () => executeWrite({
-      ...contracts.rewardRouterV2,
+      ...contracts.rewardRouter,
       functionName: "signalTransfer",
       args: [receiver],
     }));
@@ -400,7 +400,7 @@ export function useStakingActions() {
 
   const acceptTransfer = useCallback(async (sender: Address) => {
     return runAction("acceptTransfer", () => executeWrite({
-      ...contracts.rewardRouterV2,
+      ...contracts.rewardRouter,
       functionName: "acceptTransfer",
       args: [sender],
     }));
