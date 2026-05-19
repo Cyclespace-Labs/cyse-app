@@ -133,7 +133,7 @@ export default function OrderFormInputs({
           id="leverage-slider"
           type="range"
           min={1}
-          max={100}
+          max={50}
           value={leverage}
           onChange={(e) => onLeverageChange(Number(e.target.value))}
           className="w-full h-1 rounded-full appearance-none cursor-pointer"
