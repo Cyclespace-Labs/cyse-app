@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { Loader2, X } from "lucide-react";
 
 interface OrderSubmitButtonProps {
@@ -41,7 +42,13 @@ export default function OrderSubmitButton({
   onSubmit,
   onResetTxStatus,
 }: OrderSubmitButtonProps) {
-  if (!walletConnected) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+
+  // Always render the connect-button shell until mounted to avoid SSR/client mismatch.
+  // walletConnected is false on the server (wagmi is client-only) but true on the client
+  // once a wallet is connected — rendering different elements causes hydration failure.
+  if (!mounted || !walletConnected) {
     return (
       <div className="space-y-2 pt-1">
         {customConnectButton}

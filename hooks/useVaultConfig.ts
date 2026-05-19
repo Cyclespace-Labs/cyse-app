@@ -6,6 +6,7 @@ import { contracts } from "@/lib/protocol/contracts";
 export interface VaultConfigResult {
   maxLeverage: number;
   liquidationFeeUsd: number;
+  marginFeeBasisPoints: number;
   isLoading: boolean;
 }
 
@@ -27,6 +28,12 @@ export function useVaultConfig(): VaultConfigResult {
     query: { staleTime: 60_000 },
   });
 
+  const { data: marginFeeRaw, isLoading: marginFeeLoading } = useReadContract({
+    ...contracts.vault,
+    functionName: "marginFeeBasisPoints",
+    query: { staleTime: 60_000 },
+  });
+
   // Vault maxLeverage is stored as basis points (e.g., 500000 = 50x)
   // Convert to decimal: maxLeverage / 10000
   const maxLeverage = maxLeverageRaw ? Number(maxLeverageRaw) / 10000 : 50;
@@ -35,9 +42,13 @@ export function useVaultConfig(): VaultConfigResult {
   // Convert to decimal: liquidationFeeUsd / 10^30
   const liquidationFeeUsd = liquidationFeeRaw ? Number(liquidationFeeRaw) / 1e30 : 5;
 
+  // marginFeeBasisPoints: raw value (e.g. 10 = 0.1%)
+  const marginFeeBasisPoints = marginFeeRaw ? Number(marginFeeRaw) : 10;
+
   return {
     maxLeverage,
     liquidationFeeUsd,
-    isLoading: maxLeverageLoading || liquidationFeeLoading,
+    marginFeeBasisPoints,
+    isLoading: maxLeverageLoading || liquidationFeeLoading || marginFeeLoading,
   };
 }

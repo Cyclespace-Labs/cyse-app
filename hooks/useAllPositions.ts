@@ -6,6 +6,8 @@ import { Position } from "@/types/trading";
 import { useMemo } from "react";
 import { formatUnits } from "viem";
 import type { Abi } from "viem";
+import { computeLiquidationPrice } from "@/lib/positionMath";
+import { useVaultConfig } from "./useVaultConfig";
 
 function fmt30(raw: bigint): number {
   return parseFloat(formatUnits(raw, 30));
@@ -24,6 +26,7 @@ const COMBOS = [
 
 export function useAllPositions() {
   const { address } = useAccount();
+  const { maxLeverage, liquidationFeeUsd, marginFeeBasisPoints } = useVaultConfig();
 
   // ── Batch 1: getPosition for every combo ─────────────────────────────────
   const positionCalls = useMemo(
@@ -89,8 +92,6 @@ export function useAllPositions() {
         const sizeUsd = fmt30(size);
         const collateralUsd = fmt30(collateral);
         const avgPrice = fmt30(averagePrice);
-        const leverage = collateralUsd > 0 ? sizeUsd / collateralUsd : 1;
-        const liqDist = leverage > 0 ? avgPrice / leverage : 0;
 
         let pnl = 0;
         let pnlPct = 0;
@@ -106,8 +107,16 @@ export function useAllPositions() {
           side: combo.isLong ? "long" : "short",
           entryPrice: avgPrice,
           quantity: sizeUsd,
-          leverage: parseFloat(leverage.toFixed(2)),
-          liquidationPrice: combo.isLong ? avgPrice - liqDist : avgPrice + liqDist,
+          leverage: parseFloat((collateralUsd > 0 ? sizeUsd / collateralUsd : 0).toFixed(2)),
+          liquidationPrice: computeLiquidationPrice({
+            sizeUsd,
+            collateralUsd,
+            avgPrice,
+            isLong: combo.isLong,
+            maxLeverage,
+            liquidationFeeUsd,
+            marginFeeBps: marginFeeBasisPoints,
+          }),
           unrealizedPnl: pnl,
           unrealizedPnlPct: pnlPct,
           margin: collateralUsd,
@@ -115,7 +124,7 @@ export function useAllPositions() {
         } as Position;
       })
       .filter(Boolean) as Position[];
-  }, [posData, deltaData, nonZeroIndices]);
+  }, [posData, deltaData, nonZeroIndices, maxLeverage, liquidationFeeUsd, marginFeeBasisPoints]);
 
   return { positions, isLoading, refetch };
 }

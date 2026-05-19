@@ -64,14 +64,17 @@ export default function PositionManager({
     <div className="pt-2" style={{ borderTop: "1px solid rgba(66,70,84,0.4)" }}>
       <span className="text-[11px] mb-2 block" style={{ color: "var(--on-surface-disabled)" }}>Active Positions</span>
       {positions.map((pos) => {
+        // Contract-accurate PnL: Vault.getDelta → delta = size * priceDelta / avgPrice
         const priceDelta = pos.isLong
           ? currentPrice - pos.avgPriceFormatted
           : pos.avgPriceFormatted - currentPrice;
         const livePnl = pos.avgPriceFormatted > 0
-          ? pos.sizeUsd * (priceDelta / pos.avgPriceFormatted)
+          ? (pos.sizeUsd * priceDelta) / pos.avgPriceFormatted
           : 0;
+        // PnL% = return on margin (collateral), same as GMX convention
         const livePnlPct = pos.collateralUsd > 0 ? (livePnl / pos.collateralUsd) * 100 : 0;
         const pnlColor = livePnl >= 0 ? "var(--buy)" : "var(--sell)";
+        const leverage = pos.collateralUsd > 0 ? pos.sizeUsd / pos.collateralUsd : 0;
 
         // Match attached TP/SL decrease orders to this exact position
         const attachedOrders = decreaseOrders.filter((o) =>
@@ -85,12 +88,44 @@ export default function PositionManager({
           <div key={pos.id} className="rounded p-2.5 mb-2" style={{ background: "var(--surface-container-low)" }}>
             <div className="flex items-center justify-between mb-1.5">
               <span className="text-[11px] font-mono font-medium" style={{ color: pos.isLong ? "var(--buy)" : "var(--sell)" }}>
-                {pos.isLong ? "LONG" : "SHORT"} {symbol}
+                {pos.isLong ? "LONG" : "SHORT"} {symbol} {leverage.toFixed(1)}×
               </span>
               <span className="text-[10px]" style={{ color: "var(--on-surface-disabled)" }}>
                 ${pos.sizeUsd.toFixed(2)}
               </span>
             </div>
+            {/* Collateral / Margin indicator */}
+            {(() => {
+              const marginRatioPct = pos.sizeUsd > 0 ? (pos.collateralUsd / pos.sizeUsd) * 100 : 0;
+              const barFillPct = Math.min(100, marginRatioPct * 2); // 50% margin ratio fills bar fully
+              const barColor =
+                leverage > 25 ? "var(--sell)" :
+                leverage > 15 ? "#f59e0b" :
+                leverage > 8  ? "#3b82f6" :
+                "var(--buy)";
+              return (
+                <div className="mb-2 rounded p-1.5" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[10px]" style={{ color: "var(--on-surface-disabled)" }}>Margin (Collateral)</span>
+                    <span className="text-[10px] font-mono font-semibold" style={{ color: barColor }}>
+                      ${pos.collateralUsd.toFixed(2)}
+                      <span className="ml-1 font-normal opacity-60">({marginRatioPct.toFixed(1)}%)</span>
+                    </span>
+                  </div>
+                  <div className="relative w-full h-1 rounded-full overflow-hidden" style={{ background: "var(--outline-variant)" }}>
+                    <div
+                      className="absolute inset-y-0 left-0 rounded-full transition-all"
+                      style={{ width: `${barFillPct}%`, background: barColor }}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between mt-0.5">
+                    <span className="text-[9px]" style={{ color: "var(--on-surface-disabled)" }}>high risk</span>
+                    <span className="text-[9px]" style={{ color: "var(--on-surface-disabled)" }}>low risk</span>
+                  </div>
+                </div>
+              );
+            })()}
+
             <div className="flex items-center justify-between text-[10px] mb-1">
               <span style={{ color: "var(--on-surface-disabled)" }}>Entry</span>
               <span className="font-mono" style={{ color: "var(--on-surface)" }}>{pos.avgPriceFormatted.toFixed(4)}</span>
@@ -102,7 +137,7 @@ export default function PositionManager({
             <div className="flex items-center justify-between text-[10px] mb-1">
               <span style={{ color: "var(--on-surface-disabled)" }}>Unrealized PnL</span>
               <span className="font-mono" style={{ color: pnlColor }}>
-                {livePnl >= 0 ? "+" : ""}${livePnl.toFixed(2)} ({livePnlPct.toFixed(2)}%)
+                {livePnl >= 0 ? "+" : ""}${livePnl.toFixed(2)} ({livePnlPct.toFixed(2)}% of margin)
               </span>
             </div>
             {(attachedTp || attachedSl) && (

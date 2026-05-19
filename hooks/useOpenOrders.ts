@@ -7,7 +7,10 @@ import { OnChainIncreaseOrder, OnChainDecreaseOrder, OnChainOrder } from "@/type
 import { useMemo } from "react";
 import type { Abi } from "viem";
 
-const MAX_ORDERS = 20;
+// Fetch the most recent MAX_ORDERS slots from the end of each index.
+// ordersIndex = next available slot = total ever created, so active orders
+// are most likely near the end. Fetching from (total - MAX_ORDERS) covers them.
+const MAX_ORDERS = 50;
 
 export function useOpenOrders(indexToken?: `0x${string}`) {
   const { address } = useAccount();
@@ -26,8 +29,12 @@ export function useOpenOrders(indexToken?: `0x${string}`) {
     query: { enabled: !!address, refetchInterval: 2_000, staleTime: 500 },
   });
 
-  const increaseCount = Math.min(Number(increaseIndexRaw ?? 0n), MAX_ORDERS);
-  const decreaseCount = Math.min(Number(decreaseIndexRaw ?? 0n), MAX_ORDERS);
+  const rawIncreaseTotal = Number(increaseIndexRaw ?? 0n);
+  const rawDecreaseTotal = Number(decreaseIndexRaw ?? 0n);
+  const startIncreaseIdx = Math.max(0, rawIncreaseTotal - MAX_ORDERS);
+  const startDecreaseIdx = Math.max(0, rawDecreaseTotal - MAX_ORDERS);
+  const increaseCount = rawIncreaseTotal - startIncreaseIdx;
+  const decreaseCount = rawDecreaseTotal - startDecreaseIdx;
 
   const increaseContracts = useMemo(
     () =>
@@ -36,10 +43,10 @@ export function useOpenOrders(indexToken?: `0x${string}`) {
             address: contracts.orderBook.address,
             abi: contracts.orderBook.abi as Abi,
             functionName: "getIncreaseOrder" as const,
-            args: [address, BigInt(i)] as [`0x${string}`, bigint],
+            args: [address, BigInt(startIncreaseIdx + i)] as [`0x${string}`, bigint],
           }))
         : [],
-    [address, increaseCount]
+    [address, increaseCount, startIncreaseIdx]
   );
 
   const decreaseContracts = useMemo(
@@ -49,10 +56,10 @@ export function useOpenOrders(indexToken?: `0x${string}`) {
             address: contracts.orderBook.address,
             abi: contracts.orderBook.abi as Abi,
             functionName: "getDecreaseOrder" as const,
-            args: [address, BigInt(i)] as [`0x${string}`, bigint],
+            args: [address, BigInt(startDecreaseIdx + i)] as [`0x${string}`, bigint],
           }))
         : [],
-    [address, decreaseCount]
+    [address, decreaseCount, startDecreaseIdx]
   );
 
   const { data: increaseData, refetch: refetchIncreaseData } = useReadContracts({
@@ -72,7 +79,7 @@ export function useOpenOrders(indexToken?: `0x${string}`) {
         if (result.status !== "success" || !result.result) return null;
         const raw = result.result as readonly unknown[];
         const order: OnChainIncreaseOrder = {
-          index: i,
+          index: startIncreaseIdx + i,
           type: "increase",
           purchaseToken: raw[0] as `0x${string}`,
           purchaseTokenAmount: raw[1] as bigint,
@@ -100,7 +107,7 @@ export function useOpenOrders(indexToken?: `0x${string}`) {
         if (result.status !== "success" || !result.result) return null;
         const raw = result.result as readonly unknown[];
         const order: OnChainDecreaseOrder = {
-          index: i,
+          index: startDecreaseIdx + i,
           type: "decrease",
           collateralToken: raw[0] as `0x${string}`,
           collateralDelta: raw[1] as bigint,

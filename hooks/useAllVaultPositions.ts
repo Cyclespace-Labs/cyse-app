@@ -6,6 +6,8 @@ import { contracts } from "@/lib/protocol/contracts";
 import { formatUnits } from "viem";
 import { useMemo } from "react";
 import type { Abi } from "viem";
+import { computeLiquidationPrice } from "@/lib/positionMath";
+import { useVaultConfig } from "./useVaultConfig";
 
 function formatAmount30(raw: bigint): number {
   return parseFloat(formatUnits(raw, 30));
@@ -58,6 +60,7 @@ const POSITION_COMBOS: Array<{
 
 export function useAllVaultPositions(filterIndexToken?: `0x${string}`) {
   const { address } = useAccount();
+  const { maxLeverage, liquidationFeeUsd, marginFeeBasisPoints } = useVaultConfig();
 
   const combos = useMemo(
     () =>
@@ -104,8 +107,6 @@ export function useAllVaultPositions(filterIndexToken?: `0x${string}`) {
         const avgPriceFormatted = formatAmount30(averagePrice);
         const sizeUsd = formatAmount30(size);
         const collateralUsd = formatAmount30(collateral);
-        const leverage = collateralUsd > 0 ? sizeUsd / collateralUsd : 1;
-        const liqDist = leverage > 0 ? avgPriceFormatted / leverage : 0;
         return {
           id: `${combo.collateralKey}-${combo.indexKey}-${combo.isLong ? "long" : "short"}`,
           collateralToken: combo.collateralToken,
@@ -124,13 +125,19 @@ export function useAllVaultPositions(filterIndexToken?: `0x${string}`) {
           sizeUsd,
           collateralUsd,
           avgPriceFormatted,
-          liquidationPrice: combo.isLong
-            ? avgPriceFormatted - liqDist
-            : avgPriceFormatted + liqDist,
+          liquidationPrice: computeLiquidationPrice({
+            sizeUsd,
+            collateralUsd,
+            avgPrice: avgPriceFormatted,
+            isLong: combo.isLong,
+            maxLeverage,
+            liquidationFeeUsd,
+            marginFeeBps: marginFeeBasisPoints,
+          }),
         };
       })
       .filter(Boolean) as VaultPositionEntry[];
-  }, [positionData, combos]);
+  }, [positionData, combos, maxLeverage, liquidationFeeUsd, marginFeeBasisPoints]);
 
   return { positions, isLoading, refetch };
 }

@@ -11,6 +11,8 @@ import {
   ReactNode,
   useMemo,
   useState,
+  useRef,
+  useEffect,
 } from "react";
 import {
   useAccount,
@@ -103,6 +105,10 @@ function getSecurityLevel(walletType: WalletType): SecurityLevel {
 
 export function WalletProvider({ children }: { children: ReactNode }) {
   const { address, isConnected, connector } = useAccount();
+  // Stable mount timestamp — only set on the client, never on the server.
+  // Avoids SSR/client Date.now() mismatch in security context values.
+  const mountedAt = useRef<number>(0);
+  useEffect(() => { mountedAt.current = Date.now(); }, []);
   const chainId = useChainId();
   const chains = useChains();
   const { disconnect: wagmiDisconnect } = useDisconnect();
@@ -210,8 +216,8 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   };
 
   const security: SecurityState = {
-    sessionExpiry: isConnected ? Date.now() + 30 * 60 * 1000 : null,
-    lastActivity: Date.now(),
+    sessionExpiry: isConnected ? mountedAt.current + 30 * 60 * 1000 : null,
+    lastActivity: mountedAt.current,
     isIdleWarning,
     idleTimeRemaining,
   };

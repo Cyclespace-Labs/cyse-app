@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { VaultPosition } from "@/types/protocol";
 import { calculatePositionHealth, PositionValidationInput } from "@/lib/validation/trading";
+import { useVaultConfig } from "./useVaultConfig";
 
 interface PositionWithSide extends VaultPosition {
   isLong: boolean;
@@ -17,6 +18,8 @@ interface UsePositionHealthParams {
 }
 
 export function usePositionHealth({ position, currentPrice }: UsePositionHealthParams) {
+  const { maxLeverage, liquidationFeeUsd, marginFeeBasisPoints } = useVaultConfig();
+
   const health = useMemo(() => {
     if (!position) {
       return {
@@ -36,10 +39,13 @@ export function usePositionHealth({ position, currentPrice }: UsePositionHealthP
       averagePrice: position.avgPriceFormatted,
       isLong: position.isLong,
       currentPrice,
+      maxLeverage,
+      liquidationFee: liquidationFeeUsd,
+      marginFeeBps: marginFeeBasisPoints,
     };
 
     return calculatePositionHealth(input);
-  }, [position, currentPrice]);
+  }, [position, currentPrice, maxLeverage, liquidationFeeUsd, marginFeeBasisPoints]);
 
   // Additional derived metrics
   const metrics = useMemo(() => {

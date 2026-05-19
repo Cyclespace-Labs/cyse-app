@@ -1,7 +1,6 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
-import { getTickSize } from "@/lib/tradingData";
+import { useState, useEffect } from "react";
 
 const pctButtons = [25, 50, 75, 100];
 
@@ -9,16 +8,16 @@ interface OrderFormInputsProps {
   isMarket: boolean;
   price: string;
   onPriceChange: (value: string) => void;
-  quantity: string;
-  onQuantityChange: (value: string) => void;
+  collateralInput: string;        // collateral/margin amount in USD
+  onCollateralChange: (value: string) => void;
   leverage: number;
   onLeverageChange: (value: number) => void;
   currentPrice: number;
+  indexPrice: number;             // effective entry price (oracle for market, limit price for limit)
   symbol: string;
   walletConnected: boolean;
   onPctQuantity: (pct: number) => void;
-  orderValue: number;
-  marginRequired: number;
+  orderValue: number;             // derived position size in USD (collateral × leverage)
   insufficientBalance: boolean;
   estLiquidation: number | null;
   side: "buy" | "sell";
@@ -29,27 +28,32 @@ export default function OrderFormInputs({
   isMarket,
   price,
   onPriceChange,
-  quantity,
-  onQuantityChange,
+  collateralInput,
+  onCollateralChange,
   leverage,
   onLeverageChange,
   currentPrice,
+  indexPrice,
   symbol,
   walletConnected,
   onPctQuantity,
   orderValue,
-  marginRequired,
   insufficientBalance,
   estLiquidation,
   side,
   priceImpact,
 }: OrderFormInputsProps) {
-  const priceNum = parseFloat(price) || 0;
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // Derived: token quantity = collateral × leverage / indexPrice
+  const collateralNum = parseFloat(collateralInput) || 0;
+  const tokenQty = collateralNum > 0 && indexPrice > 0
+    ? (collateralNum * leverage) / indexPrice
+    : 0;
 
   return (
     <>
@@ -80,20 +84,29 @@ export default function OrderFormInputs({
         </div>
       )}
 
-      {/* Quantity Input */}
+      {/* Collateral Input — user enters margin in USD */}
       <div>
-        <label htmlFor="qty-input" className="text-[11px] mb-1 block" style={{ color: "var(--on-surface-disabled)" }}>Quantity</label>
+        <div className="flex items-center justify-between mb-1">
+          <label htmlFor="collateral-input" className="text-[11px]" style={{ color: "var(--on-surface-disabled)" }}>Collateral</label>
+          <span className="text-[10px] font-mono" style={{ color: "var(--on-surface-disabled)" }}>USD</span>
+        </div>
         <div className="flex items-center rounded px-3 py-2" style={{ background: "var(--surface-container-low)", borderBottom: "2px solid var(--outline-variant)" }}>
+          <span className="text-sm font-mono mr-1" style={{ color: "var(--on-surface-disabled)" }}>$</span>
           <input
-            id="qty-input"
+            id="collateral-input"
             type="text"
-            value={quantity}
-            onChange={(e) => onQuantityChange(e.target.value)}
-            placeholder="0"
+            value={collateralInput}
+            onChange={(e) => onCollateralChange(e.target.value)}
+            placeholder="0.00"
             className="flex-1 bg-transparent text-sm outline-none font-mono"
             style={{ color: "var(--on-surface)" }}
           />
-          <span className="text-[11px] ml-2" style={{ color: "var(--on-surface-disabled)" }}>{symbol}</span>
+          {/* Token qty derived hint */}
+          {tokenQty > 0 && (
+            <span className="text-[10px] hidden ml-2 shrink-0 font-mono" style={{ color: "var(--on-surface-disabled)" }}>
+              ≈ {tokenQty.toFixed(4)} {symbol}
+            </span>
+          )}
         </div>
         {mounted && walletConnected && (
           <div className="flex items-center gap-1 mt-1.5">
@@ -114,7 +127,7 @@ export default function OrderFormInputs({
       <div>
         <div className="flex items-center justify-between mb-1">
           <label htmlFor="leverage-slider" className="text-[11px]" style={{ color: "var(--on-surface-disabled)" }}>Leverage</label>
-          <span className="text-[11px] font-mono" style={{ color: "var(--on-surface)" }}>{leverage}x</span>
+          <span className="text-[11px] font-mono" style={{ color: "var(--on-surface)" }}>{leverage}×</span>
         </div>
         <input
           id="leverage-slider"
@@ -133,52 +146,39 @@ export default function OrderFormInputs({
               className="text-[10px] font-mono transition-colors"
               style={{ color: leverage === l ? "var(--on-surface)" : "var(--on-surface-disabled)" }}
             >
-              {l}x
+              {l}×
             </button>
           ))}
         </div>
       </div>
 
-      {/* Order Value */}
-      <div>
-        <span className="text-[11px] mb-1 block" style={{ color: "var(--on-surface-disabled)" }}>Order Value</span>
-        <div className="flex items-center rounded px-3 py-2" style={{ background: "var(--surface-container-low)" }}>
-          <span className="text-sm font-mono" style={{ color: "var(--on-surface)" }}>
+      {/* Position Size (derived) + Est. Liquidation */}
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between text-[11px]">
+          <span style={{ color: "var(--on-surface-disabled)" }}>Position Size</span>
+          <span style={{ color: insufficientBalance ? "var(--sell)" : "var(--on-surface)" }}>
             {orderValue > 0 ? `$${orderValue.toLocaleString("en-US", { minimumFractionDigits: 2 })}` : "—"}
           </span>
+        </div>
+        <div className="flex items-center justify-between text-[11px]">
+          <span style={{ color: "var(--on-surface-disabled)" }}>Est. Liquidation Price</span>
+          <span style={{ color: "var(--liquidation)" }}>{estLiquidation !== null ? estLiquidation : "—"}</span>
         </div>
       </div>
 
       {/* Price Impact */}
       {orderValue > 0 && priceImpact.impact > 0.1 && (
-        <div>
-          <span className="text-[11px] mb-1 block" style={{ color: "var(--on-surface-disabled)" }}>Price Impact</span>
-          <div className="flex items-center rounded px-3 py-2" style={{ background: priceImpact.impact > 1 ? "rgba(255,77,79,0.1)" : "rgba(255,165,0,0.05)" }}>
-            <span className="text-sm font-mono" style={{ color: priceImpact.impact > 1 ? "var(--sell)" : "#FFA500" }}>
-              {priceImpact.impact.toFixed(2)}%
+        <div className="flex items-center rounded px-3 py-1.5" style={{ background: priceImpact.impact > 1 ? "rgba(255,77,79,0.1)" : "rgba(255,165,0,0.05)" }}>
+          <span className="text-[10px] font-mono" style={{ color: priceImpact.impact > 1 ? "var(--sell)" : "#FFA500" }}>
+            Price impact {priceImpact.impact.toFixed(2)}%
+          </span>
+          {priceImpact.warning && (
+            <span className="ml-2 text-[10px]" style={{ color: priceImpact.impact > 1 ? "var(--sell)" : "#FFA500" }}>
+              {priceImpact.warning}
             </span>
-            {priceImpact.warning && (
-              <span className="ml-2 text-[10px]" style={{ color: priceImpact.impact > 1 ? "var(--sell)" : "#FFA500" }}>
-                {priceImpact.warning}
-              </span>
-            )}
-          </div>
+          )}
         </div>
       )}
-
-      {/* Margin Required & Est. Liquidation */}
-      <div className="space-y-1.5">
-        <div className="flex items-center justify-between text-[11px]">
-          <span style={{ color: "var(--on-surface-disabled)" }}>Margin Required</span>
-          <span style={{ color: insufficientBalance ? "var(--sell)" : "var(--on-surface)" }}>
-            {marginRequired > 0 ? `$${marginRequired.toLocaleString("en-US", { minimumFractionDigits: 2 })}` : "—"}
-          </span>
-        </div>
-        <div className="flex items-center justify-between text-[11px]">
-          <span style={{ color: "var(--on-surface-disabled)" }}>Est. Liquidation Price</span>
-          <span style={{ color: "var(--on-surface)" }}>{estLiquidation !== null ? estLiquidation : "—"}</span>
-        </div>
-      </div>
     </>
   );
 }

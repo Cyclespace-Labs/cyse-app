@@ -14,6 +14,7 @@ import { useVaultConfig } from "@/hooks/useVaultConfig";
 import { validateOrder, validateTPSL, formatValidationErrors, validatePositionHealth } from "@/lib/validation/trading";
 import { computeLivePnl } from "@/lib/formatters";
 import { getTickSize } from "@/lib/tradingData";
+import { estimateLiquidationPrice } from "@/lib/positionMath";
 import { parseUnits, formatUnits, maxUint256 } from "viem";
 import { contracts, erc20Abi } from "@/lib/protocol/contracts";
 import { useBalance, useReadContract } from "wagmi";
@@ -67,7 +68,7 @@ export default function TradingPanel({
   const [activeType, setActiveType] = useState("Limit");
   const [side, setSide] = useState<"buy" | "sell">("buy");
   const [price, setPrice] = useState("");
-  const [quantity, setQuantity] = useState("");
+  const [collateralInput, setCollateralInput] = useState(""); // collateral in USD
   const [leverage, setLeverage] = useState(10);
   const [postOnly, setPostOnly] = useState(false);
   const [ioc, setIoc] = useState(false);
@@ -124,11 +125,16 @@ export default function TradingPanel({
 
   const currentPrice = oraclePrice ?? tokenPriceData?.price ?? 0;
   const priceNum = parseFloat(price) || 0;
-  const qtyNum = parseFloat(quantity) || 0;
   const isLong = side === "buy";
 
-  // Read Vault configuration for max leverage and liquidation fee
-  const { maxLeverage: vaultMaxLeverage, liquidationFeeUsd } = useVaultConfig();
+  // Collateral-first: user inputs margin in USD, position size and token qty are derived
+  const collateralInputNum = parseFloat(collateralInput) || 0;
+  const indexPrice = activeType === "Market" ? currentPrice : (priceNum || currentPrice);
+  const positionSizeUsd = collateralInputNum * leverage;
+  const qtyNum = indexPrice > 0 ? positionSizeUsd / indexPrice : 0;
+
+  // Read Vault configuration for max leverage, liquidation fee, and margin fee
+  const { maxLeverage: vaultMaxLeverage, liquidationFeeUsd, marginFeeBasisPoints } = useVaultConfig();
 
   // Sync internal state with parent's indexToken prop
   useEffect(() => {
@@ -285,15 +291,9 @@ export default function TradingPanel({
 
   const { errors: tpslErrorMessages } = formatValidationErrors(tpslErrors);
 
-  const orderValue = useMemo(() => {
-    const p = activeType === "Market" ? currentPrice : priceNum;
-    return parseFloat((p * qtyNum).toFixed(2));
-  }, [activeType, currentPrice, priceNum, qtyNum]);
-
-  const marginRequired = useMemo(
-    () => (leverage > 0 ? parseFloat((orderValue / leverage).toFixed(2)) : 0),
-    [orderValue, leverage]
-  );
+  // orderValue = position size in USD; marginRequired = what the user typed (collateral)
+  const orderValue = parseFloat(positionSizeUsd.toFixed(2));
+  const marginRequired = parseFloat(collateralInputNum.toFixed(2));
 
   // Calculate price impact for large orders
   const priceImpact = useMemo(() => {
@@ -304,13 +304,21 @@ export default function TradingPanel({
   const estLiquidation = useMemo(() => {
     if (qtyNum <= 0 || leverage <= 0) return null;
     const p = activeType === "Market" ? currentPrice : priceNum;
-    const liqDist = p / leverage;
+    if (p <= 0) return null;
+    const positionSizeUsd = qtyNum * p;
     const ts = getTickSize(p);
     const decimals = ts > 0 ? Math.max(2, -Math.floor(Math.log10(ts))) : 2;
-    return side === "buy"
-      ? parseFloat((p - liqDist).toFixed(decimals))
-      : parseFloat((p + liqDist).toFixed(decimals));
-  }, [side, activeType, currentPrice, priceNum, qtyNum, leverage]);
+    const liqPrice = estimateLiquidationPrice({
+      entryPrice: p,
+      positionSizeUsd,
+      leverage,
+      isLong: side === "buy",
+      maxLeverage: vaultMaxLeverage,
+      liquidationFeeUsd,
+      marginFeeBps: marginFeeBasisPoints,
+    });
+    return liqPrice > 0 ? parseFloat(liqPrice.toFixed(decimals)) : null;
+  }, [side, activeType, currentPrice, priceNum, qtyNum, leverage, vaultMaxLeverage, liquidationFeeUsd, marginFeeBasisPoints]);
 
   const insufficientBalance = wallet.connected && marginRequired > collateralTokenBalanceUsd;
 
@@ -328,15 +336,12 @@ export default function TradingPanel({
 
   const handlePctQuantity = useCallback((pct: number) => {
     if (!wallet.connected || collateralTokenBalanceNum <= 0) return;
-    const collateralTokenPrice = selectedCollateralTokenKey === "WETH" ? currentPrice : 1;
-    if (collateralTokenPrice <= 0) return;
-    const indexPrice = activeType === "Market" ? currentPrice : priceNum || currentPrice;
-    if (indexPrice <= 0) return;
-    const collateralBalanceUsd = collateralTokenBalanceNum * collateralTokenPrice;
-    const positionSizeUsd = collateralBalanceUsd * (pct / 100) * leverage;
-    const qty = positionSizeUsd / indexPrice;
-    setQuantity(String(parseFloat(qty.toFixed(4))));
-  }, [wallet.connected, collateralTokenBalanceNum, selectedCollateralTokenKey, currentPrice, activeType, priceNum, leverage]);
+    const collatPrice = selectedCollateralTokenKey === "WETH" ? currentPrice : 1;
+    if (collatPrice <= 0) return;
+    const collateralBalanceUsd = collateralTokenBalanceNum * collatPrice;
+    const collateralUsdForPct = collateralBalanceUsd * (pct / 100);
+    setCollateralInput(parseFloat(collateralUsdForPct.toFixed(2)).toString());
+  }, [wallet.connected, collateralTokenBalanceNum, selectedCollateralTokenKey, currentPrice]);
 
   const handlePlaceOrder = useCallback(async () => {
     if (qtyNum <= 0 || !wallet.address) return;
@@ -375,19 +380,18 @@ export default function TradingPanel({
       return;
     }
 
-    // qtyNum = position size in index-token units (e.g. ETH amount)
-    const indexPrice = activeType === "Market" ? currentPrice : priceNum;
-    const positionSizeUsd = qtyNum * indexPrice;
-    const collateralUsd = positionSizeUsd / leverage;
+    // qtyNum is derived: collateralInput × leverage / indexPrice
+    const collateralUsd = collateralInputNum;
+    const positionSizeUsdForOrder = collateralUsd * leverage;
 
     // For WETH collateral being swapped to index token, use index token price for collateral calculation
     // The Vault calculates collateral based on post-swap token value
     const collateralTokenPrice = selectedCollateralTokenKey === "WETH" ? indexPrice : 1;
     const collateralAmount = parseUnits((collateralUsd / collateralTokenPrice).toFixed(8), collateralDecimals);
-    const sizeDelta = parseUnits(positionSizeUsd.toFixed(8), 30);
+    const sizeDelta = parseUnits(positionSizeUsdForOrder.toFixed(8), 30);
 
     console.log("[handlePlaceOrder] Collateral calculation:", {
-      positionSizeUsd,
+      positionSizeUsd: positionSizeUsdForOrder,
       leverage,
       collateralUsd,
       selectedCollateralTokenKey,
@@ -418,7 +422,7 @@ export default function TradingPanel({
     if (!isReduceOnly) {
       console.log("[handlePlaceOrder] Validating position health:", {
         collateralUsd,
-        sizeUsd: positionSizeUsd,
+        sizeUsd: positionSizeUsdForOrder,
         entryPrice: currentPrice,
         isLong,
         maxPrice: oracleMaxPrice,
@@ -429,7 +433,7 @@ export default function TradingPanel({
 
       const health = validatePositionHealth({
         collateralUsd,
-        sizeUsd: positionSizeUsd,
+        sizeUsd: positionSizeUsdForOrder,
         entryPrice: currentPrice,
         isLong,
         maxPrice: oracleMaxPrice,
@@ -515,7 +519,7 @@ export default function TradingPanel({
       const slPriceRaw = slPrice ? parseUnits(parseFloat(slPrice).toFixed(8), 30) : null;
       await placeTPSLOrders({ collateralToken: activeCollateralToken, indexToken: activeIndexToken, collateralDelta: 0n, sizeDelta, isLong, tpPrice: tpPriceRaw, slPrice: slPriceRaw });
     }
-  }, [activeType, currentPrice, priceNum, qtyNum, leverage, wallet.address, activeCollateralToken, activeIndexToken, isLong, placeMarketOrder, placeLimitOrder, placeDecreaseOrder, placeTPSLOrders, isOracleValid, oraclePriceRaw, slippageBps, tpsl, tpPrice, slPrice, oracleMinPrice, oracleMaxPrice, collateralDecimals, vaultRouterApproved, approveVaultRouter, routerApproved, approvePlugin, isNativeCollateral, approveToken, reduceOnly, longPosition, shortPosition]);
+  }, [activeType, currentPrice, priceNum, qtyNum, collateralInputNum, leverage, wallet.address, activeCollateralToken, activeIndexToken, isLong, placeMarketOrder, placeLimitOrder, placeDecreaseOrder, placeTPSLOrders, isOracleValid, oraclePriceRaw, slippageBps, tpsl, tpPrice, slPrice, oracleMinPrice, oracleMaxPrice, collateralDecimals, vaultRouterApproved, approveVaultRouter, routerApproved, approvePlugin, isNativeCollateral, approveToken, reduceOnly, longPosition, shortPosition]);
 
   const handleCancelOrphanedOrders = useCallback(async () => {
     for (const o of orphanedOrders) {
@@ -632,16 +636,16 @@ export default function TradingPanel({
           isMarket={activeType === "Market"}
           price={price}
           onPriceChange={setPrice}
-          quantity={quantity}
-          onQuantityChange={setQuantity}
+          collateralInput={collateralInput}
+          onCollateralChange={setCollateralInput}
           leverage={leverage}
           onLeverageChange={setLeverage}
           currentPrice={currentPrice}
+          indexPrice={indexPrice}
           symbol={symbol}
           walletConnected={wallet.connected}
           onPctQuantity={handlePctQuantity}
           orderValue={orderValue}
-          marginRequired={marginRequired}
           insufficientBalance={insufficientBalance}
           estLiquidation={estLiquidation}
           side={side}

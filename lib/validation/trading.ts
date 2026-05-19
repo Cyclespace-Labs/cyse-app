@@ -1,6 +1,6 @@
 "use client";
 
-import { formatUnits } from "viem";
+import { computeLiquidationPrice } from "@/lib/positionMath";
 
 export interface ValidationError {
   field: string;
@@ -28,6 +28,8 @@ export interface PositionValidationInput {
   isLong: boolean;
   currentPrice: number | null;
   liquidationFee?: number;
+  maxLeverage?: number;
+  marginFeeBps?: number;
 }
 
 // Constants
@@ -177,7 +179,7 @@ export function calculatePositionHealth(
   pnlPercent: number;
   status: "safe" | "warning" | "danger" | "liquidated";
 } {
-  const { size, collateral, averagePrice, isLong, currentPrice, liquidationFee = 5 } = input;
+  const { size, collateral, averagePrice, isLong, currentPrice, liquidationFee = 5, maxLeverage = 50, marginFeeBps = 10 } = input;
 
   if (!size || !collateral || !averagePrice || size === 0) {
     return {
@@ -190,24 +192,27 @@ export function calculatePositionHealth(
     };
   }
 
-  // Calculate PnL
+  // Calculate PnL matching Vault.getDelta: delta = size * priceDelta / avgPrice
   let pnl = 0;
   if (currentPrice) {
     const priceDiff = isLong ? currentPrice - averagePrice : averagePrice - currentPrice;
-    const sizeInTokens = size / averagePrice; // Approximate
-    pnl = priceDiff * sizeInTokens;
+    pnl = (size * priceDiff) / averagePrice;
   }
 
   const pnlPercent = (pnl / collateral) * 100;
 
-  // Calculate leverage
-  const leverage = size / collateral;
+  const leverage = collateral > 0 ? size / collateral : 0;
 
-  // Calculate liquidation price
-  // Liq price = entry price ± (entry price / leverage) * (1 - maintenance margin)
-  const maintenanceMargin = 0.005; // 0.5%
-  const liqBuffer = (averagePrice / leverage) * (1 - maintenanceMargin);
-  const liquidationPrice = isLong ? averagePrice - liqBuffer : averagePrice + liqBuffer;
+  // Calculate liquidation price using contract-accurate formula (VaultUtils.validateLiquidation)
+  const liquidationPrice = computeLiquidationPrice({
+    sizeUsd: size,
+    collateralUsd: collateral,
+    avgPrice: averagePrice,
+    isLong,
+    maxLeverage,
+    liquidationFeeUsd: liquidationFee,
+    marginFeeBps,
+  });
 
   // Calculate distance to liquidation
   let liquidationDistance: number | null = null;
@@ -292,9 +297,7 @@ export function validatePositionHealth(
   const leverage = sizeUsd / collateralUsd;
 
   // Hard check: collateral must exceed liquidation fee with swap buffer
-  // When collateral is swapped (e.g., WETH -> BTC), the post-swap amount may be less
-  // Apply 10% buffer to account for swap slippage and price differences
-  const swapBufferForFee = 0.90; // 10% buffer (increased from 5%)
+  const swapBufferForFee = 0.90;
   const effectiveCollateralForFee = collateralUsd * swapBufferForFee;
 
   if (effectiveCollateralForFee <= liquidationFeeUsd) {
@@ -308,16 +311,10 @@ export function validatePositionHealth(
     };
   }
 
-  // Apply 10% buffer for swap slippage when collateral != index token
-  // The Vault calculates leverage based on post-swap collateral, which may be less
-  // than the pre-swap value used in frontend calculation
-  const swapBuffer = 0.90; // 10% buffer (increased from 5%)
+  // Hard check: must not exceed vault maxLeverage (with swap buffer)
+  const swapBuffer = 0.90;
   const effectiveLeverage = leverage / swapBuffer;
 
-  // Hard check: must not exceed vault maxLeverage.
-  // VaultUtils.validateLiquidation:
-  //   if (remainingCollateral * maxLeverage < size * BASIS_POINTS_DIVISOR)
-  // Which is equivalent to: leverage > maxLeverage / 10000
   if (effectiveLeverage > maxLeverage) {
     return {
       isHealthy: false,
@@ -329,13 +326,19 @@ export function validatePositionHealth(
     };
   }
 
-  // Compute liquidation price for display / warning only.
-  // Approximate formula used by UI: liqPrice = entry ± entry / leverage
-  const liqBuffer = entryPrice / leverage;
-  const liquidationPrice = isLong
-    ? entryPrice - liqBuffer
-    : entryPrice + liqBuffer;
+  // Contract-accurate liquidation price (VaultUtils.validateLiquidation)
+  const MARGIN_FEE_BPS = 10; // Vault default marginFeeBasisPoints = 10 (0.1%)
+  const liquidationPrice = computeLiquidationPrice({
+    sizeUsd,
+    collateralUsd,
+    avgPrice: entryPrice,
+    isLong,
+    maxLeverage,
+    liquidationFeeUsd,
+    marginFeeBps: MARGIN_FEE_BPS,
+  });
 
+  const liqBuffer = Math.abs(entryPrice - liquidationPrice);
   const distanceToLiquidation = entryPrice > 0
     ? (liqBuffer / entryPrice) * 100
     : 0;
