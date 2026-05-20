@@ -45,6 +45,16 @@ export interface PlaceDecreaseOrderParams {
   triggerAboveThreshold: boolean;
 }
 
+export interface PlaceSwapParams {
+  fromToken: `0x${string}`;
+  toToken: `0x${string}`;
+  amountIn: bigint;
+  minOut: bigint;
+  receiver: `0x${string}`;
+  isFromNative: boolean;
+  isToNative: boolean;
+}
+
 export interface PlaceTPSLOrdersParams {
   collateralToken: `0x${string}`;
   indexToken: `0x${string}`;
@@ -552,6 +562,48 @@ export function useTradingActions() {
     [address, placeDecreaseOrder]
   );
 
+  const placeSwap = useCallback(
+    async ({ fromToken, toToken, amountIn, minOut, receiver, isFromNative, isToNative }: PlaceSwapParams) => {
+      if (!address) return null;
+      setTxStatus({ state: "pending" });
+      try {
+        let hash: `0x${string}`;
+        if (isFromNative) {
+          hash = await writeContractAsync({
+            ...contracts.router,
+            functionName: "swapETHToTokens",
+            args: [[fromToken, toToken], minOut, receiver],
+            value: amountIn,
+            gas: 500_000n,
+          });
+        } else if (isToNative) {
+          hash = await writeContractAsync({
+            ...contracts.router,
+            functionName: "swapTokensToETH",
+            args: [[fromToken, toToken], amountIn, minOut, receiver],
+            gas: 500_000n,
+          });
+        } else {
+          hash = await writeContractAsync({
+            ...contracts.router,
+            functionName: "swap",
+            args: [[fromToken, toToken], amountIn, minOut, receiver],
+            gas: 500_000n,
+          });
+        }
+        setPendingHash(hash);
+        setTxStatus({ state: "submitted", hash });
+        return hash;
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : "Swap failed";
+        console.error("[placeSwap] Error:", message, err);
+        setTxStatus({ state: "failed", error: message });
+        return null;
+      }
+    },
+    [address, writeContractAsync]
+  );
+
   const resetTxStatus = useCallback(() => {
     setTxStatus({ state: "idle" });
     setPendingHash(undefined);
@@ -574,6 +626,7 @@ export function useTradingActions() {
     placeTPSLOrders,
     cancelIncreaseOrder,
     cancelDecreaseOrder,
+    placeSwap,
     resetTxStatus,
     executionFee,
     PRICE_PRECISION,

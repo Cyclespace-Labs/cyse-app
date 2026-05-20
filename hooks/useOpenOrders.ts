@@ -98,7 +98,7 @@ export function useOpenOrders(indexToken?: `0x${string}`) {
         return order;
       })
       .filter(Boolean) as OnChainIncreaseOrder[];
-  }, [increaseData, indexToken]);
+  }, [increaseData, indexToken, startIncreaseIdx]);
 
   const decreaseOrders = useMemo((): OnChainDecreaseOrder[] => {
     if (!decreaseData) return [];
@@ -125,7 +125,7 @@ export function useOpenOrders(indexToken?: `0x${string}`) {
         return order;
       })
       .filter(Boolean) as OnChainDecreaseOrder[];
-  }, [decreaseData, indexToken]);
+  }, [decreaseData, indexToken, startDecreaseIdx]);
 
   const refetch = () => {
     refetchIncrease();

@@ -1,149 +1,129 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useMemo } from "react";
 import { useAccount } from "wagmi";
 
-const CACHE_KEY_PREFIX = "cyse_tx_cache_";
-const CACHE_EXPIRY = 30 * 24 * 60 * 60 * 1000; // 30 days
+// v2 prefix invalidates any old cached data with the broken format
+const CACHE_KEY_PREFIX = "cyse_tx_v2_";
+const CACHE_EXPIRY_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
-interface CachedTransaction {
+export interface CachedEntry {
   id: string;
   type: "order" | "position" | "fill" | "funding";
   data: unknown;
-  timestamp: number;
+  timestamp: number; // actual block timestamp in ms
   blockNumber: number;
   txHash: string;
 }
 
-interface CacheData {
-  transactions: CachedTransaction[];
-  lastUpdated: number;
-  blockHeight: number;
+interface CacheStore {
+  entries: CachedEntry[];
+  highWaterBlock: number;
+  savedAt: number;
 }
 
+const EMPTY: CacheStore = { entries: [], highWaterBlock: 0, savedAt: 0 };
+
+/**
+ * Lightweight transaction cache using localStorage directly.
+ *
+ * Design: all reads/writes go straight to localStorage via stable callbacks —
+ * no React state for data. This completely eliminates stale-closure bugs that
+ * occurred when addTransaction captured an outdated `cache` state snapshot.
+ */
 export function useTransactionCache() {
   const { address } = useAccount();
-  const [cache, setCache] = useState<CacheData | null>(null);
 
-  const getCacheKey = useCallback(() => {
-    return `${CACHE_KEY_PREFIX}${address?.toLowerCase() || "anonymous"}`;
-  }, [address]);
+  const cacheKey = useMemo(
+    () => `${CACHE_KEY_PREFIX}${address?.toLowerCase() ?? "anon"}`,
+    [address]
+  );
 
-  // Load cache from localStorage on mount
-  useEffect(() => {
-    if (!address) return;
-    
+  // Always reads the latest value straight from localStorage
+  const read = useCallback((): CacheStore => {
+    if (typeof window === "undefined" || !address) return EMPTY;
     try {
-      const key = getCacheKey();
-      const stored = localStorage.getItem(key);
-      if (stored) {
-        const parsed: CacheData = JSON.parse(stored);
-        // Check if cache is expired
-        if (Date.now() - parsed.lastUpdated < CACHE_EXPIRY) {
-          setCache(parsed);
-        } else {
-          // Clear expired cache
-          localStorage.removeItem(key);
-        }
+      const raw = localStorage.getItem(cacheKey);
+      if (!raw) return EMPTY;
+      const parsed: CacheStore = JSON.parse(raw);
+      if (Date.now() - parsed.savedAt > CACHE_EXPIRY_MS) {
+        localStorage.removeItem(cacheKey);
+        return EMPTY;
       }
-    } catch (error) {
-      console.error("[useTransactionCache] Failed to load cache:", error);
+      return parsed;
+    } catch {
+      return EMPTY;
     }
-  }, [address, getCacheKey]);
+  }, [cacheKey, address]);
 
-  // Save cache to localStorage
-  const saveCache = useCallback((newCache: CacheData) => {
-    if (!address) return;
-    
-    try {
-      const key = getCacheKey();
-      localStorage.setItem(key, JSON.stringify(newCache));
-      setCache(newCache);
-    } catch (error) {
-      console.error("[useTransactionCache] Failed to save cache:", error);
-    }
-  }, [address, getCacheKey]);
+  const write = useCallback(
+    (store: CacheStore) => {
+      if (typeof window === "undefined" || !address) return;
+      try {
+        localStorage.setItem(cacheKey, JSON.stringify({ ...store, savedAt: Date.now() }));
+      } catch {}
+    },
+    [cacheKey, address]
+  );
 
-  // Add a transaction to cache
-  const addTransaction = useCallback((tx: CachedTransaction) => {
-    const currentCache = cache || { transactions: [], lastUpdated: Date.now(), blockHeight: 0 };
-    
-    // Check if transaction already exists
-    const exists = currentCache.transactions.some((t) => t.txHash === tx.txHash && t.id === tx.id);
-    if (exists) return;
+  /** Highest block number we have locally cached */
+  const getHighWaterBlock = useCallback((): number => read().highWaterBlock, [read]);
 
-    const newCache: CacheData = {
-      transactions: [tx, ...currentCache.transactions].slice(0, 500), // Keep last 500
-      lastUpdated: Date.now(),
-      blockHeight: Math.max(currentCache.blockHeight, tx.blockNumber),
-    };
+  /**
+   * Merge freshly-fetched items with the local cache.
+   * De-duplication is by id. New items are batch-saved in one write
+   * (no looping addTransaction — that was the stale-closure bug).
+   * Returns the full sorted list (newest block first).
+   */
+  const mergeWithCache = useCallback(
+    <T>(
+      type: CachedEntry["type"],
+      freshItems: T[],
+      getId: (item: T) => string,
+      getBlock: (item: T) => number,
+      getTimestamp: (item: T) => number
+    ): T[] => {
+      const store = read();
+      const cached = store.entries.filter((e) => e.type === type).map((e) => e.data as T);
+      const cachedIds = new Set(cached.map(getId));
 
-    saveCache(newCache);
-  }, [cache, saveCache]);
+      const newItems = freshItems.filter((item) => !cachedIds.has(getId(item)));
 
-  // Get transactions by type
-  const getTransactionsByType = useCallback(<T>(type: CachedTransaction["type"]): T[] => {
-    if (!cache) return [];
-    return cache.transactions
-      .filter((t) => t.type === type)
-      .map((t) => t.data as T);
-  }, [cache]);
+      if (newItems.length > 0) {
+        const newEntries: CachedEntry[] = newItems.map((item) => ({
+          id: getId(item),
+          type,
+          data: item,
+          timestamp: getTimestamp(item),
+          blockNumber: getBlock(item),
+          txHash: (item as { txHash?: string }).txHash ?? "",
+        }));
 
-  // Get last synced block
-  const getLastSyncedBlock = useCallback((): number => {
-    return cache?.blockHeight || 0;
-  }, [cache]);
+        const highWaterBlock = Math.max(store.highWaterBlock, ...newItems.map(getBlock));
 
-  // Clear cache
+        write({
+          entries: [...newEntries, ...store.entries].slice(0, 2000),
+          highWaterBlock,
+          savedAt: Date.now(),
+        });
+      }
+
+      return [...newItems, ...cached].sort((a, b) => getBlock(b) - getBlock(a));
+    },
+    [read, write]
+  );
+
   const clearCache = useCallback(() => {
-    if (!address) return;
-    const key = getCacheKey();
-    localStorage.removeItem(key);
-    setCache(null);
-  }, [address, getCacheKey]);
-
-  // Merge fetched data with cache
-  const mergeWithCache = useCallback(<T>(
-    type: CachedTransaction["type"],
-    newData: T[],
-    getKey: (item: T) => string,
-    getBlockNumber: (item: T) => number
-  ): T[] => {
-    const cached = getTransactionsByType<T>(type);
-    const cachedKeys = new Set(cached.map(getKey));
-    
-    // Filter out duplicates
-    const uniqueNew = newData.filter((item) => !cachedKeys.has(getKey(item)));
-    
-    // Add new items to cache
-    uniqueNew.forEach((item) => {
-      addTransaction({
-        id: getKey(item),
-        type,
-        data: item,
-        timestamp: Date.now(),
-        blockNumber: getBlockNumber(item),
-        txHash: (item as { txHash: string }).txHash || "",
-      });
-    });
-
-    return [...uniqueNew, ...cached].sort((a, b) => {
-      const blockA = getBlockNumber(a);
-      const blockB = getBlockNumber(b);
-      return blockB - blockA; // Descending order
-    });
-  }, [addTransaction, getTransactionsByType]);
+    if (typeof window === "undefined") return;
+    try { localStorage.removeItem(cacheKey); } catch {}
+  }, [cacheKey]);
 
   return {
-    cache,
-    addTransaction,
-    getTransactionsByType,
-    getLastSyncedBlock,
-    clearCache,
     mergeWithCache,
+    getHighWaterBlock,
+    clearCache,
     isReady: !!address,
   };
 }
 
-export type { CachedTransaction, CacheData };
-export { CACHE_KEY_PREFIX, CACHE_EXPIRY };
+export type { CacheStore };

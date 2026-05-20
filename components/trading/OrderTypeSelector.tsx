@@ -3,7 +3,7 @@
 import { ChevronDown } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
 
-const orderTypes = ["Limit", "Market", "Conditional"];
+const orderTypes = ["Limit", "Market", "Swap"];
 
 interface OrderTypeSelectorProps {
   side: "buy" | "sell";
@@ -20,10 +20,12 @@ export default function OrderTypeSelector({
 }: OrderTypeSelectorProps) {
   const { theme } = useTheme();
 
+  const isSwapMode = activeType === "Swap";
+
   return (
     <>
-      {/* Buy/Sell Toggle */}
-      <div className="flex" style={{ borderBottom: "1px solid rgba(66,70,84,0.4)" }}>
+      {/* Buy/Sell Toggle — hidden in Swap mode */}
+      {!isSwapMode && <div className="flex" style={{ borderBottom: "1px solid rgba(66,70,84,0.4)" }}>
         <button
           onClick={() => onSideChange("buy")}
           className="flex-1 py-2.5 text-[13px] font-semibold transition-colors"
@@ -44,7 +46,7 @@ export default function OrderTypeSelector({
         >
           Sell / Short
         </button>
-      </div>
+      </div>}
 
       {/* Order Type Tabs */}
       <div className="flex items-center gap-1 px-3 py-2" style={{ borderBottom: "1px solid rgba(66,70,84,0.4)" }}>

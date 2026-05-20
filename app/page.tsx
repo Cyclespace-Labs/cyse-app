@@ -17,10 +17,6 @@ import { useAllPositions } from "@/hooks/useAllPositions";
 import { useOpenOrders } from "@/hooks/useOpenOrders";
 import { usePriceOracle } from "@/hooks/usePriceOracle";
 import { useTradingActions } from "@/hooks/useTradingActions";
-import { useOrderHistory } from "@/hooks/useOrderHistory";
-import { usePositionHistory } from "@/hooks/usePositionHistory";
-import { useFillHistory } from "@/hooks/useFillHistory";
-import { useFundingHistory } from "@/hooks/useFundingHistory";
 import { useVaultMarketData } from "@/hooks/useVaultMarketData";
 import { useBinance24hData } from "@/hooks/useBinance24hData";
 import { contracts } from "@/lib/protocol/contracts";
@@ -82,19 +78,6 @@ export default function Home() {
   const { positions, refetch: refetchPositions } = useAllPositions();
   const { increaseOrders, decreaseOrders, refetch: refetchOrders } = useOpenOrders();
   const { closeMarketPosition, cancelDecreaseOrder, cancelIncreaseOrder } = useTradingActions();
-
-  // History hooks for BottomTabs
-  const { orderHistory, isLoading: isLoadingOrderHistory, refresh: refreshOrderHistory } = useOrderHistory();
-  const { positionHistory, isLoading: isLoadingPositionHistory, refresh: refreshPositionHistory } = usePositionHistory();
-  const { fillHistory, isLoading: isLoadingFillHistory, refresh: refreshFillHistory } = useFillHistory();
-  const { fundingHistory, isLoading: isLoadingFundingHistory, isAvailable: fundingAvailable, refresh: refreshFundingHistory } = useFundingHistory();
-
-  const handleRefreshHistory = useCallback(() => {
-    refreshOrderHistory();
-    refreshPositionHistory();
-    refreshFillHistory();
-    refreshFundingHistory();
-  }, [refreshOrderHistory, refreshPositionHistory, refreshFillHistory, refreshFundingHistory]);
 
   const handleCancelOrder = useCallback((orderId: string) => {
     if (orderId.startsWith("dec-")) {
@@ -238,18 +221,8 @@ export default function Home() {
             positions={positions}
             orders={orders}
             currentPrice={currentPrice}
-            orderHistory={orderHistory}
-            positionHistory={positionHistory}
-            fillHistory={fillHistory}
-            fundingHistory={fundingHistory}
-            fundingAvailable={fundingAvailable}
-            isLoadingOrderHistory={isLoadingOrderHistory}
-            isLoadingPositionHistory={isLoadingPositionHistory}
-            isLoadingFillHistory={isLoadingFillHistory}
-            isLoadingFundingHistory={isLoadingFundingHistory}
             onCancelOrder={handleCancelOrder}
             onClosePosition={handleClosePosition}
-            onRefreshHistory={handleRefreshHistory}
           />
         </div>
 

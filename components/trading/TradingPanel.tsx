@@ -30,6 +30,7 @@ import OrderOptionsPanel from "./OrderOptionsPanel";
 import OrderSubmitButton from "./OrderSubmitButton";
 import PositionManager from "./PositionManager";
 import OpenOrdersPanel from "./OpenOrdersPanel";
+import SwapPanel from "./SwapPanel";
 
 // Token configuration for multi-token support
 const TOKEN_CONFIG = {
@@ -178,6 +179,7 @@ export default function TradingPanel({
     cancelIncreaseOrder,
     cancelDecreaseOrder,
     closeMarketPosition,
+    placeSwap,
     resetTxStatus,
     vaultRouterApproved,
     approveVaultRouter,
@@ -625,78 +627,95 @@ export default function TradingPanel({
       />
 
       <div className="flex-1 overflow-y-auto px-3 py-3 space-y-3 scrollbar-hide">
-        <TokenSelector
-          selectedCollateralTokenKey={selectedCollateralTokenKey}
-          onCollateralTokenChange={setSelectedCollateralTokenKey}
-          selectedIndexTokenKey={selectedIndexTokenKey}
-          onIndexTokenChange={handleIndexTokenChange}
-        />
+        {activeType === "Swap" ? (
+          <SwapPanel
+            walletConnected={wallet.connected}
+            walletAddress={wallet.address}
+            customConnectButton={<CustomConnectButton variant="large" />}
+            isPending={isPending}
+            isSubmitted={isSubmitted}
+            isConfirmed={isConfirmed}
+            txHash={txStatus.hash}
+            onSwap={placeSwap}
+            onApproveToken={approveToken}
+            onResetTxStatus={resetTxStatus}
+          />
+        ) : (
+          <>
+            <TokenSelector
+              selectedCollateralTokenKey={selectedCollateralTokenKey}
+              onCollateralTokenChange={setSelectedCollateralTokenKey}
+              selectedIndexTokenKey={selectedIndexTokenKey}
+              onIndexTokenChange={handleIndexTokenChange}
+            />
 
-        <OrderFormInputs
-          isMarket={activeType === "Market"}
-          price={price}
-          onPriceChange={setPrice}
-          collateralInput={collateralInput}
-          onCollateralChange={setCollateralInput}
-          leverage={leverage}
-          onLeverageChange={setLeverage}
-          currentPrice={currentPrice}
-          indexPrice={indexPrice}
-          symbol={symbol}
-          walletConnected={wallet.connected}
-          onPctQuantity={handlePctQuantity}
-          orderValue={orderValue}
-          insufficientBalance={insufficientBalance}
-          estLiquidation={estLiquidation}
-          side={side}
-          priceImpact={priceImpact}
-        />
+            <OrderFormInputs
+              isMarket={activeType === "Market"}
+              price={price}
+              onPriceChange={setPrice}
+              collateralInput={collateralInput}
+              onCollateralChange={setCollateralInput}
+              leverage={leverage}
+              onLeverageChange={setLeverage}
+              currentPrice={currentPrice}
+              indexPrice={indexPrice}
+              symbol={symbol}
+              walletConnected={wallet.connected}
+              onPctQuantity={handlePctQuantity}
+              orderValue={orderValue}
+              insufficientBalance={insufficientBalance}
+              estLiquidation={estLiquidation}
+              side={side}
+              priceImpact={priceImpact}
+            />
 
-        <TPSLSection
-          enabled={tpsl}
-          onToggle={setTpsl}
-          tpPrice={tpPrice}
-          onTpPriceChange={setTpPrice}
-          slPrice={slPrice}
-          onSlPriceChange={setSlPrice}
-        />
+            <TPSLSection
+              enabled={tpsl}
+              onToggle={setTpsl}
+              tpPrice={tpPrice}
+              onTpPriceChange={setTpPrice}
+              slPrice={slPrice}
+              onSlPriceChange={setSlPrice}
+            />
 
-        <OrderOptionsPanel
-          walletConnected={wallet.connected}
-          postOnly={postOnly}
-          onPostOnlyChange={setPostOnly}
-          ioc={ioc}
-          onIocChange={setIoc}
-          reduceOnly={reduceOnly}
-          onReduceOnlyChange={setReduceOnly}
-          slippageBps={slippageBps}
-          onSlippageChange={setSlippageBps}
-          orderSigning={orderSigning}
-          hardErrorMessages={hardErrorMessages}
-          hintMessages={hintMessages}
-          tpslErrorMessages={tpslErrorMessages}
-          validationWarnings={validationWarnings}
-        />
+            <OrderOptionsPanel
+              walletConnected={wallet.connected}
+              postOnly={postOnly}
+              onPostOnlyChange={setPostOnly}
+              ioc={ioc}
+              onIocChange={setIoc}
+              reduceOnly={reduceOnly}
+              onReduceOnlyChange={setReduceOnly}
+              slippageBps={slippageBps}
+              onSlippageChange={setSlippageBps}
+              orderSigning={orderSigning}
+              hardErrorMessages={hardErrorMessages}
+              hintMessages={hintMessages}
+              tpslErrorMessages={tpslErrorMessages}
+              validationWarnings={validationWarnings}
+            />
 
-        <OrderSubmitButton
-          walletConnected={wallet.connected}
-          customConnectButton={<CustomConnectButton variant="large" />}
-          orderSigning={orderSigning}
-          hasErrors={hasErrors}
-          isOracleValid={isOracleValid}
-          qtyNum={qtyNum}
-          side={side}
-          symbol={symbol}
-          isMarket={activeType === "Market"}
-          priceNum={priceNum}
-          reduceOnlyError={reduceOnlyError}
-          validationErrorMessages={validationErrorMessages}
-          isSubmitted={isSubmitted}
-          isConfirmed={isConfirmed}
-          txHash={txStatus.hash}
-          onSubmit={handlePlaceOrder}
-          onResetTxStatus={resetTxStatus}
-        />
+            <OrderSubmitButton
+              walletConnected={wallet.connected}
+              customConnectButton={<CustomConnectButton variant="large" />}
+              orderSigning={orderSigning}
+              hasErrors={hasErrors}
+              isOracleValid={isOracleValid}
+              qtyNum={qtyNum}
+              side={side}
+              symbol={symbol}
+              isMarket={activeType === "Market"}
+              priceNum={priceNum}
+              reduceOnlyError={reduceOnlyError}
+              validationErrorMessages={validationErrorMessages}
+              isSubmitted={isSubmitted}
+              isConfirmed={isConfirmed}
+              txHash={txStatus.hash}
+              onSubmit={handlePlaceOrder}
+              onResetTxStatus={resetTxStatus}
+            />
+          </>
+        )}
 
         <PositionManager
           walletConnected={wallet.connected}

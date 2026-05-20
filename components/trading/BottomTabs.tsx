@@ -1,10 +1,14 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
-import { Order, Position, OrderHistoryEntry, PositionHistoryEntry, FillHistoryEntry, FundingHistoryEntry } from "@/types/trading";
-import { X, Loader2, ArrowLeftRight } from "lucide-react";
-import { computeLivePnl, computeLivePnlPct } from "@/lib/formatters";
+import { useState, useEffect, useCallback } from "react";
+import { Order, Position } from "@/types/trading";
+import { X, Loader2, ArrowLeftRight, RefreshCw } from "lucide-react";
+import { computeLivePnl } from "@/lib/formatters";
 import { formatDistanceToNow } from "@/lib/formatters";
+import { useOrderHistory } from "@/hooks/useOrderHistory";
+import { usePositionHistory } from "@/hooks/usePositionHistory";
+import { useFillHistory } from "@/hooks/useFillHistory";
+import { useFundingHistory } from "@/hooks/useFundingHistory";
 
 const tabs = [
   "Balances",
@@ -18,28 +22,16 @@ const tabs = [
   "Funding History",
 ];
 
+// History tabs that need to call refresh when selected
+const HISTORY_TABS = new Set(["Fill History", "Order History", "Position History", "Funding History"]);
+
 interface BottomTabsProps {
   isAuthenticated?: boolean;
   positions?: Position[];
   orders?: Order[];
   currentPrice?: number;
-  
-  // History data
-  orderHistory?: OrderHistoryEntry[];
-  positionHistory?: PositionHistoryEntry[];
-  fillHistory?: FillHistoryEntry[];
-  fundingHistory?: FundingHistoryEntry[];
-  fundingAvailable?: boolean;
-  
-  // Loading states
-  isLoadingOrderHistory?: boolean;
-  isLoadingPositionHistory?: boolean;
-  isLoadingFillHistory?: boolean;
-  isLoadingFundingHistory?: boolean;
-  
   onCancelOrder?: (orderId: string) => void;
   onClosePosition?: (positionId: string) => void;
-  onRefreshHistory?: () => void;
 }
 
 export default function BottomTabs({
@@ -47,27 +39,38 @@ export default function BottomTabs({
   positions = [],
   orders = [],
   currentPrice = 0,
-  
-  // History data
-  orderHistory = [],
-  positionHistory = [],
-  fillHistory = [],
-  fundingHistory = [],
-  fundingAvailable = true,
-  
-  // Loading states
-  isLoadingOrderHistory = false,
-  isLoadingPositionHistory = false,
-  isLoadingFillHistory = false,
-  isLoadingFundingHistory = false,
-  
   onCancelOrder,
   onClosePosition,
-  onRefreshHistory,
 }: BottomTabsProps) {
+  // ── Internal history hooks ──────────────────────────────────────────────────
+  const { orderHistory,   isLoading: isLoadingOrderHistory,   refresh: refreshOrders   } = useOrderHistory();
+  const { positionHistory, isLoading: isLoadingPositionHistory, refresh: refreshPositions } = usePositionHistory();
+  const { fillHistory,    isLoading: isLoadingFillHistory,    refresh: refreshFills    } = useFillHistory();
+  const { fundingHistory, isLoading: isLoadingFundingHistory, isAvailable: fundingAvailable, refresh: refreshFunding } = useFundingHistory();
+
   const [activeTab, setActiveTab] = useState("Balances");
   const [mounted, setMounted] = useState(false);
+  const [lastRefreshed, setLastRefreshed] = useState<number>(0);
   useEffect(() => { setMounted(true); }, []);
+
+  // Refresh the relevant history data when a history tab is first selected
+  const handleTabChange = useCallback((tab: string) => {
+    setActiveTab(tab);
+    if (!HISTORY_TABS.has(tab)) return;
+    setLastRefreshed(Date.now());
+    if (tab === "Order History")   refreshOrders();
+    if (tab === "Fill History")    refreshFills();
+    if (tab === "Position History") refreshPositions();
+    if (tab === "Funding History")  refreshFunding();
+  }, [refreshOrders, refreshFills, refreshPositions, refreshFunding]);
+
+  const handleManualRefresh = useCallback(() => {
+    setLastRefreshed(Date.now());
+    if (activeTab === "Order History")   refreshOrders();
+    if (activeTab === "Fill History")    refreshFills();
+    if (activeTab === "Position History") refreshPositions();
+    if (activeTab === "Funding History")  refreshFunding();
+  }, [activeTab, refreshOrders, refreshFills, refreshPositions, refreshFunding]);
 
   // Positions tab toggles
   const [sizeMode, setSizeMode]     = useState<"usd" | "token">("usd");
@@ -96,7 +99,6 @@ export default function BottomTabs({
   const [fundRateMode, setFundRateMode] = useState<"hourly" | "apr">("hourly"); // hourly % ↔ annualised APR
 
   const authed = mounted && isAuthenticated;
-
   const openOrders = orders.filter((o) => o.status === "open");
   const filledOrders = orders.filter((o) => o.status === "filled");
 
@@ -643,38 +645,67 @@ export default function BottomTabs({
     );
   };
 
+  const isHistoryLoading =
+    (activeTab === "Order History"   && isLoadingOrderHistory)   ||
+    (activeTab === "Fill History"    && isLoadingFillHistory)     ||
+    (activeTab === "Position History" && isLoadingPositionHistory) ||
+    (activeTab === "Funding History"  && isLoadingFundingHistory);
+
   return (
     <div className="flex flex-col" style={{ background: "var(--surface-container-lowest)", borderTop: "1px solid rgba(66,70,84,0.4)", borderRight: "1px solid rgba(66,70,84,0.4)", borderLeft: "1px solid rgba(66,70,84,0.4)" }}>
       {/* Tab Header */}
-      <div className="flex items-center justify-between overflow-x-auto px-2 scrollbar-hide" style={{ borderBottom: "1px solid rgba(66,70,84,0.4)" }}>
-        {tabs.map((tab) => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className="px-3 py-2 text-[12px] whitespace-nowrap transition-colors relative"
-            style={{
-              color: activeTab === tab ? "var(--on-surface)" : "var(--on-surface-disabled)",
-              borderBottom: activeTab === tab ? "2px solid var(--primary)" : "2px solid transparent",
-            }}
-          >
-            {tab}
-            {tab === "Positions" && positions.length > 0 && (
-              <span className="ml-1 text-[9px]" style={{ color: "var(--buy)" }}>({positions.length})</span>
+      <div className="flex items-center overflow-x-auto scrollbar-hide" style={{ borderBottom: "1px solid rgba(66,70,84,0.4)" }}>
+        <div className="flex items-center flex-1 overflow-x-auto px-2 scrollbar-hide">
+          {tabs.map((tab) => (
+            <button
+              key={tab}
+              onClick={() => handleTabChange(tab)}
+              className="px-3 py-2 text-[12px] whitespace-nowrap transition-colors relative shrink-0"
+              style={{
+                color: activeTab === tab ? "var(--on-surface)" : "var(--on-surface-disabled)",
+                borderBottom: activeTab === tab ? "2px solid var(--primary)" : "2px solid transparent",
+              }}
+            >
+              {tab}
+              {tab === "Positions" && positions.length > 0 && (
+                <span className="ml-1 text-[9px]" style={{ color: "var(--buy)" }}>({positions.length})</span>
+              )}
+              {tab === "Open Orders" && openOrders.length > 0 && (
+                <span className="ml-1 text-[9px]" style={{ color: "var(--tertiary)" }}>({openOrders.length})</span>
+              )}
+              {tab === "Order History" && orderHistory.length > 0 && (
+                <span className="ml-1 text-[9px]" style={{ color: "var(--tertiary)" }}>({orderHistory.length})</span>
+              )}
+              {tab === "Position History" && positionHistory.length > 0 && (
+                <span className="ml-1 text-[9px]" style={{ color: "var(--tertiary)" }}>({positionHistory.length})</span>
+              )}
+              {tab === "Fill History" && fillHistory.length > 0 && (
+                <span className="ml-1 text-[9px]" style={{ color: "var(--buy)" }}>({fillHistory.length})</span>
+              )}
+            </button>
+          ))}
+        </div>
+
+        {/* Refresh button — only visible on history tabs */}
+        {HISTORY_TABS.has(activeTab) && authed && (
+          <div className="flex items-center gap-2 px-3 shrink-0">
+            {lastRefreshed > 0 && (
+              <span className="text-[10px]" style={{ color: "var(--on-surface-disabled)" }}>
+                {formatDistanceToNow(lastRefreshed)}
+              </span>
             )}
-            {tab === "Open Orders" && openOrders.length > 0 && (
-              <span className="ml-1 text-[9px]" style={{ color: "var(--tertiary)" }}>({openOrders.length})</span>
-            )}
-            {tab === "Order History" && orderHistory.length > 0 && (
-              <span className="ml-1 text-[9px]" style={{ color: "var(--tertiary)" }}>({orderHistory.length})</span>
-            )}
-            {tab === "Position History" && positionHistory.length > 0 && (
-              <span className="ml-1 text-[9px]" style={{ color: "var(--tertiary)" }}>({positionHistory.length})</span>
-            )}
-            {tab === "Fill History" && fillHistory.length > 0 && (
-              <span className="ml-1 text-[9px]" style={{ color: "var(--buy)" }}>({fillHistory.length})</span>
-            )}
-          </button>
-        ))}
+            <button
+              onClick={handleManualRefresh}
+              disabled={isHistoryLoading}
+              className="flex items-center gap-1 px-2 py-1 rounded text-[10px] transition-colors"
+              style={{ color: isHistoryLoading ? "var(--on-surface-disabled)" : "var(--primary)", border: "1px solid rgba(99,102,241,0.25)" }}
+              title="Refresh history"
+            >
+              {isHistoryLoading ? <Loader2 size={10} className="animate-spin" /> : <RefreshCw size={10} />}
+              Refresh
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Tab Content */}

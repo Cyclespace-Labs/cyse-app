@@ -1,11 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useAccount, usePublicClient } from "wagmi";
 import { parseAbiItem, decodeEventLog } from "viem";
 import { contracts } from "@/lib/protocol/contracts";
 import type { FillHistoryEntry } from "@/types/trading";
 import { useTransactionCache } from "./useTransactionCache";
+import { resolveBlockTimestamps } from "@/lib/blockTimestamps";
 
 // Event ABIs for executed orders
 const ExecuteIncreaseOrderEvent = parseAbiItem([
@@ -39,25 +40,25 @@ const MAX_BLOCKS = 200000n;
 export function useFillHistory() {
   const { address } = useAccount();
   const publicClient = usePublicClient();
-  const { mergeWithCache, getLastSyncedBlock, isReady } = useTransactionCache();
-  
+  const { mergeWithCache, getHighWaterBlock, isReady } = useTransactionCache();
+  const fetchingRef = useRef(false);
+
   const [fillHistory, setFillHistory] = useState<FillHistoryEntry[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const fetchFillHistory = useCallback(async () => {
-    if (!address || !publicClient) return;
-
+    if (!address || !publicClient || fetchingRef.current) return;
+    fetchingRef.current = true;
     setIsLoading(true);
     setError(null);
 
     try {
       const currentBlock = await publicClient.getBlockNumber();
-      const fromBlock = getLastSyncedBlock() > 0 
-        ? BigInt(getLastSyncedBlock())
-        : currentBlock > MAX_BLOCKS 
-          ? currentBlock - MAX_BLOCKS 
-          : 0n;
+      const hwb = getHighWaterBlock();
+      const fromBlock = hwb > 0
+        ? BigInt(hwb)
+        : currentBlock > MAX_BLOCKS ? currentBlock - MAX_BLOCKS : 0n;
 
       const orderBookAddress = contracts.orderBook.address;
       const accountAddress = address.toLowerCase() as `0x${string}`;
@@ -116,14 +117,14 @@ export function useFillHistory() {
                   orderIndex: Number(args.orderIndex),
                   symbol,
                   side: (isIncrease && args.isLong) || (!isIncrease && !args.isLong) ? "buy" : "sell",
-                  type: "limit", // Could be conditional based on triggerAboveThreshold
+                  type: args.triggerAboveThreshold ? "conditional" : "limit",
                   executionPrice: formatPrice(args.executionPrice),
                   sizeDelta: formatSize(args.sizeDelta),
-                  collateralDelta: formatSize(args.collateralDelta),
+                  collateralDelta: formatSize(args.collateralDelta ?? 0n),
                   fee: formatFee(args.executionFee),
                   txHash: log.transactionHash || "",
                   blockNumber: Number(log.blockNumber),
-                  timestamp: Date.now(),
+                  timestamp: 0, // resolved below
                 };
 
                 allEvents.push(entry);
@@ -139,12 +140,16 @@ export function useFillHistory() {
         }
       }
 
-      // Merge with cache and sort by block number desc
+      // Resolve real block timestamps
+      const tsMap = await resolveBlockTimestamps(publicClient, allEvents.map((e) => e.blockNumber));
+      for (const e of allEvents) e.timestamp = tsMap.get(e.blockNumber) ?? Date.now();
+
       const merged = mergeWithCache<FillHistoryEntry>(
         "fill",
         allEvents,
         (item) => item.id,
-        (item) => item.blockNumber
+        (item) => item.blockNumber,
+        (item) => item.timestamp
       );
 
       setFillHistory(merged);
@@ -153,8 +158,9 @@ export function useFillHistory() {
       setError(err instanceof Error ? err.message : "Failed to fetch fill history");
     } finally {
       setIsLoading(false);
+      fetchingRef.current = false;
     }
-  }, [address, publicClient, mergeWithCache, getLastSyncedBlock]);
+  }, [address, publicClient, mergeWithCache, getHighWaterBlock]);
 
   // Initial fetch
   useEffect(() => {

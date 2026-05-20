@@ -1,12 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useAccount, usePublicClient } from "wagmi";
-import { parseAbiItem, decodeEventLog, type Log } from "viem";
+import { parseAbiItem, decodeEventLog } from "viem";
 import { contracts } from "@/lib/protocol/contracts";
 import type { OrderHistoryEntry } from "@/types/trading";
 import { useTransactionCache } from "./useTransactionCache";
 import { getTokenSymbol } from "@/lib/protocol/contracts";
+import { resolveBlockTimestamps } from "@/lib/blockTimestamps";
 
 // Event ABIs for OrderBook
 const CreateIncreaseOrderEvent = parseAbiItem([
@@ -55,25 +56,25 @@ const MAX_BLOCKS = 200000n; // Go back max 200k blocks
 export function useOrderHistory() {
   const { address } = useAccount();
   const publicClient = usePublicClient();
-  const { mergeWithCache, getLastSyncedBlock, isReady } = useTransactionCache();
-  
+  const { mergeWithCache, getHighWaterBlock, isReady } = useTransactionCache();
+  const fetchingRef = useRef(false);
+
   const [orderHistory, setOrderHistory] = useState<OrderHistoryEntry[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const fetchOrderHistory = useCallback(async () => {
-    if (!address || !publicClient) return;
-
+    if (!address || !publicClient || fetchingRef.current) return;
+    fetchingRef.current = true;
     setIsLoading(true);
     setError(null);
 
     try {
       const currentBlock = await publicClient.getBlockNumber();
-      const fromBlock = getLastSyncedBlock() > 0 
-        ? BigInt(getLastSyncedBlock())
-        : currentBlock > MAX_BLOCKS 
-          ? currentBlock - MAX_BLOCKS 
-          : 0n;
+      const hwb = getHighWaterBlock();
+      const fromBlock = hwb > 0
+        ? BigInt(hwb)
+        : currentBlock > MAX_BLOCKS ? currentBlock - MAX_BLOCKS : 0n;
 
       const orderBookAddress = contracts.orderBook.address;
       const accountAddress = address.toLowerCase() as `0x${string}`;
@@ -139,7 +140,7 @@ export function useOrderHistory() {
                   orderIndex: Number(args.orderIndex),
                   symbol,
                   side: (isIncrease && args.isLong) || (!isIncrease && !args.isLong) ? "buy" : "sell",
-                  type: "limit", // Default, could be enhanced with more data
+                  type: "limit",
                   triggerPrice: formatPrice(args.triggerPrice),
                   sizeDelta: formatSize(args.sizeDelta),
                   collateralToken: args.collateralToken,
@@ -147,7 +148,7 @@ export function useOrderHistory() {
                   status,
                   txHash: log.transactionHash || "",
                   blockNumber: Number(log.blockNumber),
-                  timestamp: Date.now(), // Would need block timestamp for accuracy
+                  timestamp: 0, // resolved below
                 };
 
                 allEvents.push(entry);
@@ -163,12 +164,16 @@ export function useOrderHistory() {
         }
       }
 
-      // Merge with cache and sort by block number
+      // Resolve real block timestamps
+      const tsMap = await resolveBlockTimestamps(publicClient, allEvents.map((e) => e.blockNumber));
+      for (const e of allEvents) e.timestamp = tsMap.get(e.blockNumber) ?? Date.now();
+
       const merged = mergeWithCache<OrderHistoryEntry>(
         "order",
         allEvents,
         (item) => item.id,
-        (item) => item.blockNumber
+        (item) => item.blockNumber,
+        (item) => item.timestamp
       );
 
       setOrderHistory(merged);
@@ -177,8 +182,9 @@ export function useOrderHistory() {
       setError(err instanceof Error ? err.message : "Failed to fetch order history");
     } finally {
       setIsLoading(false);
+      fetchingRef.current = false;
     }
-  }, [address, publicClient, mergeWithCache, getLastSyncedBlock]);
+  }, [address, publicClient, mergeWithCache, getHighWaterBlock]);
 
   // Initial fetch
   useEffect(() => {
