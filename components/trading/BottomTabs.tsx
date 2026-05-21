@@ -9,6 +9,7 @@ import { useOrderHistory } from "@/hooks/useOrderHistory";
 import { usePositionHistory } from "@/hooks/usePositionHistory";
 import { useFillHistory } from "@/hooks/useFillHistory";
 import { useFundingHistory } from "@/hooks/useFundingHistory";
+import { useSwapHistory } from "@/hooks/useSwapHistory";
 
 const tabs = [
   "Balances",
@@ -20,10 +21,11 @@ const tabs = [
   "Order History",
   "Position History",
   "Funding History",
+  "Swap History",
 ];
 
 // History tabs that need to call refresh when selected
-const HISTORY_TABS = new Set(["Fill History", "Order History", "Position History", "Funding History"]);
+const HISTORY_TABS = new Set(["Fill History", "Order History", "Position History", "Funding History", "Swap History"]);
 
 interface BottomTabsProps {
   isAuthenticated?: boolean;
@@ -47,6 +49,7 @@ export default function BottomTabs({
   const { positionHistory, isLoading: isLoadingPositionHistory, refresh: refreshPositions } = usePositionHistory();
   const { fillHistory,    isLoading: isLoadingFillHistory,    refresh: refreshFills    } = useFillHistory();
   const { fundingHistory, isLoading: isLoadingFundingHistory, isAvailable: fundingAvailable, refresh: refreshFunding } = useFundingHistory();
+  const { swapHistory,   isLoading: isLoadingSwapHistory,   refresh: refreshSwaps    } = useSwapHistory();
 
   const [activeTab, setActiveTab] = useState("Balances");
   const [mounted, setMounted] = useState(false);
@@ -62,7 +65,8 @@ export default function BottomTabs({
     if (tab === "Fill History")    refreshFills();
     if (tab === "Position History") refreshPositions();
     if (tab === "Funding History")  refreshFunding();
-  }, [refreshOrders, refreshFills, refreshPositions, refreshFunding]);
+    if (tab === "Swap History")      refreshSwaps();
+  }, [refreshOrders, refreshFills, refreshPositions, refreshFunding, refreshSwaps]);
 
   const handleManualRefresh = useCallback(() => {
     setLastRefreshed(Date.now());
@@ -70,7 +74,8 @@ export default function BottomTabs({
     if (activeTab === "Fill History")    refreshFills();
     if (activeTab === "Position History") refreshPositions();
     if (activeTab === "Funding History")  refreshFunding();
-  }, [activeTab, refreshOrders, refreshFills, refreshPositions, refreshFunding]);
+    if (activeTab === "Swap History")      refreshSwaps();
+  }, [activeTab, refreshOrders, refreshFills, refreshPositions, refreshFunding, refreshSwaps]);
 
   // Positions tab toggles
   const [sizeMode, setSizeMode]     = useState<"usd" | "token">("usd");
@@ -638,6 +643,82 @@ export default function BottomTabs({
       );
     }
 
+    // Swap History Tab
+    if (activeTab === "Swap History") {
+      if (isLoadingSwapHistory) return <LoadingState />;
+      if (swapHistory.length === 0) {
+        return (
+          <div className="flex items-center justify-center h-16 text-[12px]" style={{ color: "var(--on-surface-disabled)" }}>
+            <span>No swap history to display</span>
+          </div>
+        );
+      }
+
+      return (
+        <div className="overflow-x-auto">
+          <table className="w-full text-[11px] font-mono">
+            <thead>
+              <tr style={{ color: "var(--on-surface-disabled)", borderBottom: "1px solid rgba(66,70,84,0.3)" }}>
+                <th className="text-left px-3 py-1.5 font-normal">Pair</th>
+                <th className="text-right px-3 py-1.5 font-normal">Amount In</th>
+                <th className="text-right px-3 py-1.5 font-normal">Amount Out</th>
+                <th className="text-right px-3 py-1.5 font-normal">Fee</th>
+                <th className="text-right px-3 py-1.5 font-normal">Tx</th>
+                <th className="text-right px-3 py-1.5 font-normal">Time</th>
+              </tr>
+            </thead>
+            <tbody style={{ maxHeight: "40vh" }}>
+              {swapHistory.slice(0, 50).map((swap) => (
+                <tr
+                  key={swap.id}
+                  style={{ borderBottom: "1px solid rgba(66,70,84,0.2)" }}
+                  onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = "var(--surface-container-low)")}
+                  onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = "transparent")}
+                >
+                  {/* Pair */}
+                  <td className="px-3 py-1.5">
+                    <span className="inline-flex items-center gap-1.5">
+                      <span style={{ color: "var(--on-surface)" }}>{swap.symbolIn}</span>
+                      <span style={{ color: "var(--on-surface-disabled)" }}>→</span>
+                      <span style={{ color: "#0E76FD" }}>{swap.symbolOut}</span>
+                    </span>
+                  </td>
+                  {/* Amount In */}
+                  <td className="px-3 py-1.5 text-right" style={{ color: "var(--on-surface)" }}>
+                    {swap.amountIn.toLocaleString("en-US", { maximumFractionDigits: 6 })}
+                    <span className="ml-1 opacity-50">{swap.symbolIn}</span>
+                  </td>
+                  {/* Amount Out */}
+                  <td className="px-3 py-1.5 text-right" style={{ color: "var(--buy)" }}>
+                    {swap.amountOut.toLocaleString("en-US", { maximumFractionDigits: 6 })}
+                    <span className="ml-1 opacity-50">{swap.symbolOut}</span>
+                  </td>
+                  {/* Fee */}
+                  <td className="px-3 py-1.5 text-right" style={{ color: "var(--on-surface-disabled)" }}>
+                    {(swap.feeBasisPoints / 100).toFixed(2)}%
+                  </td>
+                  {/* Tx hash */}
+                  <td className="px-3 py-1.5 text-right">
+                    {swap.txHash ? (
+                      <span style={{ color: "var(--on-surface-disabled)" }}>
+                        {swap.txHash.slice(0, 6)}…{swap.txHash.slice(-4)}
+                      </span>
+                    ) : (
+                      <span style={{ color: "var(--on-surface-disabled)" }}>—</span>
+                    )}
+                  </td>
+                  {/* Time */}
+                  <td className="px-3 py-1.5 text-right" style={{ color: "var(--on-surface-disabled)" }}>
+                    {formatDistanceToNow(swap.timestamp)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      );
+    }
+
     return (
       <div className="flex items-center justify-center h-16 text-[12px]" style={{ color: "var(--on-surface-disabled)" }}>
         <span>No {activeTab.toLowerCase()} to display</span>
@@ -649,7 +730,8 @@ export default function BottomTabs({
     (activeTab === "Order History"   && isLoadingOrderHistory)   ||
     (activeTab === "Fill History"    && isLoadingFillHistory)     ||
     (activeTab === "Position History" && isLoadingPositionHistory) ||
-    (activeTab === "Funding History"  && isLoadingFundingHistory);
+    (activeTab === "Funding History"  && isLoadingFundingHistory)  ||
+    (activeTab === "Swap History"     && isLoadingSwapHistory);
 
   return (
     <div className="flex flex-col" style={{ background: "var(--surface-container-lowest)", borderTop: "1px solid rgba(66,70,84,0.4)", borderRight: "1px solid rgba(66,70,84,0.4)", borderLeft: "1px solid rgba(66,70,84,0.4)" }}>
@@ -681,6 +763,9 @@ export default function BottomTabs({
               )}
               {tab === "Fill History" && fillHistory.length > 0 && (
                 <span className="ml-1 text-[9px]" style={{ color: "var(--buy)" }}>({fillHistory.length})</span>
+              )}
+              {tab === "Swap History" && swapHistory.length > 0 && (
+                <span className="ml-1 text-[9px]" style={{ color: "#0E76FD" }}>({swapHistory.length})</span>
               )}
             </button>
           ))}

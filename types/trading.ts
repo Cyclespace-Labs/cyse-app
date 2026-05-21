@@ -103,6 +103,21 @@ export interface FillHistoryEntry {
   timestamp: number;
 }
 
+// Swap history entry (from Vault Swap event)
+export interface SwapHistoryEntry {
+  id: string;
+  tokenIn: string;        // raw address
+  tokenOut: string;       // raw address
+  symbolIn: string;       // e.g. "ETH"
+  symbolOut: string;      // e.g. "USDC"
+  amountIn: number;       // human-readable
+  amountOut: number;      // net amount after fees
+  feeBasisPoints: number; // e.g. 30
+  txHash: string;
+  blockNumber: number;
+  timestamp: number;
+}
+
 // Funding history entry
 export interface FundingHistoryEntry {
   id: string;

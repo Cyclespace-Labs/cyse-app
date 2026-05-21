@@ -9,7 +9,7 @@ const CACHE_EXPIRY_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
 export interface CachedEntry {
   id: string;
-  type: "order" | "position" | "fill" | "funding";
+  type: "order" | "position" | "fill" | "funding" | "swap";
   data: unknown;
   timestamp: number; // actual block timestamp in ms
   blockNumber: number;
