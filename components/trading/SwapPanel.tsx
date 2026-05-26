@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
-import { toast } from "sonner";
 import { useReadContract, useBalance } from "wagmi";
 import { parseUnits, formatUnits, maxUint256 } from "viem";
 import { ArrowUpDown, ChevronDown, Loader2, X } from "lucide-react";
@@ -271,11 +270,10 @@ export default function SwapPanel({
 
     // ERC20 approval for Router (not needed for native ETH input)
     if (!isFromNative) {
+      console.log("[SwapPanel] Approving fromToken for Router");
       const approvalHash = await onApproveToken(fromCfg.address, contracts.router.address, maxUint256);
       if (!approvalHash) {
-        toast.error("Approval Failed", {
-          description: "Could not approve the token for swapping. Check your wallet and try again.",
-        });
+        console.error("[SwapPanel] Token approval failed");
         return;
       }
     }
