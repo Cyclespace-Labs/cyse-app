@@ -212,7 +212,7 @@ export default function Home() {
                 currentPrice={currentPrice}
               />
             </div>
-            <div className="w-[260px] shrink-0">
+            <div className="w-[260px] hidden shrink-0">
               <OrderBook symbol={symbol} currentPrice={currentPrice} />
             </div>
           </div>

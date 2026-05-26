@@ -6,6 +6,7 @@ import { ThemeProvider } from "@/contexts/ThemeContext";
 import { WalletProvider } from "@/contexts/WalletContext";
 import { Providers } from "@/components/Providers";
 import { cn } from "@/lib/utils";
+import { Toaster } from "sonner";
 
 
 const alexandria = Alexandria({
@@ -65,6 +66,15 @@ export default function RootLayout({
               {children}
             </WalletProvider>
           </Providers>
+          <Toaster
+            position="top-right"
+            richColors
+            closeButton
+            duration={5000}
+            toastOptions={{
+              style: { fontFamily: "var(--font-sans)" },
+            }}
+          />
         </ThemeProvider>
       </body>
     </html>

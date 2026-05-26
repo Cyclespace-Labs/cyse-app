@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { TokenPriceData } from "@/types/trading";
 import { useWallet } from "@/contexts/WalletContext";
 import { useTradingActions } from "@/hooks/useTradingActions";
@@ -13,6 +13,8 @@ import { usePositionHealth } from "@/hooks/usePositionHealth";
 import { useVaultConfig } from "@/hooks/useVaultConfig";
 import { validateOrder, validateTPSL, formatValidationErrors, validatePositionHealth } from "@/lib/validation/trading";
 import { computeLivePnl } from "@/lib/formatters";
+import { parseContractError } from "@/lib/trading/parseContractError";
+import { toast } from "sonner";
 import { getTickSize } from "@/lib/tradingData";
 import { estimateLiquidationPrice } from "@/lib/positionMath";
 import { parseUnits, formatUnits, maxUint256 } from "viem";
@@ -337,6 +339,30 @@ export default function TradingPanel({
 
   const orderSigning = isPending;
 
+  // ── Toast lifecycle: idle → submitted (loading) → confirmed/failed ──────
+  const toastIdRef = useRef<string | number | undefined>(undefined);
+  useEffect(() => {
+    if (txStatus.state === "submitted" && txStatus.hash) {
+      toastIdRef.current = toast.loading("Order Submitted", {
+        description: "Waiting for on-chain confirmation\u2026",
+      });
+    } else if (txStatus.state === "confirmed") {
+      const short = txStatus.hash
+        ? `Tx ${txStatus.hash.slice(0, 10)}\u2026${txStatus.hash.slice(-4)}`
+        : "Transaction";
+      toast.success("Order Confirmed", {
+        id: toastIdRef.current,
+        description: `${short} confirmed on-chain.`,
+      });
+      toastIdRef.current = undefined;
+    } else if (txStatus.state === "failed" && txStatus.error) {
+      const { title, description } = parseContractError(new Error(txStatus.error));
+      toast.error(title, { id: toastIdRef.current, description });
+      toastIdRef.current = undefined;
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [txStatus.state, txStatus.hash, txStatus.error]);
+
   const handlePctQuantity = useCallback((pct: number) => {
     if (!wallet.connected || collateralTokenBalanceNum <= 0) return;
     const collatPrice = selectedCollateralTokenKey === "WETH" ? currentPrice : 1;
@@ -349,7 +375,9 @@ export default function TradingPanel({
   const handlePlaceOrder = useCallback(async () => {
     if (qtyNum <= 0 || !wallet.address) return;
     if (!isOracleValid) {
-      console.error("[handlePlaceOrder] oracle not valid — aborting");
+      toast.warning("Oracle Unavailable", {
+        description: "Price oracle is not ready yet. Please wait for a valid price feed before placing an order.",
+      });
       return;
     }
 
@@ -358,8 +386,9 @@ export default function TradingPanel({
       console.log("[handlePlaceOrder] Plugin not approved in Router, approving...");
       const approvalHash = await approvePlugin();
       if (!approvalHash) {
-        console.error("[handlePlaceOrder] Failed to approve Plugin in Router");
-        alert("Failed to approve Router Plugin. Please try again.");
+        toast.error("Plugin Approval Failed", {
+          description: "Could not approve the Router plugin in your wallet. Check your connection and try again.",
+        });
         return;
       }
       console.log("[handlePlaceOrder] Plugin approved in Router");
@@ -370,16 +399,18 @@ export default function TradingPanel({
       console.log("[handlePlaceOrder] Router not approved in Vault, approving...");
       const approvalHash = await approveVaultRouter();
       if (!approvalHash) {
-        console.error("[handlePlaceOrder] Failed to approve Router in Vault");
-        alert("Failed to approve Router. Please try again.");
+        toast.error("Router Approval Failed", {
+          description: "Could not approve the Router in the Vault. Check your wallet and try again.",
+        });
         return;
       }
       console.log("[handlePlaceOrder] Router approved in Vault");
     }
 
-    // Validate we have min/max oracle prices for position health check
     if (!oracleMinPrice || !oracleMaxPrice) {
-      console.error("[handlePlaceOrder] oracle min/max prices unavailable");
+      toast.warning("Price Feed Unavailable", {
+        description: "Oracle min/max prices are not available yet. Please wait a moment and try again.",
+      });
       return;
     }
 
@@ -415,8 +446,9 @@ export default function TradingPanel({
       console.log("[handlePlaceOrder] Approving collateral token for", activeType, "spender=", spender);
       const approvalHash = await approveToken(activeCollateralToken, spender, maxUint256);
       if (!approvalHash) {
-        console.error("[handlePlaceOrder] Collateral token approval failed");
-        alert("Failed to approve collateral token. Please try again.");
+        toast.error("Token Approval Failed", {
+          description: "Could not approve your collateral token. Check your wallet and try again.",
+        });
         return;
       }
       console.log("[handlePlaceOrder] Collateral token approved");
@@ -449,13 +481,18 @@ export default function TradingPanel({
       console.log("[handlePlaceOrder] Position health result:", health);
 
       if (!health.isHealthy) {
-        console.error("[handlePlaceOrder] Position health check failed:", health.error);
-        alert(health.error);
+        toast.error("Position Invalid", {
+          description: health.error ?? "Position parameters are invalid. Adjust your collateral or reduce leverage.",
+          duration: 7000,
+        });
         return;
       }
 
       if (health.warning) {
-        console.warn("[handlePlaceOrder] Position health warning:", health.warning);
+        toast.warning("Elevated Risk", {
+          description: health.warning,
+          duration: 6000,
+        });
       }
     }
 
@@ -489,7 +526,9 @@ export default function TradingPanel({
     } else {
       // Limit / Conditional
       if (priceNum <= 0) {
-        console.error("[handlePlaceOrder] limit price required for", activeType);
+        toast.warning("Limit Price Required", {
+          description: `Enter a valid trigger price for a ${activeType.toLowerCase()} order.`,
+        });
         return;
       }
       const triggerPriceRaw = parseUnits(priceNum.toFixed(8), 30);
@@ -571,7 +610,10 @@ export default function TradingPanel({
     const tpErrors = validateTPSL(tp, sl, pos.avgPriceFormatted, pos.isLong);
     const { errors } = formatValidationErrors(tpErrors);
     if (errors.length > 0) {
-      alert(errors.join("\n"));
+      toast.error("Invalid TP/SL Prices", {
+        description: errors[0] ?? "Review your take-profit and stop-loss values.",
+        duration: 6000,
+      });
       return;
     }
 
