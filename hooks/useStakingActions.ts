@@ -339,7 +339,6 @@ export function useStakingActions() {
         functionName: "mintAndStakeCylpETH",
         args: [options?.minUsdg ?? 0n, options?.minCylp ?? 0n],
         value,
-        gas: 8_000_000n,
       }));
     },
     [executeWrite, runAction]
@@ -360,6 +359,7 @@ export function useStakingActions() {
           ...contracts.rewardRouter,
           functionName: "mintAndStakeCylp",
           args: [tokenAddress, value, options?.minUsdg ?? 0n, options?.minCylp ?? 0n],
+          gas: 15_000_000n,
         });
       });
     },

@@ -9,7 +9,7 @@ import { useStakingActions } from "@/hooks/useStakingActions";
 import { useWallet } from "@/contexts/WalletContext";
 import { contracts } from "@/lib/protocol/contracts";
 import { Loader2, Droplets, ShieldCheck, TrendingUp, Wallet, ArrowUpRight, ArrowDownLeft, Clock, ExternalLink } from "lucide-react";
-import { formatUnits } from "viem";
+import { formatUnits, parseUnits } from "viem";
 import Link from "next/link";
 
 const fmt$ = (v: number) => {
@@ -17,6 +17,13 @@ const fmt$ = (v: number) => {
 };
 
 const fmtNum = (v: number, d = 4) => v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: d });
+
+// Slippage tolerance: 0.5% (50 basis points) for USDG/output
+// For CYLP minting, use 0 since output depends on vault AUM and supply ratio
+const SLIPPAGE_BPS = 50;
+const calculateSlippage = (value: bigint) => {
+  return (value * (10000n - BigInt(SLIPPAGE_BPS))) / 10000n;
+};
 
 const getErrorMessage = (error: unknown) => {
   if (typeof error === "object" && error !== null) {
@@ -82,9 +89,19 @@ export default function VaultPage() {
     setTxStatus("Adding liquidity...");
     try {
       if (addTokenMode === "eth") {
-        await actions.addLiquidityETH(addLiqInput);
+        const ethAmount = parseUnits(addLiqInput, 18);
+        // Calculate slippage: 0.5% tolerance for USDG output
+        // CYLP output depends on vault AUM/supply ratio, so use 0 as minimum
+        const minUsdg = calculateSlippage(ethAmount);
+        const minCylp = 0n;
+        await actions.addLiquidityETH(addLiqInput, { minUsdg, minCylp });
       } else {
-        await actions.addLiquidityToken(selectedAddToken.address, addLiqInput, selectedAddToken.decimals);
+        const tokenAmount = parseUnits(addLiqInput, selectedAddToken.decimals);
+        // Calculate slippage: 0.5% tolerance for USDG output
+        // CYLP output depends on vault AUM/supply ratio, so use 0 as minimum
+        const minUsdg = calculateSlippage(tokenAmount);
+        const minCylp = 0n;
+        await actions.addLiquidityToken(selectedAddToken.address, addLiqInput, selectedAddToken.decimals, { minUsdg, minCylp });
       }
       setTxStatus("Liquidity added! CYLP minted and staked.");
       setAddLiqInput("");
@@ -97,10 +114,14 @@ export default function VaultPage() {
     if (!removeLiqInput || parseFloat(removeLiqInput) <= 0) return;
     setTxStatus("Removing liquidity...");
     try {
+      const cylpAmount = parseUnits(removeLiqInput, 18);
+      // Calculate slippage: 0.5% tolerance for output token
+      const minOut = calculateSlippage(cylpAmount);
+      
       if (removeTokenMode === "eth") {
-        await actions.removeLiquidityETH(removeLiqInput);
+        await actions.removeLiquidityETH(removeLiqInput, { minOut });
       } else {
-        await actions.removeLiquidityToken(selectedRemoveToken.address, removeLiqInput);
+        await actions.removeLiquidityToken(selectedRemoveToken.address, removeLiqInput, { minOut });
       }
       setTxStatus("Liquidity removed!");
       setRemoveLiqInput("");
