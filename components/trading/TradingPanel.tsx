@@ -164,7 +164,8 @@ export default function TradingPanel({
   const collateralTokenBalanceNum = collateralTokenBalance?.value !== undefined
     ? parseFloat(formatUnits(collateralTokenBalance.value, collateralDecimals))
     : 0;
-  const collateralTokenPrice = selectedCollateralTokenKey === "WETH" ? currentPrice : 1;
+  const collateralTokenPrice =
+    selectedCollateralTokenKey === "USDC" || selectedCollateralTokenKey === "USDT" ? 1 : currentPrice;
   const collateralTokenBalanceUsd = collateralTokenBalanceNum * collateralTokenPrice;
 
   const {
@@ -386,9 +387,10 @@ export default function TradingPanel({
     const collateralUsd = collateralInputNum;
     const positionSizeUsdForOrder = collateralUsd * leverage;
 
-    // For WETH collateral being swapped to index token, use index token price for collateral calculation
-    // The Vault calculates collateral based on post-swap token value
-    const collateralTokenPrice = selectedCollateralTokenKey === "WETH" ? indexPrice : 1;
+    // For non-stable collateral (WETH or BTC), use index price so the raw token amount
+    // is correctly derived from the user's USD collateral input.
+    const collateralTokenPrice =
+      selectedCollateralTokenKey === "USDC" || selectedCollateralTokenKey === "USDT" ? 1 : indexPrice;
     const collateralAmount = parseUnits((collateralUsd / collateralTokenPrice).toFixed(8), collateralDecimals);
     const sizeDelta = parseUnits(positionSizeUsdForOrder.toFixed(8), 30);
 

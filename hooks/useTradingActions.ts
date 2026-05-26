@@ -205,9 +205,10 @@ export function useTradingActions() {
     [writeContractAsync]
   );
 
-  // For long positions: collateral must match index token OR be a stablecoin.
-  // For short positions: collateral must be a stablecoin.
-  // When user selects WETH for a position that doesn't match, swap via the path.
+  // For long positions: collateral token MUST equal indexToken (Vault invariant).
+  // Any mismatch — including stable coins — requires a two-element path so the
+  // Router/Vault swaps the deposited token into the index token first.
+  // For short positions: collateral must be a stable coin; WETH is routed to USDC.
   function getShortPathAndCollateral(
     collateralToken: `0x${string}`,
     indexToken: `0x${string}`,
@@ -219,16 +220,10 @@ export function useTradingActions() {
       collateralToken.toLowerCase() === contracts.usdg.address.toLowerCase();
 
     if (isLong) {
-      // For longs: if collateral is not stable and doesn't match index, swap to index token
-      if (!isStable && collateralToken.toLowerCase() !== indexToken.toLowerCase()) {
-        if (collateralToken.toLowerCase() === contracts.weth.address.toLowerCase()) {
-          // WETH collateral with different index token: swap WETH -> indexToken
-          return {
-            path: [contracts.weth.address, indexToken],
-            collateralToken: indexToken,
-          };
-        }
-        // For other non-stable tokens, swap directly to index token
+      // For longs: collateral MUST equal indexToken after the swap (Vault invariant).
+      // Any collateral that differs from the index token — including stables — needs a
+      // two-element path so the Router/Vault swaps it to the index token first.
+      if (collateralToken.toLowerCase() !== indexToken.toLowerCase()) {
         return {
           path: [collateralToken, indexToken],
           collateralToken: indexToken,
@@ -362,7 +357,10 @@ export function useTradingActions() {
           isLong
         );
         // For native ETH collateral the OrderBook needs to wrap the incoming ETH value to WETH.
-        const shouldWrap = effectiveCollateral.toLowerCase() === contracts.weth.address.toLowerCase();
+        // shouldWrap = true only when the user is depositing native ETH (path[0] is WETH).
+        // Do NOT check effectiveCollateral (path[last]) — for e.g. USDT→WETH longs,
+        // effectiveCollateral is WETH but the user is depositing USDT, not ETH.
+        const shouldWrap = path[0].toLowerCase() === contracts.weth.address.toLowerCase();
         const hash = await writeContractAsync({
           ...contracts.orderBook,
           functionName: "createIncreaseOrder",
