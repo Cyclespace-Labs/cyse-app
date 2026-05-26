@@ -26,6 +26,7 @@ type InternalWriteRequest = {
   functionName: string;
   args?: readonly unknown[];
   value?: bigint;
+  gas?: bigint;
 };
 
 export function useStakingActions() {
@@ -338,6 +339,7 @@ export function useStakingActions() {
         functionName: "mintAndStakeCylpETH",
         args: [options?.minUsdg ?? 0n, options?.minCylp ?? 0n],
         value,
+        gas: 8_000_000n,
       }));
     },
     [executeWrite, runAction]
