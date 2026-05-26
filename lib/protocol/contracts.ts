@@ -209,7 +209,7 @@ export const COLLATERAL_TOKENS: Record<string, `0x${string}`> = {
 };
 
 /** Generic ERC-20 ABI for any token approval / balance reads */
-export { erc20Abi };
+export { erc20Abi, readerAbi };
 
 // ─── Token address to symbol mapping ─────────────────────────────────────────
 const TOKEN_SYMBOLS: Record<string, string> = {
