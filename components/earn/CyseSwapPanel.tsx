@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
-import { useAccount, useBalance, useReadContract } from "wagmi";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useAccount, useBalance, useReadContract, useWriteContract } from "wagmi";
 import { parseUnits, formatUnits, maxUint256 } from "viem";
 import { ArrowDownUp, Wallet, ChevronDown, Loader2 } from "lucide-react";
 import { contracts, erc20Abi, PRICE_PRECISION } from "@/lib/protocol/contracts";
@@ -41,10 +41,94 @@ interface CyseSwapPanelProps {
   customConnectButton: React.ReactNode;
 }
 
+function TokenDropdown({
+  selected,
+  exclude,
+  onSelect,
+}: {
+  selected: SwapTokenKey;
+  exclude: SwapTokenKey;
+  onSelect: (key: SwapTokenKey) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const cfg = SWAP_TOKENS[selected];
+  return (
+    <div ref={ref} className="relative shrink-0">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors"
+        style={{
+          background: open ? "var(--surface-container-high)" : "var(--surface-container-high)",
+          border: "1px solid rgba(66,70,84,0.4)",
+          color: "var(--on-surface)",
+        }}
+      >
+        <div
+          className="w-5 h-5 rounded-full flex items-center justify-center text-white text-[9px] font-bold shrink-0"
+          style={{ backgroundColor: TOKEN_COLORS[selected] || "var(--primary)" }}
+        >
+          {cfg.symbol.charAt(0)}
+        </div>
+        <span className="text-[13px] font-mono font-medium">{cfg.symbol}</span>
+        <ChevronDown
+          size={13}
+          className="transition-transform shrink-0"
+          style={{ color: "var(--on-surface-disabled)", transform: open ? "rotate(180deg)" : "rotate(0deg)" }}
+        />
+      </button>
+
+      {open && (
+        <div
+          className="absolute left-0 top-full mt-1.5 z-30 rounded-lg overflow-hidden min-w-[140px]"
+          style={{
+            background: "var(--surface-container-lowest)",
+            border: "1px solid rgba(66,70,84,0.4)",
+            boxShadow: "0 12px 32px rgba(0,0,0,0.45)",
+          }}
+        >
+          {ALL_SWAP_TOKENS.filter((k) => k !== exclude).map((key) => {
+            const c = SWAP_TOKENS[key];
+            const isSelected = key === selected;
+            return (
+              <button
+                key={key}
+                onClick={() => { onSelect(key); setOpen(false); }}
+                className="w-full flex items-center gap-2.5 px-3 py-2.5 transition-colors"
+                style={{ background: isSelected ? "var(--surface-container)" : "transparent" }}
+                onMouseEnter={(e) => { if (!isSelected) (e.currentTarget as HTMLElement).style.background = "rgba(66,70,84,0.2)"; }}
+                onMouseLeave={(e) => { if (!isSelected) (e.currentTarget as HTMLElement).style.background = "transparent"; }}
+              >
+                <div className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[9px] font-bold shrink-0" style={{ backgroundColor: TOKEN_COLORS[key] || "var(--primary)" }}>
+                  {c.symbol.charAt(0)}
+                </div>
+                <div className="flex flex-col items-start min-w-0">
+                  <span className="text-[12px] font-mono font-semibold" style={{ color: isSelected ? "var(--primary)" : "var(--on-surface)" }}>{c.symbol}</span>
+                  <span className="text-[10px] font-mono" style={{ color: "var(--on-surface-disabled)" }}>{c.name}</span>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function CyseSwapPanel({ customConnectButton }: CyseSwapPanelProps) {
   const { address } = useAccount();
   const staking = useStakingData();
   const tradingActions = useTradingActions();
+  const { writeContractAsync } = useWriteContract();
   
   const [mode, setMode] = useState<"buy" | "sell">("buy");
   const [payAmount, setPayAmount] = useState("");
@@ -73,19 +157,26 @@ export default function CyseSwapPanel({ customConnectButton }: CyseSwapPanelProp
   const payCfg = SWAP_TOKENS[payToken];
   const receiveCfg = SWAP_TOKENS[receiveToken];
 
-  // Get prices from Vault for swap calculation
+  // Get prices from Vault for swap calculation (non-CYSE swaps)
   const { data: priceInRaw } = useReadContract({
     ...contracts.vault,
     functionName: "getMinPrice",
     args: [payCfg.address],
-    query: { refetchInterval: 5_000, enabled: !!address && !STABLE_TOKENS.has(payToken) },
+    query: { refetchInterval: 5_000, enabled: !!address && !STABLE_TOKENS.has(payToken) && payToken !== "CYSE" },
   });
 
   const { data: priceOutRaw } = useReadContract({
     ...contracts.vault,
     functionName: "getMaxPrice",
     args: [receiveCfg.address],
-    query: { refetchInterval: 5_000, enabled: !!address && !STABLE_TOKENS.has(receiveToken) },
+    query: { refetchInterval: 5_000, enabled: !!address && !STABLE_TOKENS.has(receiveToken) && receiveToken !== "CYSE" },
+  });
+
+  // Get CYSE mint price from CyseFloor
+  const { data: cyseMintPriceRaw } = useReadContract({
+    ...contracts.cyseFloor,
+    functionName: "getMintPrice",
+    query: { refetchInterval: 5_000, enabled: !!address && (payToken === "CYSE" || receiveToken === "CYSE") },
   });
 
   // Get swap fee from Vault
@@ -99,30 +190,48 @@ export default function CyseSwapPanel({ customConnectButton }: CyseSwapPanelProp
   // Calculate prices (1e30 precision from vault)
   const priceIn = useMemo(() => {
     if (STABLE_TOKENS.has(payToken)) return 1.0;
+    if (payToken === "CYSE") {
+      if (!cyseMintPriceRaw) return null;
+      return parseFloat(formatUnits(cyseMintPriceRaw as bigint, PRICE_PRECISION_EXP));
+    }
     if (!priceInRaw) return null;
     return parseFloat(formatUnits(priceInRaw as bigint, PRICE_PRECISION_EXP));
-  }, [payToken, priceInRaw]);
+  }, [payToken, priceInRaw, cyseMintPriceRaw]);
 
   const priceOut = useMemo(() => {
     if (STABLE_TOKENS.has(receiveToken)) return 1.0;
+    if (receiveToken === "CYSE") {
+      if (!cyseMintPriceRaw) return null;
+      return parseFloat(formatUnits(cyseMintPriceRaw as bigint, PRICE_PRECISION_EXP));
+    }
     if (!priceOutRaw) return null;
     return parseFloat(formatUnits(priceOutRaw as bigint, PRICE_PRECISION_EXP));
-  }, [receiveToken, priceOutRaw]);
+  }, [receiveToken, priceOutRaw, cyseMintPriceRaw]);
 
   const feeBps = swapFeeBps ? Number(swapFeeBps) : getFeeBps(payToken, receiveToken);
   const swapFeePercent = feeBps / 100;
 
-  // Calculate receive amount based on Vault prices
+  // Calculate receive amount based on prices
   useEffect(() => {
     const num = parseFloat(payAmount) || 0;
     if (num <= 0 || !priceIn || !priceOut) {
       setReceiveAmount("");
       return;
     }
-    const rawOut = num * priceIn / priceOut;
-    const afterFee = rawOut * (1 - feeBps / 10_000);
-    setReceiveAmount(afterFee.toFixed(4));
-  }, [payAmount, priceIn, priceOut, feeBps]);
+    
+    const isCyseSwap = payToken === "CYSE" || receiveToken === "CYSE";
+    
+    if (isCyseSwap) {
+      // For CYSE swaps, use simple price ratio (no Vault fee)
+      const rawOut = num * priceIn / priceOut;
+      setReceiveAmount(rawOut.toFixed(4));
+    } else {
+      // For non-CYSE swaps, apply Vault fee
+      const rawOut = num * priceIn / priceOut;
+      const afterFee = rawOut * (1 - feeBps / 10_000);
+      setReceiveAmount(afterFee.toFixed(4));
+    }
+  }, [payAmount, priceIn, priceOut, feeBps, payToken, receiveToken]);
 
   // Get balances
   const { data: nativeBalance } = useBalance({
@@ -173,38 +282,108 @@ export default function CyseSwapPanel({ customConnectButton }: CyseSwapPanelProp
         receiveCfg.decimals
       );
 
-      const isFromNative = payToken === "WETH";
-      const isToNative = receiveToken === "WETH";
+      const isCyseSwap = payToken === "CYSE" || receiveToken === "CYSE";
 
-      // Approve token if not native
-      if (!isFromNative) {
-        const approvalHash = await tradingActions.approveToken(
-          payCfg.address,
-          contracts.router.address,
-          amountInRaw
-        );
-        if (!approvalHash) {
-          setTxStatus("Approval failed");
-          return;
+      if (isCyseSwap) {
+        // Use CyseFloor for CYSE swaps
+        const isBuying = receiveToken === "CYSE";
+        
+        if (isBuying) {
+          // Mint CYSE
+          const maxCostRaw = parseUnits(
+            (parseFloat(payAmount) * (1 + slippageBps / 10_000)).toFixed(payCfg.decimals),
+            payCfg.decimals
+          );
+          
+          // CyseFloor mint is nonpayable - WETH must be approved directly
+          // Approve reserve token to CyseFloor
+          const approvalHash = await tradingActions.approveToken(
+            payCfg.address,
+            contracts.cyseFloor.address,
+            amountInRaw
+          );
+          if (!approvalHash) {
+            setTxStatus("Approval failed");
+            return;
+          }
+          
+          const hash = await writeContractAsync({
+            ...contracts.cyseFloor,
+            functionName: "mint",
+            args: [amountInRaw, maxCostRaw, address],
+            gas: 25_000_000n,
+          });
+          
+          if (hash) {
+            setTxStatus("Mint submitted successfully!");
+            setPayAmount("");
+            setReceiveAmount("");
+          } else {
+            setTxStatus("Mint failed");
+          }
+        } else {
+          // Burn CYSE
+          // Approve CYSE to CyseFloor
+          const approvalHash = await tradingActions.approveToken(
+            contracts.cyse.address,
+            contracts.cyseFloor.address,
+            amountInRaw
+          );
+          if (!approvalHash) {
+            setTxStatus("Approval failed");
+            return;
+          }
+          
+          const hash = await writeContractAsync({
+            ...contracts.cyseFloor,
+            functionName: "burn",
+            args: [amountInRaw, minOutRaw, address],
+            gas: 25_000_000n,
+          });
+          
+          if (hash) {
+            setTxStatus("Burn submitted successfully!");
+            setPayAmount("");
+            setReceiveAmount("");
+          } else {
+            setTxStatus("Burn failed");
+          }
         }
-      }
-
-      const hash = await tradingActions.placeSwap({
-        fromToken: payCfg.address,
-        toToken: receiveCfg.address,
-        amountIn: amountInRaw,
-        minOut: minOutRaw,
-        receiver: address,
-        isFromNative,
-        isToNative,
-      });
-
-      if (hash) {
-        setTxStatus("Swap submitted successfully!");
-        setPayAmount("");
-        setReceiveAmount("");
       } else {
-        setTxStatus("Swap failed");
+        // Use Router for non-CYSE swaps
+        const isFromNative = payToken === "WETH";
+        const isToNative = receiveToken === "WETH";
+
+        // Approve token if not native
+        if (!isFromNative) {
+          const approvalHash = await tradingActions.approveToken(
+            payCfg.address,
+            contracts.router.address,
+            amountInRaw
+          );
+          if (!approvalHash) {
+            setTxStatus("Approval failed");
+            return;
+          }
+        }
+
+        const hash = await tradingActions.placeSwap({
+          fromToken: payCfg.address,
+          toToken: receiveCfg.address,
+          amountIn: amountInRaw,
+          minOut: minOutRaw,
+          receiver: address,
+          isFromNative,
+          isToNative,
+        });
+
+        if (hash) {
+          setTxStatus("Swap submitted successfully!");
+          setPayAmount("");
+          setReceiveAmount("");
+        } else {
+          setTxStatus("Swap failed");
+        }
       }
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Swap failed";
@@ -212,7 +391,7 @@ export default function CyseSwapPanel({ customConnectButton }: CyseSwapPanelProp
     } finally {
       setIsSwapping(false);
     }
-  }, [address, payAmount, receiveAmount, payCfg, receiveCfg, payToken, receiveToken, slippageBps, tradingActions]);
+  }, [address, payAmount, receiveAmount, payCfg, receiveCfg, payToken, receiveToken, slippageBps, tradingActions, writeContractAsync]);
 
   const canSwap = address && parseFloat(payAmount) > 0 && parseFloat(payAmount) <= payBalanceNum && priceIn !== null && priceOut !== null;
 
@@ -276,16 +455,7 @@ export default function CyseSwapPanel({ customConnectButton }: CyseSwapPanelProp
               className="flex-1 bg-transparent text-white text-[18px] font-mono font-semibold outline-none"
               style={{ color: "var(--on-surface)" }}
             />
-            <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors" style={{ background: "var(--surface-container-high)", border: "1px solid rgba(66,70,84,0.4)" }}>
-              <div
-                className="w-5 h-5 rounded-full flex items-center justify-center text-white text-[9px] font-bold"
-                style={{ backgroundColor: TOKEN_COLORS[payToken] || "var(--primary)" }}
-              >
-                {payCfg.symbol.charAt(0)}
-              </div>
-              <span className="text-white text-[13px] font-mono font-medium" style={{ color: "var(--on-surface)" }}>{payCfg.symbol}</span>
-              <ChevronDown size={13} style={{ color: "var(--on-surface-disabled)" }} />
-            </button>
+            <TokenDropdown selected={payToken} exclude={receiveToken} onSelect={setPayToken} />
           </div>
           {address && (
             <div className="flex items-center gap-1.5 mt-1.5">
@@ -342,16 +512,7 @@ export default function CyseSwapPanel({ customConnectButton }: CyseSwapPanelProp
               className="flex-1 bg-transparent text-white text-[18px] font-mono font-semibold outline-none"
               style={{ color: "var(--on-surface)" }}
             />
-            <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg" style={{ background: "var(--surface-container-high)", border: "1px solid rgba(66,70,84,0.4)" }}>
-              <div
-                className="w-5 h-5 rounded-full flex items-center justify-center text-white text-[9px] font-bold"
-                style={{ backgroundColor: receiveToken === "CYSE" ? "var(--primary)" : receiveToken === "WETH" ? "#627eea" : receiveToken === "USDC" ? "#2775ca" : "#26a17b" }}
-              >
-                {receiveCfg.symbol.charAt(0)}
-              </div>
-              <span className="text-white text-[13px] font-mono font-medium" style={{ color: "var(--on-surface)" }}>{receiveCfg.symbol}</span>
-              <ChevronDown size={13} style={{ color: "var(--on-surface-disabled)" }} />
-            </button>
+            <TokenDropdown selected={receiveToken} exclude={payToken} onSelect={setReceiveToken} />
           </div>
         </div>
 
