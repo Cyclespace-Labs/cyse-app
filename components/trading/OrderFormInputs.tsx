@@ -114,7 +114,7 @@ export default function OrderFormInputs({
               <button
                 key={pct}
                 onClick={() => onPctQuantity(pct)}
-                className="flex-1 py-1 text-[10px] font-mono rounded-md transition-colors bg-surface-container dark:bg-surface-low text-on-surface-muted hover:bg-surface-bright hover:text-on-surface"
+                className="flex-1 py-1 text-[10px] font-mono rounded-sm transition-colors bg-surface-container dark:bg-surface-low text-on-surface-muted hover:bg-surface-bright hover:text-on-surface"
               >
                 {pct}%
               </button>

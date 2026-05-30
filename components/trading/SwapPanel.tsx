@@ -563,12 +563,12 @@ export default function SwapPanel({
             ) : (
               <span className="flex items-center gap-2">
                 Swap
-                <span className="flex items-center gap-1.5 opacity-80">
+                <span className="flex hidden items-center gap-1.5 opacity-80">
                   <img src={TOKEN_ICONS[fromKey]} className="w-4 h-4 rounded-full object-contain" />
                   {fromCfg.symbol}
                 </span>
-                <span style={{ opacity: 0.5 }}>→</span>
-                <span className="flex items-center gap-1.5 opacity-80">
+                <span className="hidden" style={{ opacity: 0.5 }}>→</span>
+                <span className="flex hidden items-center gap-1.5 opacity-80">
                   <img src={TOKEN_ICONS[toKey]} className="w-4 h-4 rounded-full object-contain" />
                   {toCfg.symbol}
                 </span>
