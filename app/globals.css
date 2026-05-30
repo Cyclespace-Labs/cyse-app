@@ -162,8 +162,8 @@
   --on-surface-disabled:      oklch(0.663 0.022 264);  /* slate-400 */
 
   /* Outline — light */
-  --outline:                  oklch(0.52  0.03  264);  /* slate-500 */
-  --outline-variant:          oklch(0.845 0.015 264);  /* slate-300 */
+  --outline:                  oklch(0.52  0.03  264 / 30%);  /* slate-500 */
+  --outline-variant:          oklch(0.922 0.01  264);  /* slate-200 */
 
   /* Semantic trading */
   --buy:                      oklch(0.631 0.155 158);
@@ -245,7 +245,7 @@
   --on-surface-disabled:      oklch(0.52  0.03  264);  /* slate-500 — disabled text  */
 
   /* Outline — scaled to 800 base */
-  --outline:                  oklch(0.42  0.034 264);  /* slate-600 */
+  --outline:                  oklch(0.42  0.034 264 / 40%);  /* slate-600 */
   --outline-variant:          oklch(0.32  0.037 264);  /* slate-700 */
 
   /* Semantic trading — unchanged */

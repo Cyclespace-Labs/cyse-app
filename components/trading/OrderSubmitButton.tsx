@@ -70,7 +70,7 @@ export default function OrderSubmitButton({
             : "linear-gradient(135deg, var(--sell) 0%, var(--sell-bright) 100%)",
           color: orderSigning || hasErrors || !isOracleValid || qtyNum <= 0
             ? "var(--on-surface-disabled)"
-            : side === "buy" ? "#000" : "var(--on-primary)",
+            : side === "buy" ? "#fff" : "var(--on-primary)",
           cursor: orderSigning || hasErrors || !isOracleValid || qtyNum <= 0 ? "not-allowed" : "pointer",
           boxShadow: orderSigning || hasErrors || !isOracleValid || qtyNum <= 0
             ? "none"

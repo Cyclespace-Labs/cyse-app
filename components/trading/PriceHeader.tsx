@@ -82,11 +82,7 @@ export default function PriceHeader({
 
   return (
     <div
-      className="flex items-center gap-0 h-[52px] px-4 overflow-x-auto scrollbar-hide border-b"
-      style={{
-        background: "var(--surface-container-lowest)",
-        borderColor: "rgba(66,70,84,0.4)",
-      }}
+      className="flex items-center gap-0 h-[52px] px-4 overflow-x-auto bg-background scrollbar-hide border-b border-outline"
     >
       {/* Symbol + Leverage */}
       <button
@@ -144,7 +140,7 @@ export default function PriceHeader({
 
       {/* Index Price — from oracle or tokenPriceData */}
       <div className="flex flex-col mr-5 shrink-0">
-        <span className="text-[10px] uppercase tracking-wide" style={{ color: "var(--on-surface-disabled)" }}>Index Price</span>
+        <span className="text-[10px] uppercase tracking-wide text-on-surface-muted">Index Price</span>
         <span className="text-xs" style={{ color: "var(--on-surface)" }}>
           {currentDisplayPrice > 0 ? formatPrice(currentDisplayPrice) : d ? formatPrice(d.indexPrice) : na}
         </span>
@@ -152,7 +148,7 @@ export default function PriceHeader({
 
       {/* 24h Change - From Binance API */}
       <div className="flex flex-col mr-5 shrink-0">
-        <span className="text-[10px] uppercase tracking-wide" style={{ color: "var(--on-surface-disabled)" }}>24h Change</span>
+        <span className="text-[10px] uppercase tracking-wide text-on-surface-muted">24h Change</span>
         <span className="text-xs" style={{ color: changeColor }}>
           {isLoadingBinanceData ? "..." : display24hChange !== undefined && display24hChangePercent !== undefined
             ? `${display24hChange.toFixed(2)} / ${display24hChangePercent.toFixed(2)}%`
@@ -162,7 +158,7 @@ export default function PriceHeader({
 
       {/* 24h High - From Binance API */}
       <div className="flex flex-col mr-5 shrink-0">
-        <span className="text-[10px] uppercase tracking-wide" style={{ color: "var(--on-surface-disabled)" }}>24H High</span>
+        <span className="text-[10px] uppercase tracking-wide text-on-surface-muted">24H High</span>
         <span className="text-xs" style={{ color: "var(--on-surface)" }}>
           {isLoadingBinanceData ? "..." : display24hHigh !== undefined ? formatPrice(display24hHigh) : na}
         </span>
@@ -170,7 +166,7 @@ export default function PriceHeader({
 
       {/* 24h Low - From Binance API */}
       <div className="flex flex-col mr-5 shrink-0">
-        <span className="text-[10px] uppercase tracking-wide" style={{ color: "var(--on-surface-disabled)" }}>24H Low</span>
+        <span className="text-[10px] uppercase tracking-wide text-on-surface-muted">24H Low</span>
         <span className="text-xs" style={{ color: "var(--on-surface)" }}>
           {isLoadingBinanceData ? "..." : display24hLow !== undefined ? formatPrice(display24hLow) : na}
         </span>
@@ -178,7 +174,7 @@ export default function PriceHeader({
 
       {/* 24h Volume - From Binance API */}
       <div className="flex flex-col mr-5 shrink-0">
-        <span className="text-[10px] uppercase tracking-wide" style={{ color: "var(--on-surface-disabled)" }}>24H Volume (USD)</span>
+        <span className="text-[10px] uppercase tracking-wide text-on-surface-muted">24H Volume (USD)</span>
         <span className="text-xs" style={{ color: "var(--on-surface)" }}>
           {isLoadingBinanceData ? "..." : display24hVolume !== undefined ? formatVolume(display24hVolume) : na}
         </span>
@@ -186,7 +182,7 @@ export default function PriceHeader({
 
       {/* Open Interest - Real from Vault contract */}
       <div className="flex flex-col mr-5 shrink-0 hidden">
-        <span className="text-[10px] uppercase tracking-wide" style={{ color: "var(--on-surface-disabled)" }}>Open Interest</span>
+        <span className="text-[10px] uppercase tracking-wide text-on-surface-muted">Open Interest</span>
         <span className="text-xs" style={{ color: "var(--on-surface)" }}>
           {isLoadingVaultData ? "..." : displayOpenInterest !== undefined ? formatVolume(displayOpenInterest) : na}
         </span>
@@ -194,7 +190,7 @@ export default function PriceHeader({
 
       {/* Funding Rate - Real from Vault contract */}
       <div className="flex flex-col shrink-0 hidden">
-        <span className="text-[10px] uppercase tracking-wide" style={{ color: "var(--on-surface-disabled)" }}>Funding Rate</span>
+        <span className="text-[10px] uppercase tracking-wide text-on-surface-muted">Funding Rate</span>
         <span className="text-xs" style={{ color: displayFundingRate !== undefined && displayFundingRate >= 0 ? "var(--buy)" : "var(--sell)" }}>
           {isLoadingVaultData ? "..." : displayFundingRate !== undefined ? `${displayFundingRate.toFixed(4)}%` : na}
         </span>

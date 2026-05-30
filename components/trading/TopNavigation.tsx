@@ -162,7 +162,7 @@ export default function TopNavigation() {
   );
 
   return (
-    <header className="flex items-center justify-between h-12 px-4 shrink-0 relative z-40 bg-background border-b border-outline-variant font-sans">
+    <header className="flex items-center justify-between h-12 px-4 shrink-0 relative z-40 bg-background   border-b border-outline font-sans">
       {/* Left: Logo + Nav */}
       <div className="flex items-center gap-1">
         <Link href="/" className="flex items-center gap-1.5 pr-5">

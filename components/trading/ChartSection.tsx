@@ -438,7 +438,7 @@ export default function ChartSection({ symbol = "ETH", orders = [], positions = 
   // Style helpers
   const bdr = "1px solid rgba(66,70,84,0.4)";
   const toolBtn = (active: boolean) => ({
-    color: active ? "var(--on-surface)" : "var(--on-surface-disabled)",
+    color: active ? "var(--on-surface)" : "var(--on-surface-muted)",
     background: active ? (theme === "dark" ? "var(--surface-container-low)" : "var(--surface-container)") : "transparent",
   });
 
@@ -446,11 +446,11 @@ export default function ChartSection({ symbol = "ETH", orders = [], positions = 
     <div ref={chartContainerRef} className="flex flex-col h-full" style={{ background: "var(--surface-container-lowest)", borderRight: bdr }}>
 
       {/* ── Chart Tabs ───────────────────────────────────────────────────── */}
-      <div className="flex items-center px-2" style={{ borderBottom: bdr }}>
+      <div className="flex items-center px-2 border-b border-outline" >
         
         {chartTabs.map((tab) => (
           <button key={tab} onClick={() => setActiveTab(tab)} className="px-3 py-2.5 text-[12px] transition-colors"
-            style={{ color: activeTab === tab ? "var(--on-surface)" : "var(--on-surface-disabled)", borderBottom: activeTab === tab ? "2px solid var(--primary)" : "2px solid transparent",}}
+            style={{ color: activeTab === tab ? "var(--on-surface)" : "var(--on-surface-muted)", borderBottom: activeTab === tab ? "2px solid var(--primary)" : "2px solid transparent",}}
             suppressHydrationWarning>
             {tab}
           </button>
@@ -458,7 +458,7 @@ export default function ChartSection({ symbol = "ETH", orders = [], positions = 
 
         <div className="ml-auto flex items-center gap-1">
           {(["Last", "Mark", "Index"] as PriceType[]).map((label) => (
-            <button key={label} onClick={() => setPriceType(label)} className="px-2 py-1 text-[11px] rounded transition-colors" style={toolBtn(priceType === label)}
+            <button key={label} onClick={() => setPriceType(label)} className="px-2 py-1 text-[11px] rounded-sm transition-colors" style={toolBtn(priceType === label)}
               suppressHydrationWarning>
               {label}
             </button>
@@ -468,10 +468,10 @@ export default function ChartSection({ symbol = "ETH", orders = [], positions = 
       </div>
 
       {/* ── Timeframe + Chart type + Indicators + Tools ──────────────────── */}
-      <div className="flex items-center gap-1 px-2 py-1.5" style={{ borderBottom: bdr }}>
+      <div className="flex items-center gap-1 px-2 py-1.5 border-b border-outline">
         {timeframes.map((tf) => (
           <button key={tf} onClick={() => { setActiveTimeframe(tf); setActiveRange(null); }}
-            className="px-2 py-1 text-[11px] rounded transition-colors" style={toolBtn(activeTimeframe === tf)}
+            className="px-2 py-1 text-[11px] rounded-sm transition-colors" style={toolBtn(activeTimeframe === tf)}
             suppressHydrationWarning>
             {tf}
           </button>
@@ -483,12 +483,12 @@ export default function ChartSection({ symbol = "ETH", orders = [], positions = 
         <div className="relative" ref={chartTypeMenuRef}>
           <button onClick={() => { setShowChartTypeMenu(!showChartTypeMenu); setShowIndicatorMenu(false); }}
             className="px-2 py-1 text-[11px] rounded transition-colors flex items-center gap-1"
-            style={{ color: "var(--on-surface-disabled)" }}>
+            style={{ color: "var(--on-surface-muted)" }}>
             {CHART_TYPES.find((t) => t.id === chartType)?.label ?? "Candles"}
             <ChevronDown size={10} />
           </button>
           {showChartTypeMenu && (
-            <div className="absolute top-full left-0 mt-1 z-50 rounded-md shadow-lg py-1 min-w-[120px]" style={{ background: "var(--surface-container-high)", border: "1px solid rgba(66,70,84,0.6)" }}>
+            <div className="absolute top-full left-0 mt-1 z-50 rounded-md shadow-lg py-1 min-w-[120px] border-b border-outline " style={{ background: "var(--surface-container-low)" }}>
               {CHART_TYPES.map(({ id, label }) => (
                 <button key={id} onClick={() => { setChartType(id); setShowChartTypeMenu(false); }}
                   className="w-full text-left px-3 py-1.5 text-[11px] transition-colors hover:bg-white/5"
@@ -505,14 +505,14 @@ export default function ChartSection({ symbol = "ETH", orders = [], positions = 
         <div className="relative" ref={indicatorMenuRef}>
           <button onClick={() => { setShowIndicatorMenu(!showIndicatorMenu); setShowChartTypeMenu(false); }}
             className="px-2 py-1 text-[11px] rounded transition-colors flex items-center gap-1"
-            style={{ color: activeIndicators.length > 0 ? "var(--primary)" : "var(--on-surface-disabled)", background: activeIndicators.length > 0 ? "rgba(14,118,253,0.1)" : "transparent" }}
+            style={{ color: activeIndicators.length > 0 ? "var(--primary)" : "var(--on-surface-muted)", background: activeIndicators.length > 0 ? "rgba(14,118,253,0.1)" : "transparent" }}
             suppressHydrationWarning>
             <TrendingUp size={12} />
             {indicatorBadge}
             <ChevronDown size={10} />
           </button>
           {showIndicatorMenu && (
-            <div className="absolute top-full left-0 mt-1 z-50 rounded-md shadow-lg py-1 min-w-[180px]" style={{ background: "var(--surface-container-high)", border: "1px solid rgba(66,70,84,0.6)" }}>
+            <div className="absolute top-full left-0 mt-1 z-50 rounded-md shadow-lg py-1 min-w-[180px] border-b border-outline" style={{ background: "var(--surface-container-low)" }}>
               {INDICATOR_DEFS.map(({ id, label, color }) => {
                 const active = activeIndicators.includes(id);
                 return (
@@ -541,7 +541,7 @@ export default function ChartSection({ symbol = "ETH", orders = [], positions = 
 
         {/* OL toggle */}
         <button onClick={() => setShowOrderLines(!showOrderLines)}
-          className="px-1.5 py-1 text-[11px] rounded font-semibold transition-colors"
+          className="px-1.5 py-1 text-[11px] rounded-sm font-semibold transition-colors"
           style={{ color: showOrderLines ? "var(--tertiary)" : "var(--on-surface-disabled)", background: showOrderLines ? "rgba(255,182,143,0.1)" : "transparent" }}
           title={showOrderLines ? "Hide order/position lines" : "Show order/position lines"}>
           OL
@@ -567,7 +567,7 @@ export default function ChartSection({ symbol = "ETH", orders = [], positions = 
       </div>
 
       {/* ── OHLCV info bar ───────────────────────────────────────────────── */}
-      <div className="flex items-center gap-2 px-3 py-1 text-[11px]" style={{ color: "var(--on-surface-disabled)", borderBottom: bdr }}>
+      <div className="flex items-center gap-2 px-3 py-1 text-[11px] border-b border-outline" style={{ color: "var(--on-surface-muted)" }}>
         <span style={{ color: "var(--on-surface)" }}>{symbol}-PERP · {activeTimeframe} · Cyclespace</span>
         <span style={{ color: "var(--on-surface-muted)" }}>·</span>
         {ohlcInfo ? (
@@ -598,8 +598,8 @@ export default function ChartSection({ symbol = "ETH", orders = [], positions = 
         {/* Left drawing tools panel — grouped with flyout sub-menus */}
         {activeTab === "Chart" && (
           <div
-            className="flex flex-col items-center py-1.5 gap-0.5"
-            style={{ width: 38, borderRight: bdr, flexShrink: 0, overflow: "visible" }}
+            className="flex flex-col items-center py-1.5 gap-0.5 border-r border-outline"
+            style={{ width: 38, flexShrink: 0, overflow: "visible" }}
           >
             {TOOL_GROUPS.map((group) => {
               const selectedId = selectedPerGroup[group.groupId] ?? group.tools[0].id;
@@ -704,27 +704,27 @@ export default function ChartSection({ symbol = "ETH", orders = [], positions = 
       </div>
 
       {/* ── Bottom bar ───────────────────────────────────────────────────── */}
-      <div className="flex items-center gap-2 px-3 py-1.5 text-[11px]" style={{ borderTop: bdr }}>
+      <div className="flex items-center gap-2 px-3 py-1.5 text-[11px] border-t border-outline">
         {Object.keys(RANGE_TO_TF).reverse().map((range) => (
           <button key={range} onClick={() => handleRangeClick(range)} className="transition-colors"
             style={{ color: activeRange === range ? "var(--on-surface)" : "var(--on-surface-disabled)", fontWeight: activeRange === range ? 600 : 400 }}
             title={RANGE_TO_TF[range].label}
             onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.color = "var(--on-surface)")}
-            onMouseLeave={(e) => { if (activeRange !== range) (e.currentTarget as HTMLElement).style.color = "var(--on-surface-disabled)"; }}>
+            onMouseLeave={(e) => { if (activeRange !== range) (e.currentTarget as HTMLElement).style.color = "var(--on-surface-muted)"; }}>
             {range}
           </button>
         ))}
         <div className="ml-auto flex items-center gap-2">
           <span style={{ color: "var(--on-surface-disabled)" }}>{utcClock}</span>
           <button onClick={() => setIsLogScale(!isLogScale)} className="transition-colors"
-            style={{ color: isLogScale ? "var(--primary)" : "var(--on-surface-disabled)" }}
+            style={{ color: isLogScale ? "var(--primary)" : "var(--on-surface-muted)" }}
             title={isLogScale ? "Switch to linear scale" : "Switch to log scale"}>
             log
           </button>
           <button onClick={() => setActiveRange(null)} className="transition-colors"
             style={{ color: "var(--on-surface-disabled)" }} title="Auto-fit content"
             onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.color = "var(--on-surface)")}
-            onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.color = "var(--on-surface-disabled)")}>
+            onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.color = "var(--on-surface-muted)")}>
             auto
           </button>
         </div>

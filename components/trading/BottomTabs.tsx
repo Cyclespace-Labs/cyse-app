@@ -110,7 +110,7 @@ export default function BottomTabs({
   const renderContent = () => {
     if (!authed) {
       return (
-        <div className="flex items-center justify-center h-16 text-[12px]" style={{ color: "var(--on-surface-disabled)" }}>
+        <div className="flex items-center justify-center h-16 text-[12px]" style={{ color: "var(--on-surface-muted)" }}>
           <span>Connect wallet or log in to view your {activeTab.toLowerCase()}</span>
         </div>
       );
@@ -118,7 +118,7 @@ export default function BottomTabs({
 
     // Loading state component
     const LoadingState = () => (
-      <div className="flex items-center justify-center h-16 text-[12px]" style={{ color: "var(--on-surface-disabled)" }}>
+      <div className="flex items-center justify-center h-16 text-[12px]" style={{ color: "var(--on-surface-muted)" }}>
         <Loader2 size={14} className="animate-spin mr-2" />
         <span>Loading {activeTab.toLowerCase()}...</span>
       </div>
@@ -129,7 +129,7 @@ export default function BottomTabs({
         <div className="overflow-x-auto">
           <table className="w-full text-[11px] font-mono">
             <thead>
-              <tr style={{ color: "var(--on-surface-disabled)", borderBottom: "1px solid rgba(66,70,84,0.3)" }}>
+              <tr className="border-b border-outline text-on-surface-muted" style={{ color: "var(--on-surface-muted)"}}>
                 <th className="text-left px-3 py-1.5 font-normal">Symbol</th>
                 <th className="text-left px-3 py-1.5 font-normal">Side</th>
 
@@ -293,7 +293,7 @@ export default function BottomTabs({
         <div className="overflow-x-auto">
           <table className="w-full text-[11px] font-mono">
             <thead>
-              <tr style={{ color: "var(--on-surface-disabled)", borderBottom: "1px solid rgba(66,70,84,0.3)" }}>
+              <tr style={{ color: "var(--on-surface-muted)", borderBottom: "1px solid rgba(66,70,84,0.3)" }}>
                 <th className="text-left px-3 py-1.5 font-normal">Symbol</th>
                 <th className="text-left px-3 py-1.5 font-normal">Side</th>
                 <th className="text-left px-3 py-1.5 font-normal">Type</th>
@@ -334,9 +334,9 @@ export default function BottomTabs({
                       {orderQtyMode === "token" ? order.quantity : `$${notionalUsd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                     </td>
                     <td className="px-3 py-1.5 text-right">
-                      <button onClick={() => onCancelOrder?.(order.id)} className="p-0.5 rounded transition-colors" style={{ color: "var(--on-surface-disabled)" }} title="Cancel"
+                      <button onClick={() => onCancelOrder?.(order.id)} className="p-0.5 rounded transition-colors" style={{ color: "var(--on-surface-muted)" }} title="Cancel"
                         onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.color = "var(--sell)")}
-                        onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.color = "var(--on-surface-disabled)")}>
+                        onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.color = "var(--on-surface-muted)")}>
                         <X size={12} />
                       </button>
                     </td>
@@ -517,7 +517,7 @@ export default function BottomTabs({
         <div className="overflow-x-auto">
           <table className="w-full text-[11px] font-mono">
             <thead>
-              <tr style={{ color: "var(--on-surface-disabled)", borderBottom: "1px solid rgba(66,70,84,0.3)" }}>
+              <tr style={{ color: "var(--on-surface-muted)", borderBottom: "1px solid rgba(66,70,84,0.3)" }}>
                 <th className="text-left px-3 py-1.5 font-normal">Symbol</th>
                 <th className="text-left px-3 py-1.5 font-normal">Action</th>
                 <th className="text-left px-3 py-1.5 font-normal">Side</th>
@@ -553,8 +553,8 @@ export default function BottomTabs({
                         `$${pos.entryPrice.toFixed(2)}`
                       ) : pos.exitPrice ? (
                         <span className="inline-flex items-center gap-1">
-                          <span style={{ color: "var(--on-surface-disabled)" }}>${pos.entryPrice.toFixed(2)}</span>
-                          <span style={{ color: "var(--on-surface-disabled)" }}>→</span>
+                          <span style={{ color: "var(--on-surface-muted)" }}>${pos.entryPrice.toFixed(2)}</span>
+                          <span style={{ color: "var(--on-surface-muted)" }}>→</span>
                           <span style={{ color: pos.exitPrice >= pos.entryPrice ? "var(--buy)" : "var(--sell)" }}>${pos.exitPrice.toFixed(2)}</span>
                         </span>
                       ) : `$${pos.entryPrice.toFixed(2)}`}
@@ -567,7 +567,7 @@ export default function BottomTabs({
                         ? `${pos.pnl >= 0 ? "+" : ""}$${pos.pnl.toFixed(2)}`
                         : pnlPct != null ? `${pnlPct >= 0 ? "+" : ""}${pnlPct.toFixed(2)}%` : "—"}
                     </td>
-                    <td className="px-3 py-1.5 text-right" style={{ color: "var(--on-surface-disabled)" }}>{formatDistanceToNow(pos.timestamp)}</td>
+                    <td className="px-3 py-1.5 text-right" style={{ color: "var(--on-surface-muted)" }}>{formatDistanceToNow(pos.timestamp)}</td>
                   </tr>
                 );
               })}
@@ -581,7 +581,7 @@ export default function BottomTabs({
     if (activeTab === "Funding History") {
       if (!fundingAvailable) {
         return (
-          <div className="flex flex-col items-center justify-center h-16 text-[12px]" style={{ color: "var(--on-surface-disabled)" }}>
+          <div className="flex flex-col items-center justify-center h-16 text-[12px]" style={{ color: "var(--on-surface-muted)" }}>
             <span>Funding history not yet available</span>
             <span className="text-[10px] mt-1">Coming soon</span>
           </div>
@@ -590,7 +590,7 @@ export default function BottomTabs({
       if (isLoadingFundingHistory) return <LoadingState />;
       if (fundingHistory.length === 0) {
         return (
-          <div className="flex items-center justify-center h-16 text-[12px]" style={{ color: "var(--on-surface-disabled)" }}>
+          <div className="flex items-center justify-center h-16 text-[12px]" style={{ color: "var(--on-surface-muted)" }}>
             <span>No funding history to display</span>
           </div>
         );
@@ -634,7 +634,7 @@ export default function BottomTabs({
                   <td className="px-3 py-1.5 text-right" style={{ color: funding.fundingFee >= 0 ? "var(--sell)" : "var(--buy)" }}>
                     {funding.fundingFee >= 0 ? "+" : ""}${Math.abs(funding.fundingFee).toFixed(4)}
                   </td>
-                  <td className="px-3 py-1.5 text-right" style={{ color: "var(--on-surface-disabled)" }}>{formatDistanceToNow(funding.timestamp)}</td>
+                  <td className="px-3 py-1.5 text-right" style={{ color: "var(--on-surface-muted)" }}>{formatDistanceToNow(funding.timestamp)}</td>
                 </tr>
               ))}
             </tbody>
@@ -658,7 +658,7 @@ export default function BottomTabs({
         <div className="overflow-x-auto">
           <table className="w-full text-[11px] font-mono">
             <thead>
-              <tr style={{ color: "var(--on-surface-disabled)", borderBottom: "1px solid rgba(66,70,84,0.3)" }}>
+              <tr style={{ color: "var(--on-surface-muted)", borderBottom: "1px solid rgba(66,70,84,0.3)" }}>
                 <th className="text-left px-3 py-1.5 font-normal">Pair</th>
                 <th className="text-right px-3 py-1.5 font-normal">Amount In</th>
                 <th className="text-right px-3 py-1.5 font-normal">Amount Out</th>
@@ -679,7 +679,7 @@ export default function BottomTabs({
                   <td className="px-3 py-1.5">
                     <span className="inline-flex items-center gap-1.5">
                       <span style={{ color: "var(--on-surface)" }}>{swap.symbolIn}</span>
-                      <span style={{ color: "var(--on-surface-disabled)" }}>→</span>
+                      <span style={{ color: "var(--on-surface-muted)" }}>→</span>
                       <span style={{ color: "#0E76FD" }}>{swap.symbolOut}</span>
                     </span>
                   </td>
@@ -694,21 +694,21 @@ export default function BottomTabs({
                     <span className="ml-1 opacity-50">{swap.symbolOut}</span>
                   </td>
                   {/* Fee */}
-                  <td className="px-3 py-1.5 text-right" style={{ color: "var(--on-surface-disabled)" }}>
+                  <td className="px-3 py-1.5 text-right" style={{ color: "var(--on-surface-muted)" }}>
                     {(swap.feeBasisPoints / 100).toFixed(2)}%
                   </td>
                   {/* Tx hash */}
                   <td className="px-3 py-1.5 text-right">
                     {swap.txHash ? (
-                      <span style={{ color: "var(--on-surface-disabled)" }}>
+                      <span style={{ color: "var(--on-surface-muted)" }}>
                         {swap.txHash.slice(0, 6)}…{swap.txHash.slice(-4)}
                       </span>
                     ) : (
-                      <span style={{ color: "var(--on-surface-disabled)" }}>—</span>
+                      <span style={{ color: "var(--on-surface-muted)" }}>—</span>
                     )}
                   </td>
                   {/* Time */}
-                  <td className="px-3 py-1.5 text-right" style={{ color: "var(--on-surface-disabled)" }}>
+                  <td className="px-3 py-1.5 text-right" style={{ color: "var(--on-surface-muted)" }}>
                     {formatDistanceToNow(swap.timestamp)}
                   </td>
                 </tr>
@@ -734,9 +734,9 @@ export default function BottomTabs({
     (activeTab === "Swap History"     && isLoadingSwapHistory);
 
   return (
-    <div className="flex flex-col" style={{ background: "var(--surface-container-lowest)", borderTop: "1px solid rgba(66,70,84,0.4)", borderRight: "1px solid rgba(66,70,84,0.4)", borderLeft: "1px solid rgba(66,70,84,0.4)" }}>
+    <div className="flex flex-col border-t border-r border-l border-outline" style={{ background: "var(--surface-container-lowest)" }}>
       {/* Tab Header */}
-      <div className="flex items-center overflow-x-auto scrollbar-hide" style={{ borderBottom: "1px solid rgba(66,70,84,0.4)" }}>
+      <div className="flex items-center overflow-x-auto scrollbar-hide border-b border-outline">
         <div className="flex items-center flex-1 overflow-x-auto px-2 scrollbar-hide">
           {tabs.map((tab) => (
             <button
@@ -744,7 +744,7 @@ export default function BottomTabs({
               onClick={() => handleTabChange(tab)}
               className="px-3 py-2 text-[12px] whitespace-nowrap transition-colors relative shrink-0"
               style={{
-                color: activeTab === tab ? "var(--on-surface)" : "var(--on-surface-disabled)",
+                color: activeTab === tab ? "var(--on-surface)" : "var(--on-surface-muted)",
                 borderBottom: activeTab === tab ? "2px solid var(--primary)" : "2px solid transparent",
               }}
             >
