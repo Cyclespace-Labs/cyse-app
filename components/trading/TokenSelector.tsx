@@ -62,7 +62,7 @@ export default function TokenSelector({
         <label className="text-[11px] mb-1 block" style={{ color: "var(--on-surface-disabled)" }}>Collateral</label>
         <button
           onClick={() => { setCollateralDropdownOpen((v) => !v); setIndexDropdownOpen(false); }}
-          className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded transition-colors"
+          className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-xl transition-colors"
           style={{
             background: collateralDropdownOpen ? "var(--surface-container)" : "var(--surface-container-low)",
             border: `1px solid ${collateralDropdownOpen ? "var(--outline-variant)" : "var(--outline-variant)"}`,
@@ -111,7 +111,7 @@ export default function TokenSelector({
                     <span className="text-[11px] font-medium" style={{ color: isSelected ? "var(--primary)" : "var(--on-surface)" }}>{cfg.symbol}</span>
                     <span className="text-[9px]" style={{ color: "var(--on-surface-disabled)" }}>{cfg.name}</span>
                   </div>
-                  {isSelected && <div className="ml-auto w-1.5 h-1.5 rounded-full" style={{ background: "var(--primary)" }} />}
+                  {isSelected && <div className="ml-auto w-1.5 h-1.5 rounded-full hidden" style={{ background: "var(--primary)" }} />}
                 </button>
               );
             })}
@@ -124,7 +124,7 @@ export default function TokenSelector({
         <label className="text-[11px] mb-1 block" style={{ color: "var(--on-surface-disabled)" }}>Index Token</label>
         <button
           onClick={() => { setIndexDropdownOpen((v) => !v); setCollateralDropdownOpen(false); }}
-          className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded transition-colors"
+          className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-xl transition-colors"
           style={{
             background: indexDropdownOpen ? "var(--surface-container)" : "var(--surface-container-low)",
             border: `1px solid ${indexDropdownOpen ? "var(--outline-variant)" : "var(--outline-variant)"}`,

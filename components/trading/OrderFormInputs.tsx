@@ -64,7 +64,7 @@ export default function OrderFormInputs({
             <label htmlFor="price-input" className="text-[11px]" style={{ color: "var(--on-surface-disabled)" }}>Limit Price</label>
             <span className="text-[10px] font-mono" style={{ color: "var(--on-surface-disabled)" }}>USD</span>
           </div>
-          <div className="flex items-center rounded px-3 py-2" style={{ background: "var(--surface-container-low)", borderBottom: "2px solid var(--outline-variant)" }}>
+          <div className="flex items-center rounded-lg px-3 py-2" style={{ background: "var(--surface-container-low)", borderBottom: "2px solid var(--outline-variant)" }}>
             <input
               id="price-input"
               type="number"
@@ -76,7 +76,7 @@ export default function OrderFormInputs({
             />
             <button
               onClick={() => onPriceChange(currentPrice > 0 ? currentPrice.toFixed(2) : "")}
-              className="text-[10px] px-1.5 py-0.5 rounded transition-colors ml-2 shrink-0 text-on-surface-muted bg-surface-container dark:bg-surface-container-low hover:text-on-surface"
+              className="text-[10px] px-1.5 py-0.5 rounded-sm transition-colors ml-1 shrink-0 text-on-surface-muted bg-surface-container dark:bg-surface-container-low hover:text-on-surface"
             >
               Mark
             </button>
@@ -90,7 +90,7 @@ export default function OrderFormInputs({
           <label htmlFor="collateral-input" className="text-[11px]" style={{ color: "var(--on-surface-disabled)" }}>Collateral</label>
           <span className="text-[10px] font-mono" style={{ color: "var(--on-surface-disabled)" }}>USD</span>
         </div>
-        <div className="flex items-center rounded px-3 py-2" style={{ background: "var(--surface-container-low)", borderBottom: "2px solid var(--outline-variant)" }}>
+        <div className="flex items-center rounded-lg px-3 py-2" style={{ background: "var(--surface-container-low)", borderBottom: "2px solid var(--outline-variant)" }}>
           <span className="text-sm font-mono mr-1" style={{ color: "var(--on-surface-disabled)" }}>$</span>
           <input
             id="collateral-input"
@@ -114,7 +114,7 @@ export default function OrderFormInputs({
               <button
                 key={pct}
                 onClick={() => onPctQuantity(pct)}
-                className="flex-1 py-1 text-[10px] font-mono rounded transition-colors bg-surface-container dark:bg-surface-low text-on-surface-muted hover:bg-surface-bright hover:text-on-surface"
+                className="flex-1 py-1 text-[10px] font-mono rounded-md transition-colors bg-surface-container dark:bg-surface-low text-on-surface-muted hover:bg-surface-bright hover:text-on-surface"
               >
                 {pct}%
               </button>

@@ -54,7 +54,7 @@ export default function OrderTypeSelector({
           <button
             key={type}
             onClick={() => onTypeChange(type)}
-            className="px-2.5 py-1 text-[11px] rounded transition-colors"
+            className="px-2.5 py-1 text-[11px] rounded-md transition-colors"
             style={{
               color: activeType === type ? "var(--on-surface)" : "var(--on-surface-disabled)",
               background: activeType === type ? (theme === "dark" ? "var(--surface-container-low)" : "var(--surface-container)") : "transparent",

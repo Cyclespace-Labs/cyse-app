@@ -45,7 +45,7 @@ export function CustomConnectButton({ variant = "default" }: CustomConnectButton
                     <button
                       onClick={openConnectModal}
                       type="button"
-                      className="w-full py-2.5 text-[13px] font-semibold rounded btn-primary-gradient flex items-center justify-center gap-2"
+                      className="w-full py-2.5 text-[13px] font-semibold rounded-xl btn-primary-gradient flex items-center justify-center gap-2"
                     >
                       <Wallet size={14} />
                       Connect Wallet to Trade
@@ -57,7 +57,7 @@ export function CustomConnectButton({ variant = "default" }: CustomConnectButton
                     <button
                       onClick={openConnectModal}
                       type="button"
-                      className="flex items-center gap-2 px-4 py-1.5 text-[13px] font-semibold rounded-lg btn-primary-gradient"
+                      className="flex items-center gap-2 px-4 py-1.5 text-[13px] font-semibold rounded-xl btn-primary-gradient"
                     >
                       <Wallet size={14} />
                       Connect Wallet
@@ -68,7 +68,7 @@ export function CustomConnectButton({ variant = "default" }: CustomConnectButton
                   <button
                     onClick={openConnectModal}
                     type="button"
-                    className="flex items-center gap-2 px-5 py-2.5 text-[13px] font-mono font-semibold rounded btn-primary-gradient"
+                    className="flex items-center gap-2 px-5 py-2.5 text-[13px] font-mono font-semibold rounded-xl btn-primary-gradient"
                   >
                     <Wallet size={15} />
                     Connect Wallet
@@ -97,7 +97,7 @@ export function CustomConnectButton({ variant = "default" }: CustomConnectButton
                   <button
                     onClick={openChainModal}
                     type="button"
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors text-[12px]"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl transition-colors text-[12px]"
                     style={{
                       color: "var(--on-surface-variant)",
                       background: "var(--surface-container)",
@@ -117,7 +117,7 @@ export function CustomConnectButton({ variant = "default" }: CustomConnectButton
                   <button
                     onClick={openAccountModal}
                     type="button"
-                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors text-[12px] font-mono"
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-xl transition-colors text-[12px] font-mono"
                     style={{
                       color: "var(--on-surface)",
                       background: "var(--surface-container-high)",

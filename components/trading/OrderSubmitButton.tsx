@@ -61,7 +61,7 @@ export default function OrderSubmitButton({
       <button
         onClick={onSubmit}
         disabled={orderSigning || hasErrors || !isOracleValid || qtyNum <= 0}
-        className="w-full py-2.5 text-[13px] font-semibold rounded transition-colors flex items-center justify-center gap-2"
+        className="w-full py-2.5 text-[13px] font-semibold rounded-2xl transition-colors flex items-center justify-center gap-2"
         style={{
           background: orderSigning || hasErrors || !isOracleValid || qtyNum <= 0
             ? "var(--surface-container-low)"
@@ -104,7 +104,7 @@ export default function OrderSubmitButton({
       {/* Non-blocking on-chain status — visible while tx is submitted/confirmed */}
       {(isSubmitted || isConfirmed) && txHash && (
         <div
-          className="flex items-center gap-2 px-2 py-1.5 rounded text-[10px] font-mono"
+          className="flex items-center gap-2 px-2 py-1.5 rounded-2xl text-[10px] font-mono"
           style={{
             background: isConfirmed ? "rgba(0,192,118,0.08)" : "rgba(99,179,255,0.06)",
             border: `1px solid ${isConfirmed ? "rgba(0,192,118,0.2)" : "rgba(99,179,255,0.15)"}`,

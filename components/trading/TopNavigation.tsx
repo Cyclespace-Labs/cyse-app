@@ -22,8 +22,10 @@ const navItems = [
   { label: "Predictions", href: "/predictions" },
   { label: "Earn", href: "/earn" },
   { label: "Vault", href: "/vault" },
-  { label: "Stats", href: "#" },
-  { label: "More", href: "#", hasDropdown: true },
+  
+  /*enable in prodution*/
+  /* { label: "Stats", href: "#" }, */
+  /*{ label: "More", href: "#", hasDropdown: true },*/
 ];
 
 const mockNotifications = [
@@ -44,8 +46,6 @@ export default function TopNavigation() {
   const { theme, toggleTheme, resolvedTheme } = useTheme();
   const { wallet, CustomConnectButton, disconnect } = useWallet();
   const [primaryColor, setPrimaryColor] = useState("#0E76FD");
-  const [searchOpen, setSearchOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
   const [notifOpen, setNotifOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
@@ -141,9 +141,6 @@ export default function TopNavigation() {
     return () => observer.disconnect();
   }, []);
 
-  useEffect(() => {
-    if (searchOpen) searchRef.current?.focus();
-  }, [searchOpen]);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -183,9 +180,9 @@ export default function TopNavigation() {
           <Link
             key={item.label}
             href={item.href}
-            className={`flex items-center gap-0.5 px-3 py-1.5 text-[13px] rounded transition-colors 
+            className={`flex items-center gap-0.5 px-3 py-1.5 text-[13px] rounded-xl transition-colors duration-100
               text-on-surface-variant hover:text-on-surface hover:bg-surface-high dark:hover:bg-surface-container 
-              ${pathname === item.href ? "bg-surface-container dark:bg-surface-low text-on-surface" : ""}`}
+              ${pathname === item.href ? "bg-surface-container dark:bg-surface-low text-on-surface transition-all duration-100" : ""}`}
           >
             {item.label}
             {item.hasDropdown && <ChevronDown size={11} className="opacity-60" />}
@@ -196,50 +193,23 @@ export default function TopNavigation() {
       {/* Right: Actions */}
       <div className="flex items-center gap-1">
 
-        {/* Expandable Search */}
-        <div className="flex items-center text-on-surface-muted">
-          {searchOpen ? (
-            <div className="flex items-center gap-2 rounded-lg px-3 py-1.5 transition-all bg-surface-low border border-outline-variant w-[260px]">
-              <Search size={13} className="text-on-surface-disabled shrink-0" />
-              <input
-                ref={searchRef}
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search markets, tokens..."
-                className="flex-1 bg-transparent text-[12px] outline-none text-on-surface placeholder:text-on-surface-disabled"
-                onKeyDown={(e) => { if (e.key === "Escape") { setSearchOpen(false); setSearchQuery(""); } }}
-              />
-              <button
-                onClick={() => { setSearchOpen(false); setSearchQuery(""); }}
-                title="Close search"
-                className="p-0.5 rounded transition-colors text-on-surface-muted hover:text-on-surface"
-              >
-                <X size={13} />
-              </button>
-            </div>
-          ) : (
-            iconBtn(() => setSearchOpen(true), "Search (⌘K)", <Search size={15} />)
+        {/* Theme Toggle */}
+        <div className="rounded-sm hover:bg-surface-container">
+          {resolvedTheme && iconBtn(
+            toggleTheme,
+            resolvedTheme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode",
+            resolvedTheme === "dark"
+              ? <Sun size={15} className="text-orange-400 fill-orange-400" />
+              : <Moon size={15} className="text-blue-400 fill-blue-400" />
           )}
         </div>
-
-        {iconBtn(() => {}, "Language", <Globe size={15} className="text-on-surface-muted" />)}
-
-        {/* Theme Toggle */}
-        {resolvedTheme && iconBtn(
-          toggleTheme,
-          resolvedTheme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode",
-          resolvedTheme === "dark"
-            ? <Sun size={15} className="text-on-surface-muted" />
-            : <Moon size={15} className="text-on-surface-muted" />
-        )}
 
         {/* Notifications */}
         <div className="relative" ref={notifRef}>
           <button
             onClick={() => { setNotifOpen(!notifOpen); setSettingsOpen(false); }}
             title="Notifications"
-            className="relative p-1.5 rounded transition-colors text-on-surface-muted hover:text-on-surface hover:bg-surface-high"
+            className="relative p-1.5 rounded-sm transition-colors text-on-surface-muted hover:text-on-surface hover:bg-surface-container"
           >
             <Bell size={15} />
             {unreadCount > 0 && (
@@ -287,7 +257,7 @@ export default function TopNavigation() {
           <button
             onClick={() => { setSettingsOpen(!settingsOpen); setNotifOpen(false); }}
             title="Settings"
-            className={`p-1.5 rounded transition-colors ${settingsOpen ? "text-on-surface bg-surface-container" : "text-on-surface-muted hover:text-on-surface hover:bg-surface-high"}`}
+            className={`p-1.5 rounded-sm transition-colors ${settingsOpen ? "text-on-surface bg-surface-container" : "text-on-surface-muted hover:text-on-surface hover:bg-surface-container"}`}
           >
             <Settings size={15} />
           </button>
@@ -317,6 +287,13 @@ export default function TopNavigation() {
                     />
                   </button>
                 </div>
+                <div className="h-px mx-4 bg-outline-variant/60" />
+
+                <div className="px-2 py-1 flex items-center gap-1">
+                  {iconBtn(() => {}, "Language", <Globe size={15} className="text-on-surface-muted" />)}
+                  <span className="text-[12px] text-on-surface-variant">Language</span>
+                </div>
+
                 <div className="h-px mx-4 bg-outline-variant/60" />
                 {[
                   { icon: Monitor, label: "Display Settings" },
@@ -361,7 +338,7 @@ export default function TopNavigation() {
             {!wallet.isCorrectNetwork && (
               <button
                 onClick={() => {}}
-                className="flex items-center gap-1 px-2 py-1 rounded text-[10px] bg-warning/10 text-warning"
+                className="flex items-center gap-1 px-2 py-1 rounded-xl text-[10px] bg-warning/10 text-warning"
                 title="Wrong network detected"
               >
                 <AlertTriangle size={10} />
@@ -370,7 +347,7 @@ export default function TopNavigation() {
             )}
             {wallet.isHardwareWallet && (
               <div
-                className="flex items-center gap-1 px-2 py-1 rounded text-[10px] bg-buy/10 text-buy"
+                className="flex items-center gap-1 px-2 py-1 rounded-xl text-[10px] bg-buy/10 text-buy"
                 title="Hardware wallet connected"
               >
                 <Shield size={10} />
@@ -379,7 +356,7 @@ export default function TopNavigation() {
             )}
             {wallet.isCorrectNetwork && (
               <div
-                className="flex items-center gap-1 px-2 py-1 rounded text-[10px] bg-primary/10 text-primary"
+                className="flex items-center gap-1 px-2 py-1 rounded-xl text-[10px] bg-primary/10 text-primary"
                 title={`Connected to ${wallet.chainName}`}
               >
                 <Globe size={10} />
@@ -390,13 +367,13 @@ export default function TopNavigation() {
             <div className="flex items-center gap-1.5">
               <button
                 onClick={() => setHideBalances((prev) => !prev)}
-                className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold transition-colors bg-surface-container dark:bg-surface-low text-on-surface-muted hover:text-on-surface"
+                className="flex items-center gap-1 px-2 py-1 rounded-xl text-[10px] font-semibold transition-colors bg-surface-container dark:bg-surface-low text-on-surface-muted hover:text-on-surface"
                 title={hideBalances ? "Show balances" : "Hide balances"}
               >
                 {hideBalances ? <EyeOff size={12} /> : <Eye size={12} />}
                 <span>{hideBalances ? "Show" : "Hide"}</span>
               </button>
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-[12px] font-mono bg-surface-container dark:bg-surface-low text-on-surface-variant">
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-[12px] font-mono bg-surface-container dark:bg-surface-low text-on-surface-variant">
                 <div
                   className="w-2 h-2 rounded-full"
                   style={{
@@ -428,7 +405,7 @@ export default function TopNavigation() {
             <button
               onClick={disconnect}
               title="Disconnect wallet"
-              className="px-3 py-1.5 text-[12px] font-mono rounded-lg transition-colors text-on-surface-disabled bg-surface-container dark:bg-surface-low hover:text-sell hover:bg-surface-high dark:hover:bg-surface-container"
+              className="px-3 py-1.5 text-[12px] font-mono rounded-xl transition-colors text-on-surface-disabled bg-surface-container dark:bg-surface-low hover:text-sell hover:bg-surface-high dark:hover:bg-surface-container"
             >
               Disconnect
             </button>
