@@ -68,7 +68,7 @@ export default function OrderOptionsPanel({
 
       {/* Validation Messages */}
       {(hardErrorMessages.length > 0 || hintMessages.length > 0 || validationWarnings.length > 0 || tpslErrorMessages.length > 0) && (
-        <div className="space-y-1">
+        <div className="space-y-1 hidden">
           {hardErrorMessages.map((err, i) => (
             <div key={`err-${i}`} className="flex items-center gap-1.5 text-[10px] text-sell">
               <AlertTriangle size={10} />

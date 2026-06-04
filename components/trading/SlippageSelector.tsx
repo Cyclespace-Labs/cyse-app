@@ -17,7 +17,7 @@ export default function SlippageSelector({ value, onChange, disabled }: Slippage
 
   return (
     <div className="flex items-center gap-2">
-      <span className="text-[11px]" style={{ color: "var(--on-surface-disabled)" }}>
+      <span className="text-[11px] text-on-surface-muted">
         Slippage
       </span>
       <div className="flex items-center gap-1">

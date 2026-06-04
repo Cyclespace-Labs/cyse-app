@@ -3,6 +3,7 @@
 import { useRef, useEffect, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { contracts } from "@/lib/protocol/contracts";
+import { Button } from "../ui/button";
 
 const TOKEN_CONFIG = {
   WETH: { address: contracts.weth.address, decimals: 18, symbol: "WETH", name: "Wrapped Ether" },
@@ -57,16 +58,18 @@ export default function TokenSelector({
 
   return (
     <div className="grid grid-cols-2 gap-2">
-      {/* Collateral Token */}
+      
+      {/*--- Collateral Token */}
       <div ref={collateralDropdownRef} className="relative">
-        <label className="text-[11px] mb-1 block" style={{ color: "var(--on-surface-muted)" }}>Collateral</label>
+
+        <label className="text-[11px] text-on-surface-muted mb-1 block">Collateral</label>
+
         <button
           onClick={() => { setCollateralDropdownOpen((v) => !v); setIndexDropdownOpen(false); }}
-          className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-xl transition-colors bg-surface-container dark:bg-surface-low"
+          className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-xl transition-colors bg-surface-container dark:bg-surface-low 
+          border border-outline/50 dark:border-surface-container/60"
           style={{
             background: collateralDropdownOpen ? "var(--surface-container)" : "",
-            border: `1px solid ${collateralDropdownOpen ? "var(--outline-variant)" : "var(--outline-variant)"}`,
-            color: "var(--on-surface)",
           }}
         >
           {TOKEN_ICONS[selectedCollateralTokenKey] ? (
@@ -83,11 +86,12 @@ export default function TokenSelector({
             style={{ color: "var(--on-surface-disabled)", transform: collateralDropdownOpen ? "rotate(180deg)" : "rotate(0deg)" }}
           />
         </button>
+
         {collateralDropdownOpen && (
           <div
-            className="absolute left-0 right-0 top-full mt-1 rounded-lg z-20 overflow-hidden"
-            style={{ background: "var(--surface-container-low)", border: "1px solid rgba(66,70,84,0.5)", boxShadow: "0 8px 24px rgba(0,0,0,0.4)" }}
+            className="absolute left-0 right-0 top-full mt-1 rounded-lg z-20 overflow-hidden bg-surface-low border border-outline shadow-sm w-[260px]"
           >
+
             {COLLATERAL_TOKENS.map((token) => {
               const cfg = TOKEN_CONFIG[token as keyof typeof TOKEN_CONFIG];
               const isSelected = token === selectedCollateralTokenKey;
@@ -115,20 +119,22 @@ export default function TokenSelector({
                 </button>
               );
             })}
+            
           </div>
+
         )}
+
       </div>
 
       {/* Index Token */}
       <div ref={indexDropdownRef} className="relative">
-        <label className="text-[11px] mb-1 block" style={{ color: "var(--on-surface-disabled)" }}>Index Token</label>
+        <label className="text-[11px] mb-1 block text-on-surface-muted">Index Token</label>
         <button
           onClick={() => { setIndexDropdownOpen((v) => !v); setCollateralDropdownOpen(false); }}
-          className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-xl transition-colors bg-surface-container dark:bg-surface-low "
+          className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-xl transition-colors bg-surface-container dark:bg-surface-low 
+          border border-outline/50 dark:border-surface-container/60"
           style={{
             background: indexDropdownOpen ? "var(--surface-container)" : "",
-            border: `1px solid ${indexDropdownOpen ? "var(--outline-variant)" : "var(--outline-variant"}`,
-            color: "var(--on-surface)",
           }}
         >
           {TOKEN_ICONS[selectedIndexTokenKey] ? (

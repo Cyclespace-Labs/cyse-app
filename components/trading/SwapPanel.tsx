@@ -379,11 +379,7 @@ export default function SwapPanel({
 
       {/* ── TO box ───────────────────────────────── */}
       <div
-        className="rounded-xl p-3.5"
-        style={{
-          background: "var(--surface-container-low)",
-          border: estimatedOut > 0 ? "1px solid rgba(0,192,118,0.18)" : "1px solid rgba(66,70,84,0.4)",
-        }}
+        className="rounded-xl p-3.5 bg-surface-low border border-outline/70"
       >
         <div className="flex items-center justify-between mb-2">
           <span className="text-[11px] text-black dark:text-white font-medium uppercase tracking-wider">
@@ -503,7 +499,7 @@ export default function SwapPanel({
           <button
             onClick={handleSwap}
             disabled={isPending || !canSwap}
-            className="w-full py-3 rounded-xl text-[13px] font-semibold flex items-center justify-center gap-2 transition-all"
+            className="w-full py-3 rounded-3xl text-[13px] font-semibold flex items-center justify-center gap-2 transition-all"
             style={
               isPending || !canSwap
                 ? {
