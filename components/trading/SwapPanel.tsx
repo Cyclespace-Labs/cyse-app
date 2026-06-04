@@ -7,7 +7,7 @@ import { parseUnits, formatUnits, maxUint256 } from "viem";
 import { ArrowUpDown, ChevronDown, Loader2, X } from "lucide-react";
 import { contracts, erc20Abi } from "@/lib/protocol/contracts";
 import { PlaceSwapParams } from "@/hooks/useTradingActions";
-import { Input } from "@base-ui/react/input";
+import { Input } from "../ui/input";
 
 const SWAP_TOKENS = {
   WETH: { address: contracts.weth.address, decimals: 18, symbol: "ETH",  name: "Ethereum" },
@@ -308,7 +308,7 @@ export default function SwapPanel({
     <div className="space-y-2">
 
       {/* ── FROM box ─────────────────────────────── */}
-      <div className="rounded-xl p-3.5 bg-surface-low border border-outline/70">
+      <div className="rounded-xl p-3.5 bg-surface-low border border-outline/70 pb-5">
         {/* Label row */}
         <div className="flex items-center justify-between mb-2">
           <span className="text-[11px] text-black dark:text-white font-medium uppercase tracking-wider">
@@ -320,7 +320,7 @@ export default function SwapPanel({
         </div>
 
         {/* Token + Amount row */}
-        <div className="flex flex-col items-center gap-3">
+        <div className="flex flex-col items-center gap-1 pt-2">
           <div className="flex">
             <TokenDropdown selected={fromKey} exclude={toKey} onSelect={handleFromKeyChange} />
             <div className="flex-1 text-right">
@@ -328,11 +328,11 @@ export default function SwapPanel({
                 type="number"
                 value={amountInStr}
                 onChange={(e) => setAmountInStr(e.target.value)}
-                placeholder="0"
-                className="w-full bg-transparent text-right outline-none font-mono"
+                placeholder="0.00"
+                className="font-sans text-right w-full bg-transparent outline-none focus-none"
                 style={{
-                  fontSize: "22px",
-                  fontWeight: 600,
+                  fontSize: '20px',
+                  fontWeight: 500,
                   color: insufficientBalance ? "var(--sell)" : "var(--on-surface)",
                   letterSpacing: "-0.02em",
                 }}
@@ -355,8 +355,8 @@ export default function SwapPanel({
               <button
                 key={pct}
                 onClick={() => handlePct(pct)}
-                className="flex-1 py-1 rounded-lg text-[10px] text-on-surface-muted font-mono transition-all
-                 bg-surface-container hover:bg-surface-container-high hover:text-on-surface"
+                className="flex-1 py-1 rounded-lg text-[10px] text-on-surface font-sans transition-all
+                 bg-surface-container hover:bg-surface-container-high hover:text-on-surface-highest"
               >
                 {pct}%
               </button>
@@ -366,13 +366,14 @@ export default function SwapPanel({
       </div>
 
       {/* ── Flip button ──────────────────────────── */}
-      <div className="flex justify-center -my-1 relative z-10">
+      <div className="flex justify-center -my-4 relative z-10 -translate-y-1">
         <button
           onClick={handleFlip}
-          className="w-8 h-8 flex items-center justify-center rounded-xl transition-all bg-surface-container border border-outline-variant hover:bg-surface-container-high"
+          className="group w-11 h-11 flex items-center justify-center rounded-4xl transition-all bg-primary 
+          shadow-lg hover:shadow-primary/50 hover:scale-103 "
           title="Flip tokens"
         >
-          <ArrowUpDown size={13} style={{ color: "var(--on-surface-variant)" }} />
+          <ArrowUpDown size={15} className="text-white group-hover:rotate-z-180 transition-all duration-500" />
         </button>
       </div>
 
@@ -393,49 +394,51 @@ export default function SwapPanel({
           </span>
         </div>
 
-        <div className="flex items-center gap-3">
-          <TokenDropdown selected={toKey} exclude={fromKey} onSelect={handleToKeyChange} />
-          <div className="flex-1 text-right">
-            <span
-              className="font-mono block"
-              style={{
-                fontSize: "22px",
-                fontWeight: 600,
-                letterSpacing: "-0.02em",
-                color: pricesLoading
-                  ? "var(--on-surface-disabled)"
-                  : estimatedOut > 0
-                  ? "var(--buy)"
-                  : "var(--on-surface-disabled)",
-              }}
-            >
-              {pricesLoading ? "—" : estimatedOut > 0
-                ? estimatedOut.toLocaleString("en-US", { maximumFractionDigits: 6 })
-                : "0"}
-            </span>
-            {toUsdValue && (
-              <span className="text-[11px] font-mono" style={{ color: "var(--on-surface-disabled)" }}>
-                ≈ ${toUsdValue}
+        <div className="flex flex-col items-center gap-1 pt-2">
+          <div className="flex flex-row justify-between items-center w-full">
+            <TokenDropdown selected={toKey} exclude={fromKey} onSelect={handleToKeyChange} />
+            <div className="flex-1 text-right w-full">
+              <span
+                className="font-sans block w-full overflow-clip truncated"
+                style={{
+                  fontSize: "20px",
+                  fontWeight: 500,
+                  letterSpacing: "-0.02em",
+                  color: pricesLoading
+                    ? "var(--on-surface-disabled)"
+                    : estimatedOut > 0
+                    ? "var(--buy)"
+                    : "var(--on-surface-disabled)",
+                }}
+              >
+                {pricesLoading ? "—" : estimatedOut > 0
+                  ? estimatedOut.toLocaleString("en-US", { maximumFractionDigits: 2 })
+                  : "0.00"}
               </span>
-            )}
+            </div>
           </div>
+            <div className="w-full flex justify-end">
+              {toUsdValue && (
+                <span className="text-[11px] font-mono text-on-surface-muted">
+                  ${toUsdValue}
+                </span>
+              )}
+            </div>
         </div>
       </div>
 
       {/* ── Info card ────────────────────────────── */}
       <div
-        className="rounded-xl overflow-hidden"
-        style={{ border: "1px solid rgba(66,70,84,0.3)" }}
+        className="rounded-xl overflow-hidden border border-outline"
       >
         {/* Rate row — only shown when quote is available */}
         {rate !== null && (
           <div
-            className="flex items-center justify-between px-3 py-2 text-[11px]"
-            style={{ borderBottom: "1px solid rgba(66,70,84,0.3)" }}
+            className="flex items-center justify-between px-3 py-2 text-[11px] border border-b-outline"
           >
             <span style={{ color: "var(--on-surface-disabled)" }}>Rate</span>
             <span className="font-mono" style={{ color: "var(--on-surface-variant)" }}>
-              1 {fromCfg.symbol} ≈ {rate.toLocaleString("en-US", { maximumFractionDigits: 4 })} {toCfg.symbol}
+             <span className="font-bold">1 {fromCfg.symbol}</span> = {rate.toLocaleString("en-US", { maximumFractionDigits: 2 })} {toCfg.symbol}
             </span>
           </div>
         )}
@@ -452,7 +455,7 @@ export default function SwapPanel({
             <span style={{ color: "var(--on-surface-disabled)" }}>Min. rcvd</span>
             <span className="font-mono" style={{ color: "var(--on-surface-variant)" }}>
               {minOutNum > 0
-                ? `${minOutNum.toLocaleString("en-US", { maximumFractionDigits: 4 })} ${toCfg.symbol}`
+                ? `${minOutNum.toLocaleString("en-US", { maximumFractionDigits: 2 })} ${toCfg.symbol}`
                 : "—"}
             </span>
           </div>
@@ -463,8 +466,7 @@ export default function SwapPanel({
       <div className="flex items-center justify-between">
         <span className="text-[11px]" style={{ color: "var(--on-surface-disabled)" }}>Slippage tolerance</span>
         <div
-          className="flex items-center gap-0.5 p-0.5 rounded-lg"
-          style={{ background: "var(--surface-container-low)", border: "1px solid rgba(66,70,84,0.35)" }}
+          className="flex items-center gap-0.5 p-0.5 rounded-lg bg-surface-low border border-outline"
         >
           {SLIPPAGE_OPTIONS.map((bps) => (
             <button
@@ -472,7 +474,7 @@ export default function SwapPanel({
               onClick={() => setSlippageBps(bps)}
               className="px-2.5 py-1 text-[10px] font-mono rounded-md transition-all"
               style={{
-                background: slippageBps === bps ? "var(--surface-container-high)" : "transparent",
+                background: slippageBps === bps ? "var(--surface-container)" : "transparent",
                 color: slippageBps === bps ? "var(--on-surface)" : "var(--on-surface-disabled)",
                 fontWeight: slippageBps === bps ? 600 : 400,
               }}

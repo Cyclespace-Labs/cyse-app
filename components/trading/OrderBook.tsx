@@ -105,7 +105,7 @@ export default function OrderBook({ symbol = "ETH", currentPrice = 0 }: OrderBoo
               <span className="text-sm font-bold font-mono" style={{ color: "var(--buy)" }}>
                 {fmtPrice(currentPrice, decimals)}
               </span>
-              <span className="text-[10px] font-mono" style={{ color: "var(--on-surface-disabled)" }}>
+              <span className="text-[10px] font-mono text-on-surface-mmuted">
                 Spread: {fmtPrice(book.spread, decimals)}
               </span>
             </>
