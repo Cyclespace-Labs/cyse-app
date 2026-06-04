@@ -34,6 +34,7 @@ export default function OrderBook({ symbol = "ETH", currentPrice = 0 }: OrderBoo
   return (
     <div className="flex flex-col h-full" style={{ background: "var(--surface-container-lowest)", borderRight: "1px solid rgba(66,70,84,0.4)" }}>
       {/* Tabs */}
+
       <div className="flex items-center px-2" style={{ borderBottom: "1px solid rgba(66,70,84,0.4)" }}>
         {bookTabs.map((tab) => (
           <button

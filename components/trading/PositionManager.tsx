@@ -61,8 +61,8 @@ export default function PositionManager({
   if (!mounted || !walletConnected || positions.length === 0) return null;
 
   return (
-    <div className="pt-2" style={{ borderTop: "1px solid rgba(66,70,84,0.4)" }}>
-      <span className="text-[11px] mb-2 block" style={{ color: "var(--on-surface-disabled)" }}>Active Positions</span>
+    <div className="pt-2 border-t border-outline">
+      <span className="text-[11px] mb-2 block text-on-surface-muted">Active Positions</span>
       {positions.map((pos) => {
         // Contract-accurate PnL: Vault.getDelta → delta = size * priceDelta / avgPrice
         const priceDelta = pos.isLong
@@ -85,12 +85,12 @@ export default function PositionManager({
         const attachedSl = attachedOrders.find((o) => (o.isLong && !o.triggerAboveThreshold) || (!o.isLong && o.triggerAboveThreshold));
 
         return (
-          <div key={pos.id} className="rounded p-2.5 mb-2" style={{ background: "var(--surface-container-low)" }}>
+          <div key={pos.id} className="rounded p-2.5 mb-2 bg-surface-low">
             <div className="flex items-center justify-between mb-1.5">
               <span className="text-[11px] font-mono font-medium" style={{ color: pos.isLong ? "var(--buy)" : "var(--sell)" }}>
                 {pos.isLong ? "LONG" : "SHORT"} {symbol} {leverage.toFixed(1)}×
               </span>
-              <span className="text-[10px]" style={{ color: "var(--on-surface-disabled)" }}>
+              <span className="text-[10px] text-on-surface-muted">
                 ${pos.sizeUsd.toFixed(2)}
               </span>
             </div>
@@ -104,35 +104,35 @@ export default function PositionManager({
                 leverage > 8  ? "#3b82f6" :
                 "var(--buy)";
               return (
-                <div className="mb-2 rounded p-1.5" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                <div className="mb-2 rounded p-1.5 border border-surface-container">
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-[10px]" style={{ color: "var(--on-surface-disabled)" }}>Margin (Collateral)</span>
+                    <span className="text-[10px] text-on-surface-muted">Margin (Collateral)</span>
                     <span className="text-[10px] font-mono font-semibold" style={{ color: barColor }}>
                       ${pos.collateralUsd.toFixed(2)}
                       <span className="ml-1 font-normal opacity-60">({marginRatioPct.toFixed(1)}%)</span>
                     </span>
                   </div>
-                  <div className="relative w-full h-1 rounded-full overflow-hidden" style={{ background: "var(--outline-variant)" }}>
+                  <div className="relative w-full h-1 rounded-full overflow-hidden bg-outline-variant">
                     <div
                       className="absolute inset-y-0 left-0 rounded-full transition-all"
                       style={{ width: `${barFillPct}%`, background: barColor }}
                     />
                   </div>
                   <div className="flex items-center justify-between mt-0.5">
-                    <span className="text-[9px]" style={{ color: "var(--on-surface-disabled)" }}>high risk</span>
-                    <span className="text-[9px]" style={{ color: "var(--on-surface-disabled)" }}>low risk</span>
+                    <span className="text-[9px] text-on-surface-muted">high risk</span>
+                    <span className="text-[9px] text-on-surface-muted">low risk</span>
                   </div>
                 </div>
               );
             })()}
 
             <div className="flex items-center justify-between text-[10px] mb-1">
-              <span style={{ color: "var(--on-surface-disabled)" }}>Entry</span>
-              <span className="font-mono" style={{ color: "var(--on-surface)" }}>{pos.avgPriceFormatted.toFixed(4)}</span>
+              <span className="text-on-surface-muted">Entry</span>
+              <span className="text-on-surface">{pos.avgPriceFormatted.toFixed(4)}</span>
             </div>
             <div className="flex items-center justify-between text-[10px] mb-1">
-              <span style={{ color: "var(--on-surface-disabled)" }}>Liq. Price</span>
-              <span className="font-mono" style={{ color: "var(--liquidation)" }}>{pos.liquidationPrice.toFixed(4)}</span>
+              <span className="text-on-surface-muted">Liq. Price</span>
+              <span className="font-mono text-liquidation">{pos.liquidationPrice.toFixed(4)}</span>
             </div>
             <div className="flex items-center justify-between text-[10px] mb-1">
               <span style={{ color: "var(--on-surface-disabled)" }}>Unrealized PnL</span>
@@ -171,10 +171,7 @@ export default function PositionManager({
             <button
               onClick={() => onClosePosition(pos, closePercentage)}
               disabled={orderSigning}
-              className="w-full py-1.5 text-[11px] font-mono rounded transition-colors"
-              style={{ border: "1px solid rgba(255,77,79,0.3)", color: "var(--sell)", background: "transparent" }}
-              onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = "rgba(255,77,79,0.08)")}
-              onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = "transparent")}
+              className="w-full py-1.5 text-[11px] font-mono rounded transition-colors hover:bg-sell/20 text-sell border border-sell"
             >
               Close Position ({closePercentage}%)
             </button>

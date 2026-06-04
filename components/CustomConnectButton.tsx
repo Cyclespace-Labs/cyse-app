@@ -45,7 +45,7 @@ export function CustomConnectButton({ variant = "default" }: CustomConnectButton
                     <button
                       onClick={openConnectModal}
                       type="button"
-                      className="w-full py-2.5 text-[13px] font-semibold rounded-xl btn-primary-gradient flex items-center justify-center gap-2"
+                      className="w-full py-2.5 text-[13px] font-semibold rounded-2xl btn-primary-gradient flex items-center justify-center gap-2"
                     >
                       <Wallet size={14} />
                       Connect Wallet to Trade

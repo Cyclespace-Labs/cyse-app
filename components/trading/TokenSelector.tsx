@@ -59,12 +59,12 @@ export default function TokenSelector({
     <div className="grid grid-cols-2 gap-2">
       {/* Collateral Token */}
       <div ref={collateralDropdownRef} className="relative">
-        <label className="text-[11px] mb-1 block" style={{ color: "var(--on-surface-disabled)" }}>Collateral</label>
+        <label className="text-[11px] mb-1 block" style={{ color: "var(--on-surface-muted)" }}>Collateral</label>
         <button
           onClick={() => { setCollateralDropdownOpen((v) => !v); setIndexDropdownOpen(false); }}
-          className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-xl transition-colors"
+          className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-xl transition-colors bg-surface-container dark:bg-surface-low"
           style={{
-            background: collateralDropdownOpen ? "var(--surface-container)" : "var(--surface-container-low)",
+            background: collateralDropdownOpen ? "var(--surface-container)" : "",
             border: `1px solid ${collateralDropdownOpen ? "var(--outline-variant)" : "var(--outline-variant)"}`,
             color: "var(--on-surface)",
           }}
@@ -124,10 +124,10 @@ export default function TokenSelector({
         <label className="text-[11px] mb-1 block" style={{ color: "var(--on-surface-disabled)" }}>Index Token</label>
         <button
           onClick={() => { setIndexDropdownOpen((v) => !v); setCollateralDropdownOpen(false); }}
-          className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-xl transition-colors"
+          className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-xl transition-colors bg-surface-container dark:bg-surface-low "
           style={{
-            background: indexDropdownOpen ? "var(--surface-container)" : "var(--surface-container-low)",
-            border: `1px solid ${indexDropdownOpen ? "var(--outline-variant)" : "var(--outline-variant)"}`,
+            background: indexDropdownOpen ? "var(--surface-container)" : "",
+            border: `1px solid ${indexDropdownOpen ? "var(--outline-variant)" : "var(--outline-variant"}`,
             color: "var(--on-surface)",
           }}
         >

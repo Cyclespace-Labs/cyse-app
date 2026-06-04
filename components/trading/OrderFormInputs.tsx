@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { Input } from "../ui/input";
 
 const pctButtons = [25, 50, 75, 100];
 
@@ -61,22 +62,21 @@ export default function OrderFormInputs({
       {!isMarket && (
         <div>
           <div className="flex items-center justify-between mb-1">
-            <label htmlFor="price-input" className="text-[11px]" style={{ color: "var(--on-surface-disabled)" }}>Limit Price</label>
-            <span className="text-[10px] font-mono" style={{ color: "var(--on-surface-disabled)" }}>USD</span>
+            <label htmlFor="price-input" className="text-[11px]" style={{ color: "var(--on-surface-muted)" }}>Limit Price</label>
+            <span className="text-[10px] font-mono" style={{ color: "var(--on-surface-muted)" }}>USD</span>
           </div>
-          <div className="flex items-center rounded-lg px-3 py-2" style={{ background: "var(--surface-container-low)", borderBottom: "2px solid var(--outline-variant)" }}>
-            <input
+          <div className="flex items-center rounded-lg px-3 py-2 bg-surface-container dark:bg-surface-low border-b border-outline-variant">
+            <Input
               id="price-input"
               type="number"
               value={price}
               onChange={(e) => onPriceChange(e.target.value)}
               placeholder={currentPrice > 0 ? currentPrice.toFixed(2) : "0.00"}
-              className="flex-1 bg-transparent text-sm outline-none font-mono"
-              style={{ color: "var(--on-surface)" }}
+              className="flex-1 bg-transparent text-sm outline-none font-mono text-on-surface p-0"
             />
             <button
               onClick={() => onPriceChange(currentPrice > 0 ? currentPrice.toFixed(2) : "")}
-              className="text-[10px] px-1.5 py-0.5 rounded-sm transition-colors ml-1 shrink-0 text-on-surface-muted bg-surface-container dark:bg-surface-container-low hover:text-on-surface"
+              className="text-[10px] px-1.5 py-0.5 rounded-sm transition-colors ml-1 shrink-0 text-on-surface-muted bg-surface-high dark:bg-surface-container hover:text-on-surface"
             >
               Mark
             </button>
@@ -88,17 +88,17 @@ export default function OrderFormInputs({
       <div>
         <div className="flex items-center justify-between mb-1">
           <label htmlFor="collateral-input" className="text-[11px]" style={{ color: "var(--on-surface-disabled)" }}>Collateral</label>
-          <span className="text-[10px] font-mono" style={{ color: "var(--on-surface-disabled)" }}>USD</span>
+          <span className="text-[10px] font-mono" style={{ color: "var(--on-surface-disabled)"}}>USD</span>
         </div>
-        <div className="flex items-center rounded-lg px-3 py-2" style={{ background: "var(--surface-container-low)", borderBottom: "2px solid var(--outline-variant)" }}>
-          <span className="text-sm font-mono mr-1" style={{ color: "var(--on-surface-disabled)" }}>$</span>
-          <input
+        <div className="flex items-center rounded-lg px-3 py-2 bg-surface-container dark:bg-surface-low border-b border-outline-variant gap-0">
+          <span className="text-sm font-mono mr-1 text-on-surface-muted">$</span>
+          <Input
             id="collateral-input"
             type="text"
             value={collateralInput}
             onChange={(e) => onCollateralChange(e.target.value)}
             placeholder="0.00"
-            className="flex-1 bg-transparent text-sm outline-none font-mono"
+            className="bg-transparent text-sm outline-none font-mono"
             style={{ color: "var(--on-surface)" }}
           />
           {/* Token qty derived hint */}

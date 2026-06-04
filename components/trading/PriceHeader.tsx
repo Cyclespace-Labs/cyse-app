@@ -87,17 +87,15 @@ export default function PriceHeader({
       {/* Symbol + Leverage */}
       <button
         onClick={onTokenPickerOpen}
-        className="flex items-center gap-2 mr-4 shrink-0 rounded px-2 py-1 -ml-2 transition-colors"
-        style={{ background: "transparent" }}
-        onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = "var(--surface-container-low)")}
-        onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = "transparent")}
+        className="flex items-center gap-2 mr-4 shrink-0 rounded px-2 py-1 -ml-2 transition-colors bg-transparent hover:bg-surface-container-low "
+
       >
         <div className="flex items-center gap-1.5">
           {TOKEN_ICONS[baseSymbol] ? (
             <img
               src={TOKEN_ICONS[baseSymbol]}
               alt={baseSymbol}
-              className="w-5 h-5 rounded-full shrink-0 object-contain"
+              className="w-5 h-5 rounded-full shrink-0 object-container"
             />
           ) : (
             <div

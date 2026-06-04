@@ -7,6 +7,7 @@ import { parseUnits, formatUnits, maxUint256 } from "viem";
 import { ArrowUpDown, ChevronDown, Loader2, X } from "lucide-react";
 import { contracts, erc20Abi } from "@/lib/protocol/contracts";
 import { PlaceSwapParams } from "@/hooks/useTradingActions";
+import { Input } from "@base-ui/react/input";
 
 const SWAP_TOKENS = {
   WETH: { address: contracts.weth.address, decimals: 18, symbol: "ETH",  name: "Ethereum" },
@@ -73,11 +74,9 @@ function TokenDropdown({
     <div ref={ref} className="relative shrink-0">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl transition-all"
+        className="flex items-center gap-2 px-2.5 py-1.5 rounded-2xl transition-all text-on-surface border border-outline/70"
         style={{
           background: open ? "var(--surface-container-high)" : "var(--surface-container)",
-          border: "1px solid rgba(66,70,84,0.5)",
-          color: "var(--on-surface)",
         }}
       >
         {TOKEN_ICONS[selected] ? (
@@ -90,19 +89,15 @@ function TokenDropdown({
         <span className="text-[13px] font-semibold tracking-tight">{cfg.symbol}</span>
         <ChevronDown
           size={12}
-          className="transition-transform shrink-0"
-          style={{ color: "var(--on-surface-disabled)", transform: open ? "rotate(180deg)" : "rotate(0deg)" }}
+          className="transition-transform shrink-0 text-on-surface-muted"
+          style={{ transform: open ? "rotate(180deg)" : "rotate(0deg)" }}
         />
       </button>
 
       {open && (
         <div
-          className="absolute left-0 top-full mt-1.5 z-30 rounded-xl overflow-hidden min-w-[148px]"
-          style={{
-            background: "var(--surface-container-low)",
-            border: "1px solid rgba(66,70,84,0.5)",
-            boxShadow: "0 12px 32px rgba(0,0,0,0.45)",
-          }}
+          className="absolute left-0 top-full mt-1.5 z-30 rounded-xl overflow-hidden min-w-[230px] 
+          bg-surface-low border border-outline shadow-sm"
         >
           {ALL_SWAP_TOKENS.filter((k) => k !== exclude).map((key) => {
             const c = SWAP_TOKENS[key];
@@ -127,9 +122,6 @@ function TokenDropdown({
                   <span className="text-[12px] font-semibold" style={{ color: isSelected ? "var(--primary)" : "var(--on-surface)" }}>{c.symbol}</span>
                   <span className="text-[10px]" style={{ color: "var(--on-surface-disabled)" }}>{c.name}</span>
                 </div>
-                {isSelected && (
-                  <div className="ml-auto w-1.5 h-1.5 rounded-full shrink-0" style={{ background: "var(--primary)" }} />
-                )}
               </button>
             );
           })}
@@ -316,51 +308,41 @@ export default function SwapPanel({
     <div className="space-y-2">
 
       {/* ── FROM box ─────────────────────────────── */}
-      <div
-        className="rounded-xl p-3.5"
-        style={{
-          background: "var(--surface-container-low)",
-          border: "1px solid rgba(66,70,84,0.4)",
-        }}
-      >
+      <div className="rounded-xl p-3.5 bg-surface-low border border-outline/70">
         {/* Label row */}
         <div className="flex items-center justify-between mb-2">
-          <span className="text-[10px] font-medium uppercase tracking-wider" style={{ color: "var(--on-surface-disabled)" }}>
-            From
+          <span className="text-[11px] text-black dark:text-white font-medium uppercase tracking-wider">
+            SELL
           </span>
-          {mounted && walletConnected && fromBalanceNum > 0 && (
-            <button
-              onClick={() => handlePct(100)}
-              className="text-[10px] font-mono transition-colors"
-              style={{ color: "var(--on-surface-disabled)" }}
-              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = "var(--primary)"; }}
-              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = "var(--on-surface-disabled)"; }}
-            >
-              Balance: {fromBalanceNum.toLocaleString("en-US", { maximumFractionDigits: 5 })} {fromCfg.symbol}
-            </button>
-          )}
+          <span className="text-[10px] text-on-surface-muted font-mono">
+            You pay
+          </span>
         </div>
 
         {/* Token + Amount row */}
-        <div className="flex items-center gap-3">
-          <TokenDropdown selected={fromKey} exclude={toKey} onSelect={handleFromKeyChange} />
-          <div className="flex-1 text-right">
-            <input
-              type="number"
-              value={amountInStr}
-              onChange={(e) => setAmountInStr(e.target.value)}
-              placeholder="0"
-              className="w-full bg-transparent text-right outline-none font-mono"
-              style={{
-                fontSize: "22px",
-                fontWeight: 600,
-                color: insufficientBalance ? "var(--sell)" : "var(--on-surface)",
-                letterSpacing: "-0.02em",
-              }}
-            />
+        <div className="flex flex-col items-center gap-3">
+          <div className="flex">
+            <TokenDropdown selected={fromKey} exclude={toKey} onSelect={handleFromKeyChange} />
+            <div className="flex-1 text-right">
+              <Input
+                type="number"
+                value={amountInStr}
+                onChange={(e) => setAmountInStr(e.target.value)}
+                placeholder="0"
+                className="w-full bg-transparent text-right outline-none font-mono"
+                style={{
+                  fontSize: "22px",
+                  fontWeight: 600,
+                  color: insufficientBalance ? "var(--sell)" : "var(--on-surface)",
+                  letterSpacing: "-0.02em",
+                }}
+              />
+            </div>
+          </div>
+          <div className="w-full flex justify-end">
             {fromUsdValue && (
-              <span className="text-[11px] font-mono" style={{ color: "var(--on-surface-disabled)" }}>
-                ≈ ${fromUsdValue}
+              <span className="text-[11px] font-mono text-on-surface-muted">
+                ${fromUsdValue}
               </span>
             )}
           </div>
@@ -373,16 +355,8 @@ export default function SwapPanel({
               <button
                 key={pct}
                 onClick={() => handlePct(pct)}
-                className="flex-1 py-1 rounded-lg text-[10px] font-mono transition-all"
-                style={{ background: "var(--surface-container)", color: "var(--on-surface-disabled)" }}
-                onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLElement).style.background = "var(--surface-container-high)";
-                  (e.currentTarget as HTMLElement).style.color = "var(--on-surface)";
-                }}
-                onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLElement).style.background = "var(--surface-container)";
-                  (e.currentTarget as HTMLElement).style.color = "var(--on-surface-disabled)";
-                }}
+                className="flex-1 py-1 rounded-lg text-[10px] text-on-surface-muted font-mono transition-all
+                 bg-surface-container hover:bg-surface-container-high hover:text-on-surface"
               >
                 {pct}%
               </button>
@@ -395,13 +369,7 @@ export default function SwapPanel({
       <div className="flex justify-center -my-1 relative z-10">
         <button
           onClick={handleFlip}
-          className="w-8 h-8 flex items-center justify-center rounded-xl transition-all"
-          style={{
-            background: "var(--surface-container)",
-            border: "1px solid rgba(66,70,84,0.5)",
-          }}
-          onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "var(--surface-container-high)"; }}
-          onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "var(--surface-container)"; }}
+          className="w-8 h-8 flex items-center justify-center rounded-xl transition-all bg-surface-container border border-outline-variant hover:bg-surface-container-high"
           title="Flip tokens"
         >
           <ArrowUpDown size={13} style={{ color: "var(--on-surface-variant)" }} />
@@ -417,10 +385,10 @@ export default function SwapPanel({
         }}
       >
         <div className="flex items-center justify-between mb-2">
-          <span className="text-[10px] font-medium uppercase tracking-wider" style={{ color: "var(--on-surface-disabled)" }}>
-            To
+          <span className="text-[11px] text-black dark:text-white font-medium uppercase tracking-wider">
+            BUY
           </span>
-          <span className="text-[10px] font-mono" style={{ color: "var(--on-surface-disabled)" }}>
+          <span className="text-[10px] text-on-surface-muted font-mono">
             You receive
           </span>
         </div>
