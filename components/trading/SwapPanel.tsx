@@ -329,7 +329,7 @@ export default function SwapPanel({
                 value={amountInStr}
                 onChange={(e) => setAmountInStr(e.target.value)}
                 placeholder="0.00"
-                className="font-sans text-right w-full bg-transparent outline-none focus-none"
+                className="font-sans text-right w-full bg-transparent border-none outline-none focus-none"
                 style={{
                   fontSize: '20px',
                   fontWeight: 500,
