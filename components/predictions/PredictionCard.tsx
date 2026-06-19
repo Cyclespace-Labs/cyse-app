@@ -33,6 +33,8 @@ export default function PredictionCard({ market }: PredictionCardProps) {
           style={{ backgroundColor: market.iconColor }}
         >
           {market.tokenIcon}
+          {market.icon}
+          {market.image}
         </div>
         <h3 className="text-[13px] font-medium leading-snug font-mono flex-1" style={{ color: "var(--on-surface)" }}>
           {market.question}

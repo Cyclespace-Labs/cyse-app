@@ -11,6 +11,8 @@ export interface PredictionMarket {
   id: string;
   question: string;
   tokenSymbol: string;
+  image: string;
+  icon: string;
   tokenIcon: string;
   iconColor: string;
   options: PredictionOption[];
