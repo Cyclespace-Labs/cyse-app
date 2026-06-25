@@ -56,6 +56,8 @@ export interface PolymarketMarket {
   enableOrderBook?: boolean;
   events?: PolymarketEvent[];
   tags?: PolymarketTag[];
+  image?: string;
+  icon?: string;
   [key: string]: any;
 }
 
@@ -118,8 +120,8 @@ export function transformPolymarketMarketBasic(market: PolymarketMarket): Partia
 export function transformPolymarketMarket(market: PolymarketMarket): PredictionMarket {
   const options = transformOutcomes(market.outcomes, market.outcomePricesNum);
   
-  // Determine token symbol and icon based on category or tags
-  const tokenInfo = getTokenInfo(market);
+  // Determine token symbol and icon based on category or tags, prioritizing API URLs
+  const tokenInfo = getTokenInfo(market, market.image, market.icon);
   
   return {
     id: market.id,
@@ -144,6 +146,8 @@ export function transformPolymarketMarket(market: PolymarketMarket): PredictionM
     currentPrice: market.lastTradePrice || market.price,
     bestBid: market.bestBid,
     bestAsk: market.bestAsk,
+    image: market.image || '', // Added missing property
+    icon: market.icon || '',   // Added missing property
   };
 }
 
@@ -186,13 +190,22 @@ export function transformOutcomes(
 }
 
 /**
- * Get token information based on market category/tags
+ * Get token information based on market category/tags, with API URL fallback
  */
-function getTokenInfo(market: PolymarketMarket): {
+function getTokenInfo(market: PolymarketMarket, imageUrl?: string, iconUrl?: string): {
   symbol: string;
   icon: string;
   color: string;
 } {
+  // 1. Prioritize explicit URLs from the API response
+  if (imageUrl) {
+    return { symbol: 'API', icon: imageUrl, color: '#007bff' }; // Use a distinct color for API-provided images
+  }
+  if (iconUrl) {
+    return { symbol: 'API', icon: iconUrl, color: '#007bff' };
+  }
+
+  // 2. Fallback to category/tag analysis (existing logic)
   const category = market.category?.toLowerCase() || '';
   const tags = market.tags?.map(t => t.label?.toLowerCase()) || [];
 

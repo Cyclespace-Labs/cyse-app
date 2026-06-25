@@ -29,12 +29,22 @@ export default function PredictionCard({ market }: PredictionCardProps) {
       {/* Header */}
       <div className="flex items-start gap-3 mb-3">
         <div
-          className="w-8 h-8 rounded-full shrink-0 flex items-center justify-center text-white text-sm font-bold"
+          className="w-8 h-8 rounded-full shrink-0 flex items-center justify-center text-white text-sm font-bold overflow-clip"
           style={{ backgroundColor: market.iconColor }}
         >
-          {market.tokenIcon}
-          {market.icon}
-          {market.image}
+          {market.image ? (
+            <img 
+              src={market.image} 
+              alt="Market Icon" 
+              className="w-full h-full object-contain p-[0px] overflow-clip" 
+            />
+          ) : (
+            <>
+              {market.tokenIcon}
+              {market.icon}
+              {/* Fallback to combined text/emoji if no image URL is provided */}
+            </>
+          )}
         </div>
         <h3 className="text-[13px] font-medium leading-snug font-mono flex-1" style={{ color: "var(--on-surface)" }}>
           {market.question}
