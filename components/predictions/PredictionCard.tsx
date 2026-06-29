@@ -22,10 +22,7 @@ export default function PredictionCard({ market }: PredictionCardProps) {
   return (
     <Link
       href={`/predictions/${market.id}`}
-      className="group rounded-lg p-4 flex flex-col cursor-pointer transition-all duration-300"
-      style={{ background: "var(--surface-container-low)", border: "1px solid rgba(66,70,84,0.4)" }}
-      onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.border = "1px solid rgba(14,118,253,0.3)")}
-      onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.border = "1px solid rgba(66,70,84,0.4)")}>
+      className="group rounded-lg p-4 flex flex-col cursor-pointer transition-all duration-300 bg-surface-low">
       {/* Header */}
       <div className="flex items-start gap-3 mb-3">
         <div

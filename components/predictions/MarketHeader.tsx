@@ -37,7 +37,19 @@ export default function MarketHeader({ market }: MarketHeaderProps) {
             className="w-12 h-12 rounded-full shrink-0 flex items-center justify-center text-white text-xl font-bold"
             style={{ backgroundColor: market.iconColor }}
           >
-            {market.tokenIcon}
+          {market.image ? (
+            <img 
+              src={market.image} 
+              alt="Market Icon" 
+              className="w-full h-full object-contain p-[0px] overflow-clip" 
+            />
+          ) : (
+            <>
+              {market.tokenIcon}
+              {market.icon}
+              {/* Fallback to combined text/emoji if no image URL is provided */}
+            </>
+          )}
           </div>
           <div className="flex-1 min-w-0">
             <h1 className="text-xl font-semibold leading-snug mb-1" style={{ color: "var(--on-surface)" }}>
