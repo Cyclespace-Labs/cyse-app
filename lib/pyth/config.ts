@@ -7,11 +7,13 @@
  */
 
 // ── Hermes endpoints (HTTP + WebSocket, real-time streaming) ────────────────
+// Note: Pyth Network now requires API key authentication as of August 26, 2026
+// Using Douro Labs endpoint which may have different authentication requirements
 export const HERMES_BASE_URL =
-  process.env.NEXT_PUBLIC_PYTH_HERMES_URL ?? "https://hermes.pyth.network";
+  process.env.NEXT_PUBLIC_PYTH_HERMES_URL ?? "https://pyth.dourolabs.app/hermes";
 
 export const HERMES_WS_URL =
-  process.env.NEXT_PUBLIC_PYTH_HERMES_WS_URL ?? "wss://hermes.pyth.network/ws";
+  process.env.NEXT_PUBLIC_PYTH_HERMES_WS_URL ?? "wss://pyth.dourolabs.app/hermes/ws";
 
 // ── Stable price-feed IDs ───────────────────────────────────────────────────
 // Each ID is a 32-byte hex string that uniquely identifies a Pyth price feed.

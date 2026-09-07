@@ -5,7 +5,7 @@ import { useReadContracts } from "wagmi";
 import { contracts } from "@/lib/protocol/contracts";
 import { formatUnits } from "viem";
 import type { Abi } from "viem";
-import { HERMES_WS_URL, resolvePythFeed, PYTH_FEED_IDS, feedIdToPair } from "@/lib/pyth/config";
+import { HERMES_WS_URL, HERMES_BASE_URL, resolvePythFeed, PYTH_FEED_IDS, feedIdToPair } from "@/lib/pyth/config";
 import type { PythWebsocketMessage, PythWebsocketPriceFeed, PythResolvedPrice } from "@/types/trading";
 
 // ── Thresholds ──────────────────────────────────────────────────────────────
@@ -92,6 +92,16 @@ export function usePriceOracle(indexToken: `0x${string}`, maximise = true) {
     const connect = () => {
       if (!mountedRef.current) return;
 
+      // Check if API key is available for authentication
+      const apiKey = process.env.NEXT_PUBLIC_PYTH_API_KEY;
+      if (!apiKey) {
+        console.warn("[usePriceOracle] PYTH_API_KEY not set. Pyth Hermes API requires authentication as of August 26, 2026.");
+        console.warn("[usePriceOracle] Get your free API key from: https://pyth.network/terminal");
+        console.warn("[usePriceOracle] Add it to your .env file as: NEXT_PUBLIC_PYTH_API_KEY=your_key_here");
+      }
+
+      // Construct WebSocket URL - Pyth WebSocket uses different auth than HTTP
+      // We'll try without auth first, then fall back to HTTP polling if needed
       const ws = new WebSocket(HERMES_WS_URL);
       wsRef.current = ws;
 
@@ -146,7 +156,7 @@ export function usePriceOracle(indexToken: `0x${string}`, maximise = true) {
               emaPrice,
               publishTime: feed.price.publish_time,
               priceRaw: feed.price.price,
-              exponent: feed.price.expo,
+              exponent: feed.price.exponent,
               updateData: null,
             });
             setPythLastUpdate(Date.now());

@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Alexandria, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import "@rainbow-me/rainbowkit/styles.css";
@@ -45,6 +45,9 @@ export const metadata: Metadata = {
       { url: "/apple-touch-icon-192x192.png", sizes: "192x192", type: "image/png" },
     ],
   },
+};
+
+export const viewport: Viewport = {
   themeColor: "#0e76fd",
 };
 
