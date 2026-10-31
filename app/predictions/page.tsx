@@ -50,7 +50,7 @@ export default function PredictionsPage() {
         <TopNavigation />
         <div className="flex-1 flex items-center justify-center">
           <div className="text-sm" style={{ color: "var(--on-surface-disabled)" }}>
-            Loading markets...
+            Loading prediction markets...
           </div>
         </div>
         <BottomTicker />
